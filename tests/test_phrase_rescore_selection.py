@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import anagram_rerank_topk_impl as reranker
 
@@ -97,6 +98,104 @@ class PhraseRescoreSelectionTests(unittest.TestCase):
 
         self.assertEqual(added, 1)
         self.assertEqual({id(row) for row in chosen}, {id(baseline), id(collocated)})
+
+
+    def test_baseline_corpus_hit_does_not_consume_corpus_quota(self):
+        baseline = _row("baseline", pre=0.99, final=0.99)
+        outside = _row("outside", pre=0.10, final=0.11)
+        reranker._ORDER_CANDIDATES_BY_ROW_ID[id(baseline)] = (
+            _candidate("very", "famous", "baseline"),
+        )
+        reranker._ORDER_CANDIDATES_BY_ROW_ID[id(outside)] = (
+            _candidate("useful", "outside", "phrase"),
+        )
+
+        chosen, added = reranker._select_phrase_rescore_rows(
+            [baseline, outside],
+            collocation=None,
+            phrase_index=_PhraseCounts(
+                {
+                    "very famous baseline": 1000,
+                    "useful outside phrase": 2,
+                }
+            ),
+            top_per_group=1,
+        )
+
+        self.assertEqual(added, 1)
+        self.assertEqual({id(row) for row in chosen}, {id(baseline), id(outside)})
+
+    def test_multi_slot_union_deduplicates_and_preserves_final_ordering(self):
+        pre_winner = _row("pre", pre=0.99, final=0.50)
+        final_winner = _row("final", pre=0.40, final=0.98)
+        overlap = _row("overlap", pre=0.90, final=0.89)
+        corpus_one = _row("corpus-one", pre=0.30, final=0.25)
+        corpus_two = _row("corpus-two", pre=0.20, final=0.19)
+        rows = [pre_winner, final_winner, overlap, corpus_one, corpus_two]
+
+        phrases = {
+            id(pre_winner): ("known", "pre"),
+            id(final_winner): ("known", "final"),
+            id(overlap): ("known", "overlap"),
+            id(corpus_one): ("corpus", "one"),
+            id(corpus_two): ("corpus", "two"),
+        }
+        for row in rows:
+            reranker._ORDER_CANDIDATES_BY_ROW_ID[id(row)] = (
+                _candidate(*phrases[id(row)]),
+            )
+
+        chosen, added = reranker._select_phrase_rescore_rows(
+            rows,
+            collocation=None,
+            phrase_index=_PhraseCounts(
+                {
+                    "known overlap": 1000,
+                    "corpus one": 10,
+                    "corpus two": 5,
+                }
+            ),
+            top_per_group=2,
+        )
+
+        self.assertEqual(added, 2)
+        self.assertEqual(len(chosen), 5)
+        self.assertEqual(len({id(row) for row in chosen}), 5)
+        self.assertEqual(
+            [row.words[0] for row in chosen],
+            ["pre", "final", "overlap", "corpus-one", "corpus-two"],
+        )
+
+    def test_no_corpus_signal_skips_candidate_materialization(self):
+        row = _row("ordinary", pre=0.5, final=0.5)
+        with patch.object(
+            reranker,
+            "_row_phrase_candidates",
+            side_effect=AssertionError("should not materialize candidates"),
+        ):
+            scores = reranker._corpus_probe_scores(
+                [row],
+                collocation=None,
+                phrase_index=None,
+            )
+        self.assertEqual(scores, {})
+
+    def test_bigram_probe_checks_only_grammar_winner(self):
+        row = _row("alternatives", pre=0.1, final=0.1)
+        grammar_winner = ("grammar", "winner")
+        alternate = ("strong", "alternate")
+        reranker._ORDER_CANDIDATES_BY_ROW_ID[id(row)] = (
+            _candidate(*grammar_winner),
+            _candidate(*alternate),
+        )
+
+        scores = reranker._corpus_probe_scores(
+            [row],
+            collocation=_Collocation(alternate),
+            phrase_index=None,
+        )
+
+        self.assertEqual(scores[id(row)], 0.0)
 
 
 if __name__ == "__main__":
