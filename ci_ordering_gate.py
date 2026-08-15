@@ -14,19 +14,6 @@ MIN_RECALL_50 = 0.95
 MIN_MRR = 0.47
 
 
-def metrics(results: list[benchmark.OrderResult]) -> dict[str, float]:
-    exact = [result for result in results if result.exact_rank is not None]
-    if not exact:
-        raise RuntimeError("Ordering benchmark produced no exact-rank cases")
-    n = len(exact)
-    return {
-        "recall1": sum(result.exact_rank <= 1 for result in exact) / n,
-        "recall10": sum(result.exact_rank <= 10 for result in exact) / n,
-        "recall50": sum(result.exact_rank <= 50 for result in exact) / n,
-        "mrr": sum(1.0 / result.exact_rank for result in exact) / n,
-    }
-
-
 def main() -> int:
     cases = benchmark.load_cases(benchmark.DEFAULT_CASES, set())
     wn_dir = rerank.ensure_wordnet(rerank.DEFAULT_WORDNET_DIR)
@@ -36,7 +23,9 @@ def main() -> int:
     t0 = time.perf_counter()
     results = [benchmark.run_order_case(rerank, lex, case) for case in cases]
     benchmark.print_order_summary(results)
-    observed = metrics(results)
+    observed = benchmark.compute_order_metrics(results)
+    if not observed:
+        raise RuntimeError("Ordering benchmark produced no exact-rank cases")
 
     thresholds = {
         "recall1": MIN_RECALL_1,
