@@ -24,12 +24,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Sequence
 
-from anagram_search_parallel import (
-    SearchCandidate,
-    resolve_worker_count,
-    solve_parallel,
-)
-
 DEFAULT_DICT_URL = "https://phillipmfeldman.org/English/large.txt"
 DEFAULT_CACHE_DIR = Path.home() / ".multi_anagram"
 DEFAULT_DICT_CACHE = DEFAULT_CACHE_DIR / "large.txt"
@@ -391,9 +385,14 @@ def solve(
     dead: set[tuple[tuple[int, ...], int, int]] = set()
     min_candidate_len = min(c.length for c in candidates)
     max_candidate_len = max(c.length for c in candidates)
+    sparse_signatures = [
+        tuple((letter, amount) for letter, amount in enumerate(c.sig) if amount)
+        for c in candidates
+    ]
 
     def dfs(
         rem: tuple[int, ...],
+        rem_len: int,
         start: int,
         words_left: int,
         chosen: list[str],
@@ -403,7 +402,6 @@ def solve(
         if max_results > 0 and results_found >= max_results:
             return
 
-        rem_len = sum(rem)
         if words_left == 0:
             if rem_len == 0:
                 results_found += 1
@@ -448,19 +446,35 @@ def solve(
             c = candidates[i]
             if c.length < min_this_len or c.length > max_this_len:
                 continue
-            if not fits(c.sig, rem):
+            sparse = sparse_signatures[i]
+            candidate_fits = True
+            for letter, amount in sparse:
+                if rem[letter] < amount:
+                    candidate_fits = False
+                    break
+            if not candidate_fits:
                 continue
-            new_rem = tuple(r - w for r, w in zip(rem, c.sig))
+            mutable_rem = list(rem)
+            for letter, amount in sparse:
+                mutable_rem[letter] -= amount
+            new_rem = tuple(mutable_rem)
             next_start = i if allow_repeat else i + 1
-            yield from dfs(new_rem, next_start, words_left - 1, chosen + [c.word])
+            yield from dfs(
+                new_rem,
+                rem_len - c.length,
+                next_start,
+                words_left - 1,
+                chosen + [c.word],
+            )
             if max_results > 0 and results_found >= max_results:
                 return
 
         if results_found == before:
             dead.add(state)
 
+    initial_remaining_len = sum(remaining)
     for nwords in range(min_words, max_words + 1):
-        yield from dfs(remaining, 0, nwords, [])
+        yield from dfs(remaining, initial_remaining_len, 0, nwords, [])
         if max_results > 0 and results_found >= max_results:
             break
 
@@ -1033,10 +1047,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Additional 1-2 letter words allowed by the safe short-word policy",
     )
     p.add_argument("--no-repeat", action="store_true")
-    p.add_argument(
-        "--workers", type=int, default=0, metavar="N",
-        help="Exact-search worker processes; 0 chooses automatically",
-    )
 
     p.add_argument(
         "--analyze", action="store_true",
@@ -1093,8 +1103,6 @@ def main() -> int:
         raise SystemExit("Invalid --min-words/--max-words")
     if args.max_results < 0:
         raise SystemExit("--max-results must be >= 0")
-    if args.workers < 0:
-        raise SystemExit("--workers must be >= 0")
     if args.all_results:
         args.max_results = 0
     if args.deep_per_group < 1:
@@ -1281,22 +1289,15 @@ def main() -> int:
     solutions: list[tuple[str, ...]] = []
     generated = 0
     accepted = 0
-    worker_count = resolve_worker_count(args.workers)
-    search_candidates = [
-        SearchCandidate(c.word, c.sig, c.length) for c in candidates
-    ]
     search_started = time.perf_counter()
     try:
-        for solution in solve_parallel(
+        for solution in solve(
             remaining,
-            search_candidates,
+            candidates,
             args.min_words,
             args.max_words,
             args.max_results,
             allow_repeat=not args.no_repeat,
-            workers=worker_count,
-            required_any=contains_any,
-            initial_any_matched=bool(contains_any.intersection(required_words)),
         ):
             generated += 1
             all_words = tuple([*required_words, *solution])
@@ -1320,7 +1321,7 @@ def main() -> int:
     print(
         f"Generated {generated:,} exact word set(s); "
         f"{accepted:,} survived clue constraints. "
-        f"Exact search: {search_seconds:.2f}s with {worker_count} worker(s).",
+        f"Exact search: {search_seconds:.2f}s.",
         file=sys.stderr,
     )
 

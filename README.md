@@ -16,8 +16,6 @@ On the first run the solver may download/cache its dictionary, WordNet data, and
 
 Normal use runs a balanced search capped at 100,000 generated word bags. This avoids silently turning every simple solve into an unlimited 2–6-word enumeration while still giving the reranker a large candidate population.
 
-Exact candidate search uses multiple worker processes by default (up to 8, based on available CPUs). `--workers N` controls both generation and reranking. Search tasks are split at ordered word prefixes and merged in canonical DFS order, so worker count does not change the bounded no-clue candidate prefix. Hint words are enforced during search, allowing dead no-hint branches to be pruned before they become candidate bags.
-
 For a faster exploratory pass:
 
 ```powershell

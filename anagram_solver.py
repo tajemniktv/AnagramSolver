@@ -14,7 +14,6 @@ import json
 import re
 import subprocess
 import sys
-import time
 import unicodedata
 import uuid
 from dataclasses import dataclass
@@ -132,7 +131,6 @@ def build_generator_command(args: argparse.Namespace, output: Path) -> list[str]
         "--min-zipf", str(args.min_zipf),
         "--short-word-policy", "common",
         "--top-per-group", "1",
-        "--workers", str(args.workers),
         "--export", str(output),
     ]
 
@@ -261,7 +259,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Minimum unigram frequency; lower values admit rarer words, 0 disables filtering",
     )
     parser.add_argument("--top", type=int, default=10, metavar="N", help="Results shown per word-count bucket")
-    parser.add_argument("--workers", type=int, default=0, metavar="N", help="Generator/reranker workers; 0 chooses automatically")
+    parser.add_argument("--workers", type=int, default=0, metavar="N", help="Reranker workers; 0 chooses automatically")
     parser.add_argument("--phrase-db", type=Path, metavar="FILE", help="Optional Wikimedia phrase SQLite index")
     search_mode = parser.add_mutually_exclusive_group()
     search_mode.add_argument(
@@ -346,12 +344,11 @@ def _print_results(args: argparse.Namespace, results: Sequence[Result], run_dir:
         print(f"\nCached run files: {run_dir}")
 
 
-def _generate_candidates(args: argparse.Namespace, candidates: Path) -> float:
+def _generate_candidates(args: argparse.Namespace, candidates: Path) -> None:
     """Generate privately, publishing the shared cache only on success."""
     temporary = candidates.with_name(
         f".{candidates.name}.{uuid.uuid4().hex}.tmp"
     )
-    started = time.perf_counter()
     try:
         _run(build_generator_command(args, temporary), verbose=args.verbose)
         if not temporary.is_file():
@@ -359,7 +356,6 @@ def _generate_candidates(args: argparse.Namespace, candidates: Path) -> float:
                 f"Generator completed without writing its candidate export: {temporary}"
             )
         temporary.replace(candidates)
-        return time.perf_counter() - started
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -382,9 +378,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 detail = f"up to {cap:,} candidate bags"
             print(f"Generating exact candidate word bags ({mode}; {detail}) ...")
-        generation_seconds = _generate_candidates(args, candidates)
-        if not args.json:
-            print(f"Candidate generation finished in {generation_seconds:.2f}s.")
+        _generate_candidates(args, candidates)
     elif not args.json:
         print("Using cached candidate word bags ...")
 

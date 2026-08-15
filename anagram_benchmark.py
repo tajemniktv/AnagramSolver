@@ -479,7 +479,6 @@ def make_generator_command(
     case: dict,
     generator: Path,
     export: Path,
-    workers: int = 0,
 ) -> list[str]:
     answer = str(case["answer"])
     words = tokens(answer)
@@ -506,7 +505,6 @@ def make_generator_command(
         "--show-components",
         "--export", str(export),
         "--top-per-group", "1",
-        "--workers", str(workers),
     ]
 
     if unique_words:
@@ -583,7 +581,7 @@ def run_full_case(
 
     if rebuild or not export.exists():
         generated = True
-        cmd = make_generator_command(case, generator, export, workers)
+        cmd = make_generator_command(case, generator, export)
         print(f"\n[{case_id}] generating exact candidate bags ...")
         proc = subprocess.run(cmd, text=True, capture_output=True)
         if proc.returncode != 0:
