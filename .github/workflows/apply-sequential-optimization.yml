@@ -1,0 +1,302 @@
+name: apply sequential search optimization
+
+on:
+  push:
+    branches: [feature/user-friendly-cli]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: feature/user-friendly-cli
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Restore sequential implementation and optimize hot loop
+        shell: bash
+        run: |
+          git checkout 3466847bee57eb2e6b8602f4600d4334efac11a1 -- \
+            README.md anagram_benchmark.py anagram_generate.py anagram_solver.py tests/test_user_cli.py
+          rm -f anagram_search_parallel.py tests/test_generator_parallel.py
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('anagram_generate.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('import sys\nimport unicodedata\n', 'import sys\nimport time\nimport unicodedata\n', 1)
+          anchor = '''    results_found = 0
+          dead: set[tuple[tuple[int, ...], int, int]] = set()
+          min_candidate_len = min(c.length for c in candidates)
+          max_candidate_len = max(c.length for c in candidates)
+          '''
+          anchor = '\n'.join(line[10:] if line.startswith('          ') else line for line in anchor.splitlines()) + '\n'
+          replacement = '''    results_found = 0
+          dead: set[tuple[tuple[int, ...], int, int]] = set()
+          min_candidate_len = min(c.length for c in candidates)
+          max_candidate_len = max(c.length for c in candidates)
+          # The historical hot loop compared all 26 letter counts for every
+          # candidate at every DFS node. Words touch only a handful of distinct
+          # letters, so precompute sparse signatures once and use those for both
+          # fit checks and subtraction without changing traversal order.
+          sparse_signatures = [
+              tuple((letter, amount) for letter, amount in enumerate(c.sig) if amount)
+              for c in candidates
+          ]
+          '''
+          replacement = '\n'.join(line[10:] if line.startswith('          ') else line for line in replacement.splitlines()) + '\n'
+          if anchor not in text:
+              raise SystemExit('solve setup anchor not found')
+          text = text.replace(anchor, replacement, 1)
+
+          old = '''            if not fits(c.sig, rem):
+                      continue
+                  new_rem = tuple(r - w for r, w in zip(rem, c.sig))
+                  next_start = i if allow_repeat else i + 1
+          '''
+          old = '\n'.join(line[12:] if line.startswith('            ') else line for line in old.splitlines()) + '\n'
+          new = '''            sparse = sparse_signatures[i]
+                  if any(rem[letter] < amount for letter, amount in sparse):
+                      continue
+                  mutable_rem = list(rem)
+                  for letter, amount in sparse:
+                      mutable_rem[letter] -= amount
+                  new_rem = tuple(mutable_rem)
+                  next_start = i if allow_repeat else i + 1
+          '''
+          new = '\n'.join(line[12:] if line.startswith('            ') else line for line in new.splitlines()) + '\n'
+          if old not in text:
+              raise SystemExit('hot-loop anchor not found')
+          text = text.replace(old, new, 1)
+
+          old_loop = '''    solutions: list[tuple[str, ...]] = []
+          generated = 0
+          accepted = 0
+          try:
+              for solution in solve(
+          '''
+          old_loop = '\n'.join(line[10:] if line.startswith('          ') else line for line in old_loop.splitlines()) + '\n'
+          new_loop = '''    solutions: list[tuple[str, ...]] = []
+          generated = 0
+          accepted = 0
+          search_started = time.perf_counter()
+          try:
+              for solution in solve(
+          '''
+          new_loop = '\n'.join(line[10:] if line.startswith('          ') else line for line in new_loop.splitlines()) + '\n'
+          if old_loop not in text:
+              raise SystemExit('generation loop timing anchor not found')
+          text = text.replace(old_loop, new_loop, 1)
+
+          old_summary = '''    print(
+              f"Generated {generated:,} exact word set(s); "
+              f"{accepted:,} survived clue constraints.",
+              file=sys.stderr,
+          )
+          '''
+          old_summary = '\n'.join(line[10:] if line.startswith('          ') else line for line in old_summary.splitlines()) + '\n'
+          new_summary = '''    search_seconds = time.perf_counter() - search_started
+          print(
+              f"Generated {generated:,} exact word set(s); "
+              f"{accepted:,} survived clue constraints. "
+              f"Exact search: {search_seconds:.2f}s.",
+              file=sys.stderr,
+          )
+          '''
+          new_summary = '\n'.join(line[10:] if line.startswith('          ') else line for line in new_summary.splitlines()) + '\n'
+          if old_summary not in text:
+              raise SystemExit('generation summary anchor not found')
+          text = text.replace(old_summary, new_summary, 1)
+          path.write_text(text, encoding='utf-8')
+
+          path = Path('anagram_solver.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace('import subprocess\nimport sys\n', 'import subprocess\nimport sys\nimport time\n', 1)
+          old_fn = '''def _generate_candidates(args: argparse.Namespace, candidates: Path) -> None:
+              """Generate privately, publishing the shared cache only on success."""
+              temporary = candidates.with_name(
+                  f".{candidates.name}.{uuid.uuid4().hex}.tmp"
+              )
+              try:
+                  _run(build_generator_command(args, temporary), verbose=args.verbose)
+                  if not temporary.is_file():
+                      raise SystemExit(
+                          f"Generator completed without writing its candidate export: {temporary}"
+                      )
+                  temporary.replace(candidates)
+              finally:
+                  temporary.unlink(missing_ok=True)
+          '''
+          old_fn = '\n'.join(line[14:] if line.startswith('              ') else line for line in old_fn.splitlines())
+          new_fn = '''def _generate_candidates(args: argparse.Namespace, candidates: Path) -> float:
+              """Generate privately, publishing the shared cache only on success."""
+              temporary = candidates.with_name(
+                  f".{candidates.name}.{uuid.uuid4().hex}.tmp"
+              )
+              started = time.perf_counter()
+              try:
+                  _run(build_generator_command(args, temporary), verbose=args.verbose)
+                  if not temporary.is_file():
+                      raise SystemExit(
+                          f"Generator completed without writing its candidate export: {temporary}"
+                      )
+                  temporary.replace(candidates)
+                  return time.perf_counter() - started
+              finally:
+                  temporary.unlink(missing_ok=True)
+          '''
+          new_fn = '\n'.join(line[14:] if line.startswith('              ') else line for line in new_fn.splitlines())
+          if old_fn not in text:
+              raise SystemExit('frontend generation function anchor not found')
+          text = text.replace(old_fn, new_fn, 1)
+          old_call = '        _generate_candidates(args, candidates)\n    elif not args.json:\n'
+          new_call = ('        generation_seconds = _generate_candidates(args, candidates)\n'
+                      '        if not args.json:\n'
+                      '            print(f"Candidate generation finished in {generation_seconds:.2f}s.")\n'
+                      '    elif not args.json:\n')
+          if old_call not in text:
+              raise SystemExit('frontend generation call anchor not found')
+          text = text.replace(old_call, new_call, 1)
+          path.write_text(text, encoding='utf-8')
+
+          Path('tests/test_generator_search_optimization.py').write_text(r'''from __future__ import annotations
+
+          import unittest
+          from collections import defaultdict
+          from typing import Iterator
+
+          import anagram_generate as generator
+
+
+          def reference_solve(
+              remaining: tuple[int, ...],
+              candidates: list[generator.Candidate],
+              min_words: int,
+              max_words: int,
+              max_results: int,
+              allow_repeat: bool,
+          ) -> Iterator[tuple[str, ...]]:
+              by_signature: dict[tuple[int, ...], list[int]] = defaultdict(list)
+              for i, candidate in enumerate(candidates):
+                  by_signature[candidate.sig].append(i)
+              if not candidates:
+                  return
+
+              results_found = 0
+              dead: set[tuple[tuple[int, ...], int, int]] = set()
+              min_candidate_len = min(c.length for c in candidates)
+              max_candidate_len = max(c.length for c in candidates)
+
+              def dfs(rem, start, words_left, chosen):
+                  nonlocal results_found
+                  if max_results > 0 and results_found >= max_results:
+                      return
+                  rem_len = sum(rem)
+                  if words_left == 0:
+                      if rem_len == 0:
+                          results_found += 1
+                          yield tuple(chosen)
+                      return
+                  if rem_len == 0:
+                      return
+                  if rem_len < words_left * min_candidate_len:
+                      return
+                  if rem_len > words_left * max_candidate_len:
+                      return
+                  state = (rem, start, words_left)
+                  if state in dead:
+                      return
+                  before = results_found
+                  if words_left == 1:
+                      for i in by_signature.get(rem, []):
+                          if i < start:
+                              continue
+                          results_found += 1
+                          yield tuple(chosen + [candidates[i].word])
+                          if max_results > 0 and results_found >= max_results:
+                              return
+                      if results_found == before:
+                          dead.add(state)
+                      return
+                  min_this_len = max(
+                      min_candidate_len,
+                      rem_len - (words_left - 1) * max_candidate_len,
+                  )
+                  max_this_len = min(
+                      max_candidate_len,
+                      rem_len - (words_left - 1) * min_candidate_len,
+                  )
+                  for i in range(start, len(candidates)):
+                      candidate = candidates[i]
+                      if candidate.length < min_this_len or candidate.length > max_this_len:
+                          continue
+                      if not generator.fits(candidate.sig, rem):
+                          continue
+                      new_rem = tuple(r - w for r, w in zip(rem, candidate.sig))
+                      yield from dfs(
+                          new_rem,
+                          i if allow_repeat else i + 1,
+                          words_left - 1,
+                          chosen + [candidate.word],
+                      )
+                      if max_results > 0 and results_found >= max_results:
+                          return
+                  if results_found == before:
+                      dead.add(state)
+
+              for nwords in range(min_words, max_words + 1):
+                  yield from dfs(remaining, 0, nwords, [])
+                  if max_results > 0 and results_found >= max_results:
+                      break
+
+
+          class SearchOptimizationTests(unittest.TestCase):
+              def setUp(self) -> None:
+                  def sig(a=0, b=0, c=0):
+                      return (a, b, c) + (0,) * 23
+                  self.remaining = sig(2, 2, 2)
+                  self.candidates = [
+                      generator.Candidate('ab', sig(1, 1), 2, 5.0),
+                      generator.Candidate('ac', sig(1, 0, 1), 2, 4.9),
+                      generator.Candidate('bc', sig(0, 1, 1), 2, 4.8),
+                      generator.Candidate('abc', sig(1, 1, 1), 3, 4.7),
+                  ]
+
+              def assert_equivalent(self, *, limit: int, allow_repeat: bool) -> None:
+                  expected = list(reference_solve(
+                      self.remaining, self.candidates, 2, 3, limit, allow_repeat
+                  ))
+                  observed = list(generator.solve(
+                      self.remaining, self.candidates, 2, 3, limit, allow_repeat
+                  ))
+                  self.assertEqual(observed, expected)
+
+              def test_exhaustive_matches_historical_dfs(self) -> None:
+                  self.assert_equivalent(limit=0, allow_repeat=True)
+                  self.assert_equivalent(limit=0, allow_repeat=False)
+
+              def test_bounded_prefix_matches_historical_dfs(self) -> None:
+                  for limit in (1, 2, 3):
+                      with self.subTest(limit=limit):
+                          self.assert_equivalent(limit=limit, allow_repeat=True)
+          '''.replace('          ', ''), encoding='utf-8')
+          PY
+      - name: Validate optimized sequential search
+        run: |
+          python -m py_compile anagram_generate.py anagram_solver.py
+          python -m unittest discover -s tests -v
+          git diff --check
+      - name: Commit validated implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A README.md anagram_benchmark.py anagram_generate.py anagram_solver.py anagram_search_parallel.py tests/test_user_cli.py tests/test_generator_parallel.py tests/test_generator_search_optimization.py
+          git commit -m "Optimize exact candidate DFS"
+          git push origin HEAD:feature/user-friendly-cli
