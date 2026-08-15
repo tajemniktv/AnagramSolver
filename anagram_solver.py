@@ -14,6 +14,7 @@ import json
 import re
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -45,13 +46,23 @@ def _csv_words(values: Sequence[str]) -> list[str]:
     return out
 
 
+def _normalized_target(text: str) -> str:
+    """Match the generator's effective A-Z target normalization for caching."""
+    ascii_text = (
+        unicodedata.normalize("NFKD", text)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    return "".join(ch for ch in ascii_text.lower() if "a" <= ch <= "z")
+
+
 def _source_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
 
 
 def _run_key(args: argparse.Namespace) -> str:
     payload = {
-        "text": args.text,
+        "text": _normalized_target(args.text),
         "min_word_len": args.min_word_len,
         "min_words": args.min_words,
         "max_words": args.max_words,
