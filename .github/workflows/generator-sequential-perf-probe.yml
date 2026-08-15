@@ -1,0 +1,48 @@
+name: generator sequential performance probe
+
+on:
+  push:
+    branches: [feature/user-friendly-cli]
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Prepare historical generator and warm shared data
+        shell: bash
+        run: |
+          git show 3466847bee57eb2e6b8602f4600d4334efac11a1:anagram_generate.py > /tmp/anagram_generate_baseline.py
+          python anagram_generate.py IAMTESTINGANAGRAMS \
+            --min-word-len 2 --min-words 2 --max-words 2 \
+            --min-zipf 2.7 --short-word-policy common \
+            --max-results 1 --top-per-group 1 --export /tmp/warm.txt >/dev/null
+      - name: Compare historical and optimized DFS
+        shell: bash
+        run: |
+          set -e
+          measure() {
+            label="$1"; script="$2"; cap="$3"
+            echo "=== $label cap=$cap ==="
+            /usr/bin/time -f "WALL=%e USER=%U SYS=%S CPU=%P RSS=%MKB" \
+              python "$script" IAMTESTINGANAGRAMS \
+                --min-word-len 2 --min-words 2 --max-words 6 \
+                --min-zipf 2.7 --short-word-policy common \
+                --max-results "$cap" --top-per-group 1 \
+                --export "/tmp/${label}.txt" >/dev/null
+            echo
+          }
+
+          measure baseline20 /tmp/anagram_generate_baseline.py 20000
+          measure optimized20 anagram_generate.py 20000
+          diff -q /tmp/baseline20.txt /tmp/optimized20.txt
+
+          measure baseline100 /tmp/anagram_generate_baseline.py 100000
+          measure optimized100 anagram_generate.py 100000
+          diff -q /tmp/baseline100.txt /tmp/optimized100.txt
