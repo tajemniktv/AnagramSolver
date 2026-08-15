@@ -29,6 +29,17 @@ class UserCliCacheSafetyTests(unittest.TestCase):
         )
         self.assertEqual(solver._run_key(lower), solver._run_key(equivalent))
 
+    def test_run_key_preserves_required_word_multiplicity_and_order(self) -> None:
+        single = self._args("--require", "hips")
+        repeated = self._args("--require", "hips,hips")
+        ordered = self._args("--require", "these hips")
+        split_ordered = self._args("--require", "these", "--require", "hips")
+        reversed_order = self._args("--require", "hips", "--require", "these")
+
+        self.assertNotEqual(solver._run_key(single), solver._run_key(repeated))
+        self.assertEqual(solver._run_key(ordered), solver._run_key(split_ordered))
+        self.assertNotEqual(solver._run_key(ordered), solver._run_key(reversed_order))
+
     def test_same_key_generations_use_independent_temporary_exports(self) -> None:
         args = self._args()
         with tempfile.TemporaryDirectory() as tmp:
