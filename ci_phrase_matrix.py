@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run PR benchmark scenarios and publish a compact GitHub Step Summary."""
+"""Run corpus benchmark scenarios and publish a compact GitHub Step Summary."""
 
 from __future__ import annotations
 
@@ -62,7 +62,11 @@ def section(text: str, heading: str, next_headings: tuple[str, ...]) -> str:
 
 
 def metric(block: str, label: str) -> float | None:
-    match = re.search(rf"^\s*{re.escape(label)}\s+([+-]?\d+(?:\.\d+)?)\s*$", block, re.MULTILINE)
+    match = re.search(
+        rf"^\s*{re.escape(label)}\s+([+-]?\d+(?:\.\d+)?)\s*$",
+        block,
+        re.MULTILINE,
+    )
     return float(match.group(1)) if match else None
 
 
@@ -139,7 +143,7 @@ def _require_metrics(
 def validate_metrics(
     scenario: Scenario,
     order: dict[str, float | None],
-    full: dict[str, float | None],
+    full: dict[str, float | None] | None,
 ) -> None:
     """Treat benchmark output format drift as a CI failure, not a blank cell."""
     order_required = ("grammar_r1", "grammar_r10", "grammar_mrr")
@@ -153,17 +157,25 @@ def validate_metrics(
             "delta_mrr",
         )
     _require_metrics(f"{scenario.name} ordering benchmark", order, order_required)
-    _require_metrics(
-        f"{scenario.name} full benchmark",
-        full,
-        ("bag_r10", "bag_mrr", "exact_r1", "exact_r10", "exact_mrr"),
-    )
+
+    if full is not None:
+        _require_metrics(
+            f"{scenario.name} full benchmark",
+            full,
+            ("bag_r10", "bag_mrr", "exact_r1", "exact_r10", "exact_mrr"),
+        )
 
 
-def append_summary(rows: list[tuple[Scenario, dict, dict]]) -> None:
+def append_summary(
+    rows: list[
+        tuple[Scenario, dict[str, float | None], dict[str, float | None] | None]
+    ],
+) -> None:
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary_path:
         return
+
+    include_full = any(full is not None for _, _, full in rows)
     out = Path(summary_path)
     with out.open("a", encoding="utf-8") as f:
         f.write("## Anagram corpus benchmark matrix\n\n")
@@ -173,19 +185,39 @@ def append_summary(rows: list[tuple[Scenario, dict, dict]]) -> None:
             "compare the identical retained top-K orders. Exact <=6w R@1 is a separate "
             "exhaustive-permutation metric over only cases with at most six words.\n\n"
         )
-        f.write(
-            "| Corpus | Exact <=6w R@1 | Retained G R@1 | Phrase R@1 | Δ R@1 | "
-            "Phrase MRR | Full Bag R@10 | Full Exact R@10 | Full Exact MRR |\n"
-        )
-        f.write("|---|---:|---:|---:|---:|---:|---:|---:|---:|\n")
-        for scenario, order, full in rows:
+
+        if include_full:
             f.write(
-                f"| {scenario.name} | {fmt(order['grammar_r1'])} | "
-                f"{fmt(order['retained_r1'])} | {fmt(order['phrase_r1'])} | "
-                f"{fmt(order['delta_r1'])} | {fmt(order['phrase_mrr'])} | "
-                f"{fmt(full['bag_r10'])} | {fmt(full['exact_r10'])} | "
-                f"{fmt(full['exact_mrr'])} |\n"
+                "| Corpus | Exact <=6w R@1 | Retained G R@1 | Phrase R@1 | Δ R@1 | "
+                "Phrase MRR | Full Bag R@10 | Full Exact R@10 | Full Exact MRR |\n"
             )
+            f.write("|---|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+            for scenario, order, full in rows:
+                assert full is not None
+                f.write(
+                    f"| {scenario.name} | {fmt(order['grammar_r1'])} | "
+                    f"{fmt(order['retained_r1'])} | {fmt(order['phrase_r1'])} | "
+                    f"{fmt(order['delta_r1'])} | {fmt(order['phrase_mrr'])} | "
+                    f"{fmt(full['bag_r10'])} | {fmt(full['exact_r10'])} | "
+                    f"{fmt(full['exact_mrr'])} |\n"
+                )
+        else:
+            f.write(
+                "PR fast path: full candidate generation/reranking is intentionally "
+                "omitted; main/manual runs retain the end-to-end matrix.\n\n"
+            )
+            f.write(
+                "| Corpus | Exact <=6w R@1 | Retained G R@1 | Phrase R@1 | Δ R@1 | "
+                "Phrase MRR |\n"
+            )
+            f.write("|---|---:|---:|---:|---:|---:|\n")
+            for scenario, order, _ in rows:
+                f.write(
+                    f"| {scenario.name} | {fmt(order['grammar_r1'])} | "
+                    f"{fmt(order['retained_r1'])} | {fmt(order['phrase_r1'])} | "
+                    f"{fmt(order['delta_r1'])} | {fmt(order['phrase_mrr'])} |\n"
+                )
+
         f.write("\n")
         f.write(
             "This job is currently an execution/reporting check, not a phrase-quality gate. "
@@ -198,6 +230,11 @@ def main() -> int:
     ap.add_argument("--wiktionary-db", type=Path, required=True)
     ap.add_argument("--wikipedia-db", type=Path, required=True)
     ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument(
+        "--order-only",
+        action="store_true",
+        help="Run only the fast ordering A/B and skip full candidate generation/reranking",
+    )
     args = ap.parse_args()
 
     # Resolve relative paths against the caller's working directory before child
@@ -217,22 +254,20 @@ def main() -> int:
         Scenario("Wiktionary + Wikipedia", "wiktionary-wikipedia", wikipedia_db),
     ]
 
-    rows: list[tuple[Scenario, dict, dict]] = []
+    rows: list[
+        tuple[Scenario, dict[str, float | None], dict[str, float | None] | None]
+    ] = []
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     for scenario in scenarios:
-        phrase_args = ["--phrase-db", str(scenario.phrase_db)] if scenario.phrase_db else []
+        phrase_args = (
+            ["--phrase-db", str(scenario.phrase_db)] if scenario.phrase_db else []
+        )
         order_cmd = [
             sys.executable,
             "anagram_benchmark.py",
-            "--mode", "order",
-            *phrase_args,
-        ]
-        full_cmd = [
-            sys.executable,
-            "anagram_benchmark.py",
-            "--mode", "full",
-            "--workers", str(args.workers),
+            "--mode",
+            "order",
             *phrase_args,
         ]
 
@@ -241,23 +276,42 @@ def main() -> int:
             order_cmd,
             RESULTS_DIR / f"{scenario.slug}-order.txt",
         )
-        full_text = run_logged(
-            f"{scenario.name}: full pipeline",
-            full_cmd,
-            RESULTS_DIR / f"{scenario.slug}-full.txt",
-        )
         order = order_metrics(order_text)
-        full = full_metrics(full_text)
+
+        full: dict[str, float | None] | None = None
+        if not args.order_only:
+            full_cmd = [
+                sys.executable,
+                "anagram_benchmark.py",
+                "--mode",
+                "full",
+                "--workers",
+                str(args.workers),
+                *phrase_args,
+            ]
+            full_text = run_logged(
+                f"{scenario.name}: full pipeline",
+                full_cmd,
+                RESULTS_DIR / f"{scenario.slug}-full.txt",
+            )
+            full = full_metrics(full_text)
+
         validate_metrics(scenario, order, full)
         rows.append((scenario, order, full))
 
     print("\n=== CORPUS MATRIX SUMMARY ===")
     for scenario, order, full in rows:
-        print(
+        line = (
             f"{scenario.name:<28} exact6wR1={fmt(order['grammar_r1'])} "
-            f"phraseR1={fmt(order['phrase_r1'])} deltaR1={fmt(order['delta_r1'])} "
-            f"bagR10={fmt(full['bag_r10'])} exactR10={fmt(full['exact_r10'])}"
+            f"phraseR1={fmt(order['phrase_r1'])} deltaR1={fmt(order['delta_r1'])}"
         )
+        if full is not None:
+            line += (
+                f" bagR10={fmt(full['bag_r10'])} "
+                f"exactR10={fmt(full['exact_r10'])}"
+            )
+        print(line)
+
     append_summary(rows)
     return 0
 
