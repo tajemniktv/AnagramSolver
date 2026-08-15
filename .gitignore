@@ -1,6 +1,8 @@
 __pycache__/
 *.py[cod]
 .anagram_bench_cache/
+.ci_benchmark_results/
+.ci_phrase_cache/
 *.db
 *.sqlite
 *.sqlite3
