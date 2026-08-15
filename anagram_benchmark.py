@@ -109,24 +109,8 @@ class PhraseOrderResult:
     exact_best: bool
     target_retained: bool
     best_phrase_score: float
-
-
-def compute_phrase_order_metrics(results: list[PhraseOrderResult]) -> dict[str, float]:
-    """Metrics for phrase-aware ordering; dropped targets count as misses."""
-    if not results:
-        return {}
-    n = len(results)
-    ranks = [r.retained_rank for r in results]
-    retained = sum(rank is not None for rank in ranks)
-    return {
-        "cases": float(n),
-        "retained": float(retained),
-        "retained_rate": retained / n,
-        "recall1": sum(rank is not None and rank <= 1 for rank in ranks) / n,
-        "recall10": sum(rank is not None and rank <= 10 for rank in ranks) / n,
-        "recall50": sum(rank is not None and rank <= 50 for rank in ranks) / n,
-        "mrr": sum((1.0 / rank) if rank else 0.0 for rank in ranks) / n,
-    }
+    grammar_rank: int | None = None
+    grammar_best_order: str = ""
 
 
 def compute_order_metrics(results: list[OrderResult]) -> dict[str, float]:
@@ -239,13 +223,31 @@ def run_order_case(reranker, lex, case: dict) -> OrderResult:
     )
 
 
-def _candidate_final_order_component(candidate) -> float:
-    """Order-dependent part of FINAL; bag-level terms cancel within one bag."""
-    return 100.0 * (
-        0.22 * candidate.grammar_norm
-        + 0.28 * candidate.structure_norm
-        + 0.08 * candidate.valency_norm
-    )
+def _rank_metrics(ranks: list[int | None]) -> dict[str, float]:
+    """Metrics over a fixed case population; missing ranks count as misses."""
+    if not ranks:
+        return {}
+    n = len(ranks)
+    retained = sum(rank is not None for rank in ranks)
+    return {
+        "cases": float(n),
+        "retained": float(retained),
+        "retained_rate": retained / n,
+        "recall1": sum(rank is not None and rank <= 1 for rank in ranks) / n,
+        "recall10": sum(rank is not None and rank <= 10 for rank in ranks) / n,
+        "recall50": sum(rank is not None and rank <= 50 for rank in ranks) / n,
+        "mrr": sum((1.0 / rank) if rank else 0.0 for rank in ranks) / n,
+    }
+
+
+def compute_phrase_order_metrics(results: list[PhraseOrderResult]) -> dict[str, float]:
+    """Phrase-aware metrics over the retained top-K population."""
+    return _rank_metrics([r.retained_rank for r in results])
+
+
+def compute_retained_grammar_metrics(results: list[PhraseOrderResult]) -> dict[str, float]:
+    """Grammar-only metrics over exactly the same retained top-K population."""
+    return _rank_metrics([r.grammar_rank for r in results])
 
 
 def run_phrase_order_case(
@@ -257,7 +259,7 @@ def run_phrase_order_case(
     order_candidates: int,
     phrase_bonus_max: float,
 ) -> PhraseOrderResult:
-    """Rerank grammar-retained orders with positive phrase-index evidence."""
+    """Compare grammar-only and phrase-aware ranking on the same retained orders."""
     answer = str(case["answer"])
     bag = tokens(answer)
     acceptable = {
@@ -274,85 +276,123 @@ def run_phrase_order_case(
         top_k=order_candidates,
     )
 
-    scored: list[tuple[float, float, tuple[str, ...]]] = []
+    grammar_scored: list[tuple[float, tuple[str, ...]]] = []
+    phrase_scored: list[tuple[float, float, tuple[str, ...]]] = []
     for candidate in candidates:
+        # rank_orders() already defines the normalized grammar/structure
+        # objective. Using it here guarantees bonus=0 reproduces the retained
+        # grammar ordering exactly, including syntax coverage.
+        grammar_score = 100.0 * candidate.objective
         phrase_score, _ = phrase_index.score(candidate.order)
-        combined = (
-            _candidate_final_order_component(candidate)
-            + phrase_bonus_max * phrase_score
+        grammar_scored.append((grammar_score, candidate.order))
+        phrase_scored.append(
+            (
+                grammar_score + phrase_bonus_max * phrase_score,
+                phrase_score,
+                candidate.order,
+            )
         )
-        scored.append((combined, phrase_score, candidate.order))
 
-    scored.sort(key=lambda item: (-item[0], -item[1], item[2]))
-    ranks = [
+    grammar_scored.sort(key=lambda item: (-item[0], item[1]))
+    phrase_scored.sort(key=lambda item: (-item[0], -item[1], item[2]))
+
+    grammar_ranks = [
         i
-        for i, (_, _, order) in enumerate(scored, 1)
+        for i, (_, order) in enumerate(grammar_scored, 1)
         if phrase_key(order) in acceptable
     ]
-    retained_rank = min(ranks) if ranks else None
-    best_order = scored[0][2] if scored else tuple()
-    best_phrase_score = scored[0][1] if scored else 0.0
+    phrase_ranks = [
+        i
+        for i, (_, _, order) in enumerate(phrase_scored, 1)
+        if phrase_key(order) in acceptable
+    ]
+
+    grammar_rank = min(grammar_ranks) if grammar_ranks else None
+    retained_rank = min(phrase_ranks) if phrase_ranks else None
+    grammar_best = grammar_scored[0][1] if grammar_scored else tuple()
+    best_order = phrase_scored[0][2] if phrase_scored else tuple()
+    best_phrase_score = phrase_scored[0][1] if phrase_scored else 0.0
 
     return PhraseOrderResult(
         case_id=str(case["id"]),
         answer=answer,
         category=str(case.get("category", "uncategorized")),
         retained_rank=retained_rank,
-        retained_total=len(scored),
+        retained_total=len(phrase_scored),
         best_order=" ".join(best_order),
         exact_best=phrase_key(best_order) in acceptable,
         target_retained=retained_rank is not None,
         best_phrase_score=best_phrase_score,
+        grammar_rank=grammar_rank,
+        grammar_best_order=" ".join(grammar_best),
     )
 
 
 def print_phrase_order_summary(
     results: list[PhraseOrderResult],
     *,
-    grammar_results: list[OrderResult],
     order_candidates: int,
     phrase_db: Path,
 ) -> None:
     print("\n=== PHRASE-AWARE FINAL ORDER A/B ===")
     print(f"Phrase DB: {phrase_db}")
     print(f"Grammar-retained orders per bag: {order_candidates}")
+    if not results:
+        print("No benchmark cases selected.")
+        return
+
     for result in results:
-        if result.retained_rank is None:
-            status = "DROP"
-            rank_text = f"-/{result.retained_total}"
-        else:
-            status = (
-                "TOP1" if result.retained_rank == 1
-                else "TOP10" if result.retained_rank <= 10
-                else "TOP50" if result.retained_rank <= 50
-                else "MISS"
-            )
-            rank_text = f"{result.retained_rank}/{result.retained_total}"
+        phrase_rank = "-" if result.retained_rank is None else str(result.retained_rank)
+        grammar_rank = "-" if result.grammar_rank is None else str(result.grammar_rank)
+        status = "TOP1" if result.retained_rank == 1 else (
+            "TOP10" if result.retained_rank is not None and result.retained_rank <= 10
+            else "TOP50" if result.retained_rank is not None and result.retained_rank <= 50
+            else "DROP" if result.retained_rank is None
+            else "MISS"
+        )
         print(
             f"{status:5}  {result.case_id:<24} [{result.category:<20}] "
-            f"rank={rank_text:<8} phrase={result.best_phrase_score:5.3f} "
-            f"best={result.best_order}"
+            f"G={grammar_rank:>2}/{result.retained_total:<2} "
+            f"P={phrase_rank:>2}/{result.retained_total:<2} "
+            f"phrase={result.best_phrase_score:5.3f} best={result.best_order}"
         )
 
+    grammar = compute_retained_grammar_metrics(results)
     observed = compute_phrase_order_metrics(results)
+
+    print("\nRetained grammar metrics (same top-K):")
+    print(f"  cases           {int(grammar['cases'])}")
+    print(
+        f"  target retained {int(grammar['retained'])}/{int(grammar['cases'])} "
+        f"({grammar['retained_rate']:.3f})"
+    )
+    print(f"  Recall@1        {grammar['recall1']:.3f}")
+    print(f"  Recall@10       {grammar['recall10']:.3f}")
+    print(f"  Recall@50       {grammar['recall50']:.3f}")
+    print(f"  MRR             {grammar['mrr']:.3f}")
+
     print("\nPhrase-aware retained-order metrics:")
-    print(f"  cases          {int(observed['cases'])}")
+    print(f"  cases           {int(observed['cases'])}")
     print(
         f"  target retained {int(observed['retained'])}/{int(observed['cases'])} "
         f"({observed['retained_rate']:.3f})"
     )
-    print(f"  Recall@1       {observed['recall1']:.3f}")
-    print(f"  Recall@10      {observed['recall10']:.3f}")
-    print(f"  Recall@50      {observed['recall50']:.3f}")
-    print(f"  MRR            {observed['mrr']:.3f}")
+    print(f"  Recall@1        {observed['recall1']:.3f}")
+    print(f"  Recall@10       {observed['recall10']:.3f}")
+    print(f"  Recall@50       {observed['recall50']:.3f}")
+    print(f"  MRR             {observed['mrr']:.3f}")
 
-    grammar = compute_order_metrics(grammar_results)
-    if grammar and int(grammar["cases"]) == int(observed["cases"]):
-        print("\nA/B delta vs grammar-only exact ordering:")
-        print(f"  Recall@1   {observed['recall1'] - grammar['recall1']:+.3f}")
-        print(f"  Recall@10  {observed['recall10'] - grammar['recall10']:+.3f}")
-        print(f"  Recall@50  {observed['recall50'] - grammar['recall50']:+.3f}")
-        print(f"  MRR        {observed['mrr'] - grammar['mrr']:+.3f}")
+    print("\nA/B delta on identical retained candidates:")
+    print(f"  Recall@1   {observed['recall1'] - grammar['recall1']:+.3f}")
+    print(f"  Recall@10  {observed['recall10'] - grammar['recall10']:+.3f}")
+    print(f"  Recall@50  {observed['recall50'] - grammar['recall50']:+.3f}")
+    print(f"  MRR        {observed['mrr'] - grammar['mrr']:+.3f}")
+    if order_candidates < 50:
+        print(
+            f"  note: Recall@50 is bounded by retained top-{order_candidates}; "
+            "its delta is expected to be zero unless the retained population changes."
+        )
+
 
 
 def print_order_summary(results: list[OrderResult]) -> None:
@@ -502,13 +542,15 @@ def make_reranker_command(
         "--deep-per-group", str(int(case.get("deep_per_group", 5000))),
         "--beam-width", "128",
         "--phrase-rescore-top", "300",
-        "--phrase-bonus-max", str(phrase_bonus_max),
-        "--order-candidates", str(order_candidates),
         "--top-per-group", "1",
         "--export", str(output),
     ]
     if phrase_db is not None:
-        cmd += ["--phrase-db", str(phrase_db)]
+        cmd += [
+            "--phrase-bonus-max", str(phrase_bonus_max),
+            "--order-candidates", str(order_candidates),
+            "--phrase-db", str(phrase_db),
+        ]
     return cmd
 
 
@@ -736,8 +778,8 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    if args.phrase_bonus_max < 0:
-        raise SystemExit("--phrase-bonus-max must be >= 0")
+    if not math.isfinite(args.phrase_bonus_max) or args.phrase_bonus_max < 0:
+        raise SystemExit("--phrase-bonus-max must be a finite value >= 0")
     if args.order_candidates < 1:
         raise SystemExit("--order-candidates must be >= 1")
 
@@ -779,7 +821,6 @@ def main() -> int:
                 ]
                 print_phrase_order_summary(
                     phrase_results,
-                    grammar_results=results,
                     order_candidates=args.order_candidates,
                     phrase_db=phrase_db,
                 )
