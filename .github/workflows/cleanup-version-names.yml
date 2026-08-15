@@ -1,0 +1,40 @@
+name: cleanup version names
+
+on:
+  push:
+    branches: [cleanup/remove-versioned-names-run]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: "3.14"
+      - name: Apply cleanup
+        run: python scripts/cleanup_version_names.py
+      - name: Syntax check
+        run: python -m py_compile *.py tests/*.py
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Diff check
+        run: git diff --check
+      - name: Commit generated cleanup
+        shell: bash
+        run: |
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No cleanup changes produced."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Remove historical solver version names"
+          git push origin HEAD:cleanup/remove-versioned-names-run
