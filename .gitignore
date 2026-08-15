@@ -1,2 +1,6 @@
-__pycache__
-.anagram_bench_cache
+__pycache__/
+*.py[cod]
+.anagram_bench_cache/
+*.db
+*.sqlite
+*.sqlite3
