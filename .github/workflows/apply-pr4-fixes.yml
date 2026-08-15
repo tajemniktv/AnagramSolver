@@ -24,6 +24,7 @@ jobs:
         with:
           python-version: "3.14"
 
+      # This workflow is temporary and deletes itself after a green validation.
       - name: Apply fixes
         run: python .github/scripts/apply_pr4_review_fixes.py
 
