@@ -205,7 +205,7 @@
       "id": "water_cold",
       "answer": "the water feels cold",
       "category": "ordinary-predicative",
-      "full": true
+      "full": false
     },
     {
       "id": "reads_night",
@@ -235,7 +235,7 @@
       "id": "machine_quietly",
       "answer": "this machine runs quietly",
       "category": "ordinary-predicative",
-      "full": true
+      "full": false
     },
     {
       "id": "bridge_unsafe",
@@ -283,7 +283,7 @@
       "id": "choice_cost",
       "answer": "every choice has a cost",
       "category": "ordinary-clause",
-      "full": true
+      "full": false
     },
     {
       "id": "tools_time",
