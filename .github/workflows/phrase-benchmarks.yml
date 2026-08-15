@@ -2,6 +2,12 @@ name: phrase corpus benchmarks
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    # Refresh the default-branch corpus snapshot near the start of each month.
+    - cron: "17 3 1 * *"
   workflow_dispatch:
 
 permissions:
@@ -31,6 +37,7 @@ jobs:
         run: echo "month=$(date -u +'%Y-%m')" >> "$GITHUB_OUTPUT"
 
       - name: Restore language data and phrase indexes
+        id: corpus-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
@@ -63,8 +70,18 @@ jobs:
           fi
 
       - name: Run corpus benchmark matrix
+        if: >-
+          github.event_name == 'pull_request' ||
+          github.event_name == 'workflow_dispatch' ||
+          steps.corpus-cache.outputs.cache-hit != 'true'
         run: |
           python ci_phrase_matrix.py \
             --wiktionary-db .ci_phrase_cache/wiktionary.db \
             --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
             --workers 8
+
+      - name: Default-branch cache already warm
+        if: >-
+          (github.event_name == 'push' || github.event_name == 'schedule') &&
+          steps.corpus-cache.outputs.cache-hit == 'true'
+        run: echo "Corpus cache already exists for this monthly snapshot; skipping duplicate main-branch benchmarks."
