@@ -123,6 +123,23 @@ class OrderingLayerTests(unittest.TestCase):
         self.assertEqual(rankings[1], rankings[2])
         self.assertEqual(rankings[0][:2], (("a", "b", "c"), ("a", "c", "b")))
 
+    def test_best_order_returns_real_structure_for_winner(self) -> None:
+        candidate = self._candidate(("a", "b", "c"))
+        sentinel = object()
+        with (
+            patch.object(rerank.impl, "rank_orders", return_value=((candidate,), 7)),
+            patch.object(rerank.impl, "phrase_structure", return_value=sentinel) as structure,
+        ):
+            raw, order, returned_structure, evaluated = rerank.impl.best_order(
+                ("c", "b", "a"), object(), order_mode="exact"
+            )
+
+        self.assertEqual(raw, candidate.grammar_raw)
+        self.assertEqual(order, candidate.order)
+        self.assertIs(returned_structure, sentinel)
+        self.assertEqual(evaluated, 7)
+        structure.assert_called_once_with(candidate.order, unittest.mock.ANY)
+
     def test_phrase_evidence_can_choose_retained_alternative(self) -> None:
         row = self._row(("a", "b", "c"))
         grammar_winner = self._candidate(("a", "b", "c"), objective=0.88)
@@ -205,6 +222,36 @@ class OrderingLayerTests(unittest.TestCase):
         self.assertGreater(best_final.phrase_bonus, 0.0)
         self.assertGreater(best_pre.phrase_bonus, 0.0)
         self.assertEqual(middle.phrase_bonus, 0.0)
+
+    def test_cache_rejects_nonfinite_and_out_of_range_values(self) -> None:
+        base = rerank._row_to_cache_dict(self._row(("a", "b", "c")))
+        bad_values = (
+            ("lex", float("nan")),
+            ("hint", float("inf")),
+            ("zavg", 1e100),
+            ("old_pre", -1.0),
+            ("v13_pre", 101.0),
+            ("word_count", 0),
+            ("old_rank", 0),
+        )
+        for field, value in bad_values:
+            with self.subTest(field=field, value=value):
+                item = dict(base)
+                item[field] = value
+                self.assertIsNone(rerank._row_from_cache_dict(item))
+
+    def test_prepare_rows_uses_captured_core_delegate(self) -> None:
+        rows = [self._row(("c", "a", "b")), self._row(("f", "d", "e"))]
+        lex = object()
+        with patch.object(rerank, "_CORE_PREPARE_ROWS") as delegate:
+            # Reproduce main()'s runtime rebinding. A dynamic core.prepare_rows
+            # lookup here would recurse back into rerank.prepare_rows.
+            with patch.object(core, "prepare_rows", rerank.prepare_rows):
+                rerank.prepare_rows(rows, lex)
+
+        delegate.assert_called_once_with(rows, lex)
+        self.assertEqual(rows[0].words, ("a", "b", "c"))
+        self.assertEqual(rows[1].words, ("d", "e", "f"))
 
     def test_importing_frontend_does_not_mutate_core(self) -> None:
         originals = (
