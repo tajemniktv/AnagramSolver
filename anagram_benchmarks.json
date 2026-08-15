@@ -1,0 +1,295 @@
+{
+  "schema": 1,
+  "description": "Generalization suite for anagram word-order/reranking. Includes common sayings/titles plus ordinary non-lexicalized English clauses so phrase dictionaries cannot trivially ace the suite.",
+  "cases": [
+    {
+      "id": "shakira_control",
+      "answer": "these hips dont lie",
+      "category": "title/control",
+      "full": true,
+      "hints": [
+        "dont"
+      ],
+      "min_zipf": 3.0,
+      "max_results": 0
+    },
+    {
+      "id": "knowledge_power",
+      "answer": "knowledge is power",
+      "category": "aphorism",
+      "full": true,
+      "min_zipf": 2.7,
+      "max_results": 100000
+    },
+    {
+      "id": "better_late",
+      "answer": "better late than never",
+      "category": "proverb",
+      "full": true,
+      "min_zipf": 3.0,
+      "max_results": 100000
+    },
+    {
+      "id": "practice_perfect",
+      "answer": "practice makes perfect",
+      "category": "proverb",
+      "full": true,
+      "min_zipf": 2.7,
+      "max_results": 100000
+    },
+    {
+      "id": "less_more",
+      "answer": "less is more",
+      "category": "aphorism",
+      "full": true,
+      "min_zipf": 3.0,
+      "max_results": 100000
+    },
+    {
+      "id": "haste_waste",
+      "answer": "haste makes waste",
+      "category": "proverb",
+      "full": true,
+      "min_zipf": 2.7,
+      "max_results": 100000
+    },
+    {
+      "id": "still_waters",
+      "answer": "still waters run deep",
+      "category": "proverb",
+      "full": true,
+      "min_zipf": 3.0,
+      "max_results": 100000
+    },
+    {
+      "id": "look_leap",
+      "answer": "look before you leap",
+      "category": "proverb",
+      "full": true,
+      "min_zipf": 3.0,
+      "max_results": 100000
+    },
+    {
+      "id": "actions_words",
+      "answer": "actions speak louder than words",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "birds_feather",
+      "answer": "birds of a feather",
+      "category": "phrase",
+      "full": false
+    },
+    {
+      "id": "roads_rome",
+      "answer": "all roads lead to rome",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "time_arrow",
+      "answer": "time flies like an arrow",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "fortune_bold",
+      "answer": "fortune favors the bold",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "honesty_policy",
+      "answer": "honesty is the best policy",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "watched_pot",
+      "answer": "a watched pot never boils",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "two_heads",
+      "answer": "two heads are better than one",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "silver_lining",
+      "answer": "every cloud has a silver lining",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "still_waste",
+      "answer": "waste not want not",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "easy_go",
+      "answer": "easy come easy go",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "pain_gain",
+      "answer": "no pain no gain",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "curiosity_cat",
+      "answer": "curiosity killed the cat",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "early_bird",
+      "answer": "the early bird catches the worm",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "absence_fonder",
+      "answer": "absence makes the heart grow fonder",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "united_stand",
+      "answer": "united we stand divided we fall",
+      "category": "aphorism",
+      "full": false
+    },
+    {
+      "id": "necessity_invention",
+      "answer": "necessity is the mother of invention",
+      "category": "proverb",
+      "full": false
+    },
+    {
+      "id": "dog_ball",
+      "answer": "the dog chased the ball",
+      "category": "ordinary-clause",
+      "full": false
+    },
+    {
+      "id": "birds_dawn",
+      "answer": "small birds sing at dawn",
+      "category": "ordinary-clause",
+      "full": false
+    },
+    {
+      "id": "phone_charge",
+      "answer": "my phone needs a charge",
+      "category": "ordinary-clause",
+      "full": false
+    },
+    {
+      "id": "water_cold",
+      "answer": "the water feels cold",
+      "category": "ordinary-predicative",
+      "full": false
+    },
+    {
+      "id": "reads_night",
+      "answer": "she reads books at night",
+      "category": "ordinary-clause",
+      "full": false
+    },
+    {
+      "id": "leave_sunrise",
+      "answer": "we should leave before sunrise",
+      "category": "ordinary-modal",
+      "full": false
+    },
+    {
+      "id": "red_car",
+      "answer": "the red car stopped suddenly",
+      "category": "ordinary-clause",
+      "full": false
+    },
+    {
+      "id": "keys_table",
+      "answer": "your keys are on the table",
+      "category": "ordinary-copula",
+      "full": false
+    },
+    {
+      "id": "machine_quietly",
+      "answer": "this machine runs quietly",
+      "category": "ordinary-predicative",
+      "full": false
+    },
+    {
+      "id": "bridge_unsafe",
+      "answer": "the old bridge looks unsafe",
+      "category": "ordinary-predicative",
+      "full": false
+    },
+    {
+      "id": "never_answer",
+      "answer": "they never found the answer",
+      "category": "ordinary-adverb",
+      "full": false
+    },
+    {
+      "id": "quiet_focus",
+      "answer": "a quiet room helps focus",
+      "category": "ordinary-clause",
+      "full": false
+    },
+    {
+      "id": "train_time",
+      "answer": "the train arrived on time",
+      "category": "ordinary-pp",
+      "full": false
+    },
+    {
+      "id": "rain_slippery",
+      "answer": "rain makes roads slippery",
+      "category": "ordinary-resultative",
+      "full": false
+    },
+    {
+      "id": "cats_places",
+      "answer": "cats sleep in warm places",
+      "category": "ordinary-pp",
+      "full": false
+    },
+    {
+      "id": "package_yesterday",
+      "answer": "the package arrived yesterday",
+      "category": "ordinary-adverb",
+      "full": false
+    },
+    {
+      "id": "choice_cost",
+      "answer": "every choice has a cost",
+      "category": "ordinary-clause",
+      "full": false
+    },
+    {
+      "id": "tools_time",
+      "answer": "good tools save time",
+      "category": "ordinary-clause",
+      "full": false
+    },
+    {
+      "id": "learn_mistakes",
+      "answer": "we learn by making mistakes",
+      "category": "ordinary-pp",
+      "full": false
+    },
+    {
+      "id": "coffee_hot",
+      "answer": "coffee tastes better hot",
+      "category": "ordinary-predicative",
+      "full": false
+    }
+  ]
+}
