@@ -45,6 +45,15 @@ jobs:
             .ci_phrase_cache
           key: phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-${{ hashFiles('build_wikimedia_phrase_index.py') }}
 
+      # Prepared rows depend on reranker feature code, while their on-disk key
+      # intentionally uses an explicit schema rather than hashing source files.
+      # Never inherit them across branches/PRs. Rebuilding them is cheap compared
+      # with rebuilding the Wikimedia phrase indexes, and later scenarios in this
+      # same job can still reuse the freshly prepared rows.
+      - name: Drop code-sensitive prepared-feature cache
+        shell: bash
+        run: rm -rf ~/.multi_anagram/prepared_cache
+
       - name: Build Wiktionary phrase index
         shell: bash
         run: |
