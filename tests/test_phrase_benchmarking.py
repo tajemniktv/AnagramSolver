@@ -38,6 +38,20 @@ class _NoTargetReranker:
         )
 
 
+class _TiedReranker:
+    @staticmethod
+    def rank_orders(words, _lex, **_kwargs):
+        # Incoming rank_orders() tie order is authoritative. The intended phrase
+        # deliberately comes second and has stronger phrase evidence.
+        return (
+            (
+                SimpleNamespace(order=("power", "is", "knowledge"), objective=0.90),
+                SimpleNamespace(order=("knowledge", "is", "power"), objective=0.90),
+            ),
+            6,
+        )
+
+
 class _PhraseIndex:
     def score(self, order):
         if tuple(order) == ("knowledge", "is", "power"):
@@ -78,6 +92,21 @@ class PhraseBenchmarkTests(unittest.TestCase):
         self.assertEqual(result.grammar_rank, 2)
         self.assertEqual(result.retained_rank, 2)
         self.assertEqual(result.best_order, result.grammar_best_order)
+        self.assertFalse(result.exact_best)
+
+    def test_zero_bonus_preserves_incoming_order_for_objective_ties(self):
+        result = benchmark.run_phrase_order_case(
+            _TiedReranker,
+            object(),
+            {"id": "knowledge_power", "answer": "knowledge is power"},
+            _PhraseIndex(),
+            order_candidates=16,
+            phrase_bonus_max=0.0,
+        )
+        self.assertEqual(result.grammar_best_order, "power is knowledge")
+        self.assertEqual(result.best_order, "power is knowledge")
+        self.assertEqual(result.grammar_rank, 2)
+        self.assertEqual(result.retained_rank, 2)
         self.assertFalse(result.exact_best)
 
     def test_no_acceptable_order_retained_counts_as_miss(self):

@@ -293,8 +293,13 @@ def run_phrase_order_case(
             )
         )
 
-    grammar_scored.sort(key=lambda item: (-item[0], item[1]))
-    phrase_scored.sort(key=lambda item: (-item[0], -item[1], item[2]))
+    # Python's sort is stable, so equal objectives preserve rank_orders()'s
+    # incoming tie order. Phrase evidence may break ties only when enabled.
+    grammar_scored.sort(key=lambda item: -item[0])
+    if phrase_bonus_max > 0:
+        phrase_scored.sort(key=lambda item: (-item[0], -item[1]))
+    else:
+        phrase_scored.sort(key=lambda item: -item[0])
 
     grammar_ranks = [
         i

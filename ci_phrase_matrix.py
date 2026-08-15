@@ -134,10 +134,11 @@ def append_summary(rows: list[tuple[Scenario, dict, dict]]) -> None:
         f.write(
             "The same code and benchmark cases are evaluated with no phrase DB, "
             "Wiktionary titles, and Wiktionary+Wikipedia titles. Phrase A/B deltas "
-            "compare the identical retained top-K orders.\n\n"
+            "compare the identical retained top-K orders. Exact <=6w R@1 is a separate "
+            "exhaustive-permutation metric over only cases with at most six words.\n\n"
         )
         f.write(
-            "| Corpus | Grammar R@1 | Retained G R@1 | Phrase R@1 | Δ R@1 | "
+            "| Corpus | Exact <=6w R@1 | Retained G R@1 | Phrase R@1 | Δ R@1 | "
             "Phrase MRR | Full Bag R@10 | Full Exact R@10 | Full Exact MRR |\n"
         )
         f.write("|---|---:|---:|---:|---:|---:|---:|---:|---:|\n")
@@ -163,10 +164,21 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=8)
     args = ap.parse_args()
 
+    # Resolve relative paths against the caller's working directory before child
+    # benchmarks switch cwd to HERE, and fail fast before running the baseline.
+    wiktionary_db = args.wiktionary_db.expanduser().resolve()
+    wikipedia_db = args.wikipedia_db.expanduser().resolve()
+    for label, path in (
+        ("Wiktionary phrase DB", wiktionary_db),
+        ("Wiktionary + Wikipedia phrase DB", wikipedia_db),
+    ):
+        if not path.is_file():
+            ap.error(f"{label} does not exist or is not a file: {path}")
+
     scenarios = [
         Scenario("Baseline (no phrase DB)", "baseline", None),
-        Scenario("Wiktionary", "wiktionary", args.wiktionary_db),
-        Scenario("Wiktionary + Wikipedia", "wiktionary-wikipedia", args.wikipedia_db),
+        Scenario("Wiktionary", "wiktionary", wiktionary_db),
+        Scenario("Wiktionary + Wikipedia", "wiktionary-wikipedia", wikipedia_db),
     ]
 
     rows: list[tuple[Scenario, dict, dict]] = []
@@ -203,7 +215,7 @@ def main() -> int:
     print("\n=== CORPUS MATRIX SUMMARY ===")
     for scenario, order, full in rows:
         print(
-            f"{scenario.name:<28} grammarR1={fmt(order['grammar_r1'])} "
+            f"{scenario.name:<28} exact6wR1={fmt(order['grammar_r1'])} "
             f"phraseR1={fmt(order['phrase_r1'])} deltaR1={fmt(order['delta_r1'])} "
             f"bagR10={fmt(full['bag_r10'])} exactR10={fmt(full['exact_r10'])}"
         )
