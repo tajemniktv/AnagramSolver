@@ -78,10 +78,13 @@ jobs:
             echo "Using cached Wiktionary + Wikipedia phrase index"
           fi
 
+      # Corpus availability and benchmark freshness are separate concerns.
+      # PRs, main pushes, and manual runs always benchmark the checked-out code;
+      # only a scheduled monthly refresh may skip when its corpus key is already
+      # warm (for example after a manual rerun of the same scheduled revision).
       - name: Run corpus benchmark matrix
         if: >-
-          github.event_name == 'pull_request' ||
-          github.event_name == 'workflow_dispatch' ||
+          github.event_name != 'schedule' ||
           steps.corpus-cache.outputs.cache-hit != 'true'
         run: |
           python ci_phrase_matrix.py \
@@ -89,8 +92,8 @@ jobs:
             --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
             --workers 8
 
-      - name: Default-branch cache already warm
+      - name: Scheduled corpus snapshot already warm
         if: >-
-          (github.event_name == 'push' || github.event_name == 'schedule') &&
+          github.event_name == 'schedule' &&
           steps.corpus-cache.outputs.cache-hit == 'true'
-        run: echo "Corpus cache already exists for this monthly snapshot; skipping duplicate main-branch benchmarks."
+        run: echo "Corpus cache already exists for this scheduled monthly snapshot; skipping the duplicate scheduled benchmark."
