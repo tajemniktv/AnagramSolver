@@ -16,12 +16,19 @@ import argparse
 import math
 import re
 import sys
+import time
 import unicodedata
 import urllib.request
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator, Sequence
+
+from anagram_search_parallel import (
+    SearchCandidate,
+    resolve_worker_count,
+    solve_parallel,
+)
 
 DEFAULT_DICT_URL = "https://phillipmfeldman.org/English/large.txt"
 DEFAULT_CACHE_DIR = Path.home() / ".multi_anagram"
@@ -1026,6 +1033,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Additional 1-2 letter words allowed by the safe short-word policy",
     )
     p.add_argument("--no-repeat", action="store_true")
+    p.add_argument(
+        "--workers", type=int, default=0, metavar="N",
+        help="Exact-search worker processes; 0 chooses automatically",
+    )
 
     p.add_argument(
         "--analyze", action="store_true",
@@ -1082,6 +1093,8 @@ def main() -> int:
         raise SystemExit("Invalid --min-words/--max-words")
     if args.max_results < 0:
         raise SystemExit("--max-results must be >= 0")
+    if args.workers < 0:
+        raise SystemExit("--workers must be >= 0")
     if args.all_results:
         args.max_results = 0
     if args.deep_per_group < 1:
@@ -1268,14 +1281,22 @@ def main() -> int:
     solutions: list[tuple[str, ...]] = []
     generated = 0
     accepted = 0
+    worker_count = resolve_worker_count(args.workers)
+    search_candidates = [
+        SearchCandidate(c.word, c.sig, c.length) for c in candidates
+    ]
+    search_started = time.perf_counter()
     try:
-        for solution in solve(
+        for solution in solve_parallel(
             remaining,
-            candidates,
+            search_candidates,
             args.min_words,
             args.max_words,
             args.max_results,
             allow_repeat=not args.no_repeat,
+            workers=worker_count,
+            required_any=contains_any,
+            initial_any_matched=bool(contains_any.intersection(required_words)),
         ):
             generated += 1
             all_words = tuple([*required_words, *solution])
@@ -1295,9 +1316,11 @@ def main() -> int:
         if stream is not None:
             stream.close()
 
+    search_seconds = time.perf_counter() - search_started
     print(
         f"Generated {generated:,} exact word set(s); "
-        f"{accepted:,} survived clue constraints.",
+        f"{accepted:,} survived clue constraints. "
+        f"Exact search: {search_seconds:.2f}s with {worker_count} worker(s).",
         file=sys.stderr,
     )
 

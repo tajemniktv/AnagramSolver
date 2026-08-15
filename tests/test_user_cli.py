@@ -36,6 +36,7 @@ class UserCliTests(unittest.TestCase):
             str(solver.BALANCED_MAX_RESULTS),
         )
         self.assertEqual(cmd[cmd.index("--min-zipf") + 1], "2.7")
+        self.assertEqual(cmd[cmd.index("--workers") + 1], "0")
         self.assertEqual(solver._generation_mode(args), "balanced")
 
     def test_quick_generation_uses_smaller_cap(self) -> None:
