@@ -19,6 +19,7 @@ COMMON_REPLACEMENTS = {
     "_v8_ALL.txt": "_candidates.txt",
     "v13_RERANKED.txt": "reranked.txt",
     "V8_LINE_RE": "GENERATOR_LINE_RE",
+    "parse_v8": "parse_candidates",
     "score_pre_v13": "score_pre",
     "score_final_v13": "score_final",
     "v13_pre": "pre_score",
@@ -91,6 +92,8 @@ def clean_benchmark(text: str) -> str:
                         'FINAL_RE = re.compile(r"FINAL rank:')
     text = text.replace('PRE_RE = re.compile(r"V\\d+ PRE rank:',
                         'PRE_RE = re.compile(r"PRE rank:')
+    text = text.replace('raise SystemExit(f"V8 generator not found: {args.generator}")',
+                        'raise SystemExit(f"Generator not found: {args.generator}")')
     return text
 
 
