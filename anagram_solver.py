@@ -15,6 +15,7 @@ import re
 import subprocess
 import sys
 import unicodedata
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -56,6 +57,17 @@ def _normalized_target(text: str) -> str:
     return "".join(ch for ch in ascii_text.lower() if "a" <= ch <= "z")
 
 
+def _normalized_words(values: Sequence[str]) -> list[str]:
+    """Canonicalize word constraints using the generator's token semantics."""
+    return sorted(
+        {
+            normalized
+            for word in _csv_words(values)
+            if (normalized := _normalized_target(word))
+        }
+    )
+
+
 def _source_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
 
@@ -67,9 +79,9 @@ def _run_key(args: argparse.Namespace) -> str:
         "min_words": args.min_words,
         "max_words": args.max_words,
         "min_zipf": args.min_zipf,
-        "hints": sorted(_csv_words(args.hint)),
-        "exclude": sorted(_csv_words(args.exclude)),
-        "require": sorted(_csv_words(args.require)),
+        "hints": _normalized_words(args.hint),
+        "exclude": _normalized_words(args.exclude),
+        "require": _normalized_words(args.require),
         "quick": args.quick,
         "generator": _source_hash(GENERATOR),
     }
@@ -295,9 +307,10 @@ def _print_results(args: argparse.Namespace, results: Sequence[Result], run_dir:
 
 
 def _generate_candidates(args: argparse.Namespace, candidates: Path) -> None:
-    """Generate into a temporary file, publishing the cache only on success."""
-    temporary = candidates.with_name(candidates.name + ".tmp")
-    temporary.unlink(missing_ok=True)
+    """Generate privately, publishing the shared cache only on success."""
+    temporary = candidates.with_name(
+        f".{candidates.name}.{uuid.uuid4().hex}.tmp"
+    )
     try:
         _run(build_generator_command(args, temporary), verbose=args.verbose)
         if not temporary.is_file():
