@@ -15,6 +15,11 @@ class UserCliTests(unittest.TestCase):
         solver._validate_args(args)
         return args
 
+    def _target_args(self, target: str, *extra: str) -> argparse.Namespace:
+        args = solver.build_parser().parse_args([target, *extra])
+        solver._validate_args(args)
+        return args
+
     def _assert_validation_error(self, *extra: str) -> str:
         args = solver.build_parser().parse_args(["abcdef", *extra])
         with self.assertRaises(SystemExit) as caught:
@@ -113,6 +118,13 @@ not a reranker result
                 (4, 1, "these hips dont lie"),
             ],
         )
+
+    def test_run_key_normalizes_equivalent_target_text(self) -> None:
+        spaced = self._target_args("Tóm Marvolo Riddle")
+        compact = self._target_args("tom-marvolo-riddle")
+        letters = self._target_args("TOMMARVOLORIDDLE")
+        self.assertEqual(solver._run_key(spaced), solver._run_key(compact))
+        self.assertEqual(solver._run_key(spaced), solver._run_key(letters))
 
     def test_run_key_changes_for_generation_constraints(self) -> None:
         base = self._args()
