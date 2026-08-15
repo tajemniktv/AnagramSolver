@@ -81,6 +81,7 @@ class UserCliTests(unittest.TestCase):
             (("--top", "0"), "--top"),
             (("--min-zipf", "-0.1"), "--min-zipf"),
             (("--phrase-db", "definitely-not-a-real-phrase-db.sqlite"), "--phrase-db"),
+            (("--json", "--verbose"), "--json"),
         ]
         for argv, expected in cases:
             with self.subTest(argv=argv):
@@ -155,6 +156,41 @@ not a reranker result
         _, kwargs = run.call_args
         self.assertTrue(kwargs["text"])
         self.assertNotIn("capture_output", kwargs)
+
+    def test_candidate_cache_is_published_only_after_success(self) -> None:
+        args = self._args()
+        with tempfile.TemporaryDirectory() as tmp:
+            candidates = Path(tmp) / "candidates.txt"
+            candidates.write_text("old-cache\n", encoding="utf-8")
+
+            def fail_run(cmd: list[str], *, verbose: bool):
+                export = Path(cmd[cmd.index("--export") + 1])
+                export.write_text("partial\n", encoding="utf-8")
+                raise SystemExit("generator failed")
+
+            with patch.object(solver, "_run", side_effect=fail_run):
+                with self.assertRaisesRegex(SystemExit, "generator failed"):
+                    solver._generate_candidates(args, candidates)
+
+            self.assertEqual(candidates.read_text(encoding="utf-8"), "old-cache\n")
+            self.assertFalse(Path(str(candidates) + ".tmp").exists())
+
+    def test_successful_generation_atomically_replaces_candidate_cache(self) -> None:
+        args = self._args()
+        with tempfile.TemporaryDirectory() as tmp:
+            candidates = Path(tmp) / "candidates.txt"
+            candidates.write_text("old-cache\n", encoding="utf-8")
+
+            def succeed_run(cmd: list[str], *, verbose: bool):
+                export = Path(cmd[cmd.index("--export") + 1])
+                export.write_text("fresh-cache\n", encoding="utf-8")
+                return __import__("subprocess").CompletedProcess(cmd, 0)
+
+            with patch.object(solver, "_run", side_effect=succeed_run):
+                solver._generate_candidates(args, candidates)
+
+            self.assertEqual(candidates.read_text(encoding="utf-8"), "fresh-cache\n")
+            self.assertFalse(Path(str(candidates) + ".tmp").exists())
 
 
 if __name__ == "__main__":
