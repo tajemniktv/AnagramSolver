@@ -1,453 +1,195 @@
 #!/usr/bin/env python3
-"""
-Current AnagramSolver reranker front-end.
-
-The stable V13 implementation lives in ``anagram_rerank_core.py``.  This module
-adds the next ranking layer without duplicating that large, well-tested parser:
-
-* deterministic, input-order-independent word ordering;
-* retention of several strong grammatical orders per word bag;
-* phrase/collocation rescoring across those alternative orders;
-* phrase rescoring over the union of strong PRE and strong grammar candidates.
-
-The core module remains importable so this layer can stay small and easy to
-review.  The public API intentionally mirrors ``anagram_rerank_core`` because
-``anagram_benchmark.py`` imports helper functions directly.
-"""
+"""Active AnagramSolver front-end with scoped top-K and safety adapters."""
 
 from __future__ import annotations
 
+import gzip
+import hashlib
+import json
 import multiprocessing
 import sys
-import time
-from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import anagram_rerank_core as core
 
-# Re-export the existing public and benchmark-facing surface, including the
-# underscore-prefixed ordering helpers used by anagram_benchmark.py.
-for _name in dir(core):
+# The top-K implementation predates this facade and historically patched core at
+# import time. Capture and restore the frozen core API immediately so merely
+# importing ``anagram_rerank`` is side-effect free.
+_CORE_HOOK_NAMES = (
+    "best_order",
+    "deep_analyze",
+    "apply_phrase_rescore",
+    "DeepResult",
+)
+_core_before_impl = {name: getattr(core, name) for name in _CORE_HOOK_NAMES}
+import anagram_rerank_topk_impl as impl  # noqa: E402
+for _name, _value in _core_before_impl.items():
+    setattr(core, _name, _value)
+
+# Preserve the benchmark-facing API exposed by the implementation.
+for _name in dir(impl):
     if not _name.startswith("__"):
-        globals()[_name] = getattr(core, _name)
+        globals()[_name] = getattr(impl, _name)
 
-ENGINE_LAYER = "top-k-order-reranking"
-DEFAULT_ORDER_CANDIDATES = 16
-_ORDER_CANDIDATE_COUNT = DEFAULT_ORDER_CANDIDATES
-
-# Main-process side table. Row uses slots, so keeping the alternatives outside
-# Row lets us add the feature without invalidating prepared-cache pickles.
-_ORDER_CANDIDATES_BY_ROW_ID: dict[int, tuple["OrderCandidate", ...]] = {}
-
-# Worker-local settings.
-_WORKER_LEX = None
-_WORKER_ORDER_MODE = "auto"
-_WORKER_BEAM_WIDTH = 128
-_WORKER_EXACT_MAX_WORDS = 5
-_WORKER_ORDER_CANDIDATES = DEFAULT_ORDER_CANDIDATES
+ENGINE_LAYER = "top-k-order-reranking-reviewed"
+PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-1"
 
 
-@dataclass(slots=True, frozen=True)
-class OrderCandidate:
-    order: tuple[str, ...]
-    grammar_raw: float
-    grammar_norm: float
-    structure_norm: float
-    valency_norm: float
-    syntax_coverage: float
-    phrase_kind: str
-    objective: float
+def canonical_bag_key(row: Row) -> tuple[str, ...]:
+    return tuple(sorted(row.words))
 
 
-@dataclass(slots=True, frozen=True)
-class DeepResult:
-    row_index: int
-    grammar_raw: float
-    best_order: tuple[str, ...]
-    structure_norm: float
-    valency_norm: float
-    syntax_coverage: float
-    phrase_kind: str
-    orders_evaluated: int
-    order_candidates: tuple[OrderCandidate, ...] = ()
+def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
+    """Fingerprint prepared caches independently of the legacy pickle schema."""
+    h = hashlib.sha256()
+    h.update(PREPARED_CACHE_SCHEMA.encode("ascii"))
+    h.update(str(input_path.resolve()).encode("utf-8", "replace"))
+    h.update(core._hash_file(input_path).encode("ascii"))
+    for name in (
+        "index.noun", "index.verb", "index.adj", "index.adv",
+        "noun.exc", "verb.exc", "data.verb",
+    ):
+        path = wordnet_dir / name
+        if path.exists():
+            stat = path.stat()
+            h.update(name.encode("ascii"))
+            h.update(str(stat.st_size).encode("ascii"))
+            h.update(str(stat.st_mtime_ns).encode("ascii"))
+    return h.hexdigest()[:24]
 
 
-def _candidate_sort_key(candidate: OrderCandidate) -> tuple:
-    """Best-first key with lexical order as the final deterministic tie break."""
-    return (
-        -candidate.objective,
-        -candidate.structure_norm,
-        -candidate.grammar_norm,
-        -candidate.valency_norm,
-        -candidate.syntax_coverage,
-        candidate.order,
-    )
-
-
-def rank_orders(
-    words: Sequence[str],
-    lex: WordNetLexicon,
-    *,
-    order_mode: str = "auto",
-    beam_width: int = 128,
-    exact_max_words: int = 5,
-    top_k: int = DEFAULT_ORDER_CANDIDATES,
-) -> tuple[tuple[OrderCandidate, ...], int]:
-    """
-    Return several strong complete orders for one unordered word bag.
-
-    The input bag is canonicalized before any search, so equal scores cannot be
-    resolved differently merely because the generator happened to emit
-    ``power knowledge is`` instead of ``is knowledge power``.
-    """
-    if top_k < 1:
-        raise ValueError("top_k must be >= 1")
-
-    canonical_words = tuple(sorted(words))
-    n = len(canonical_words)
-    if n == 0:
-        return (), 0
-
-    if n == 1:
-        structure = phrase_structure(canonical_words, lex)
-        raw = local_grammar_raw(canonical_words, lex)
-        candidate = OrderCandidate(
-            order=canonical_words,
-            grammar_raw=raw,
-            grammar_norm=grammar_normalize(raw),
-            structure_norm=structure.norm,
-            valency_norm=structure.valency,
-            syntax_coverage=structure.coverage,
-            phrase_kind=structure.kind,
-            objective=(
-                0.38 * grammar_normalize(raw)
-                + 0.44 * structure.norm
-                + 0.12 * structure.valency
-                + 0.06 * structure.coverage
-            ),
-        )
-        return (candidate,), 1
-
-    pair, starts, ends = _order_local_tables(canonical_words, lex)
-    use_exact = order_mode == "exact" or (
-        order_mode == "auto" and n <= exact_max_words
-    )
-
-    if use_exact:
-        order_iter: Iterable[tuple[int, ...]] = _exact_index_orders(n)
-    else:
-        # Retain a larger locally-plausible pool than the final top-K because
-        # whole-clause structure is deliberately non-decomposable.
-        search_width = max(beam_width, top_k * 8)
-        order_iter = _kbest_local_orders(
-            n,
-            pair,
-            starts,
-            ends,
-            max_complete=search_width,
-        )
-
-    by_order: dict[tuple[str, ...], OrderCandidate] = {}
-    evaluated = 0
-
-    for idx_order in order_iter:
-        word_order = tuple(canonical_words[i] for i in idx_order)
-        # Repeated words can realize the same phrase through several position
-        # permutations. Score each realized sequence once.
-        if word_order in by_order:
-            continue
-
-        evaluated += 1
-        raw = _local_raw_indices(idx_order, pair, starts, ends)
-        grammar_norm = grammar_normalize(raw)
-        structure = phrase_structure(word_order, lex)
-        objective = (
-            0.38 * grammar_norm
-            + 0.44 * structure.norm
-            + 0.12 * structure.valency
-            + 0.06 * structure.coverage
-        )
-        by_order[word_order] = OrderCandidate(
-            order=word_order,
-            grammar_raw=raw,
-            grammar_norm=grammar_norm,
-            structure_norm=structure.norm,
-            valency_norm=structure.valency,
-            syntax_coverage=structure.coverage,
-            phrase_kind=structure.kind,
-            objective=objective,
-        )
-
-    ranked = tuple(sorted(by_order.values(), key=_candidate_sort_key)[:top_k])
-    return ranked, evaluated
-
-
-def best_order(
-    words: Sequence[str],
-    lex: WordNetLexicon,
-    *,
-    order_mode: str = "auto",
-    beam_width: int = 128,
-    exact_max_words: int = 5,
-) -> tuple[float, tuple[str, ...], StructureResult, int]:
-    """Compatibility wrapper returning the strongest grammar-only order."""
-    candidates, evaluated = rank_orders(
-        words,
-        lex,
-        order_mode=order_mode,
-        beam_width=beam_width,
-        exact_max_words=exact_max_words,
-        top_k=1,
-    )
-    if not candidates:
-        structure = phrase_structure(tuple(words), lex)
-        return local_grammar_raw(words, lex), tuple(words), structure, evaluated
-
-    winner = candidates[0]
-    structure = StructureResult(
-        winner.structure_norm,
-        winner.valency_norm,
-        winner.syntax_coverage,
-        0.5,
-        winner.phrase_kind,
-        4.0 * winner.structure_norm,
-    )
-    return winner.grammar_raw, winner.order, structure, evaluated
-
-
-def _worker_init(
-    wordnet_dir: str,
-    order_mode: str,
-    beam_width: int,
-    exact_max_words: int,
-    order_candidates: int,
-) -> None:
-    global _WORKER_LEX, _WORKER_ORDER_MODE, _WORKER_BEAM_WIDTH
-    global _WORKER_EXACT_MAX_WORDS, _WORKER_ORDER_CANDIDATES
-    _WORKER_LEX = WordNetLexicon.load(Path(wordnet_dir))
-    _WORKER_ORDER_MODE = order_mode
-    _WORKER_BEAM_WIDTH = beam_width
-    _WORKER_EXACT_MAX_WORDS = exact_max_words
-    _WORKER_ORDER_CANDIDATES = order_candidates
-
-
-def _worker_analyze_batch(
-    batch: tuple[tuple[int, tuple[str, ...]], ...],
-) -> list[DeepResult]:
-    if _WORKER_LEX is None:
-        raise RuntimeError("Worker WordNet lexicon was not initialized.")
-
-    out: list[DeepResult] = []
-    for row_index, words in batch:
-        candidates, evaluated = rank_orders(
-            words,
-            _WORKER_LEX,
-            order_mode=_WORKER_ORDER_MODE,
-            beam_width=_WORKER_BEAM_WIDTH,
-            exact_max_words=_WORKER_EXACT_MAX_WORDS,
-            top_k=_WORKER_ORDER_CANDIDATES,
-        )
-        if not candidates:
-            continue
-        winner = candidates[0]
-        out.append(
-            DeepResult(
-                row_index=row_index,
-                grammar_raw=winner.grammar_raw,
-                best_order=winner.order,
-                structure_norm=winner.structure_norm,
-                valency_norm=winner.valency_norm,
-                syntax_coverage=winner.syntax_coverage,
-                phrase_kind=winner.phrase_kind,
-                orders_evaluated=evaluated,
-                order_candidates=candidates,
-            )
-        )
-    return out
-
-
-def _order_base_final(row: Row, candidate: OrderCandidate) -> float:
-    return 100.0 * (
-        0.10 * row.lex
-        + 0.16 * row.fam
-        + 0.12 * row.hint
-        + 0.22 * candidate.grammar_norm
-        + 0.28 * candidate.structure_norm
-        + 0.08 * candidate.valency_norm
-        + 0.04 * row.wn_coverage
-    )
-
-
-def _apply_deep_result(rows: list[Row], result: DeepResult) -> None:
-    row = rows[result.row_index]
-    row.deep = True
-    row.grammar_raw = result.grammar_raw
-    row.grammar_norm = grammar_normalize(result.grammar_raw)
-    row.best_order = result.best_order
-    row.structure_norm = result.structure_norm
-    row.valency_norm = result.valency_norm
-    row.syntax_coverage = result.syntax_coverage
-    row.phrase_kind = result.phrase_kind
-    row.final = score_final_v13(row)
-    row.base_final = row.final
-    _ORDER_CANDIDATES_BY_ROW_ID[id(row)] = result.order_candidates
-
-
-def deep_analyze(
-    rows: list[Row],
-    selected: set[int],
-    lex: WordNetLexicon,
-    *,
-    wordnet_dir: Path,
-    backend: str,
-    workers: int,
-    batch_size: int,
-    order_mode: str,
-    beam_width: int,
-    exact_max_words: int,
-) -> dict[str, float]:
-    """Multicore deep analysis that also returns top-K alternative orders."""
-    selected_sorted = sorted(selected)
-    total = len(selected_sorted)
-    if total == 0:
-        return {"seconds": 0.0, "orders": 0.0, "candidates": 0.0}
-
-    _ORDER_CANDIDATES_BY_ROW_ID.clear()
-    resolved_backend = resolve_backend(backend, workers)
-    print(
-        f"Deep backend: {resolved_backend}; workers={workers}; "
-        f"order_mode={order_mode}; exact<= {exact_max_words}; "
-        f"k-best width={beam_width}; retained-orders={_ORDER_CANDIDATE_COUNT}; "
-        f"batch={batch_size}"
-    )
-
-    t0 = time.perf_counter()
-    done = 0
-    total_orders = 0
-
-    def progress(increment: int, order_count: int) -> None:
-        nonlocal done, total_orders
-        done += increment
-        total_orders += order_count
-        if done == total or done % 2000 < increment:
-            elapsed = max(1e-9, time.perf_counter() - t0)
-            print(
-                f"  deep-analyzed {done:,} / {total:,} "
-                f"({done/elapsed:,.1f} candidates/s; "
-                f"{total_orders/elapsed:,.0f} orders/s)"
-            )
-
-    if resolved_backend == "serial":
-        for row_index in selected_sorted:
-            candidates, evaluated = rank_orders(
-                rows[row_index].words,
-                lex,
-                order_mode=order_mode,
-                beam_width=beam_width,
-                exact_max_words=exact_max_words,
-                top_k=_ORDER_CANDIDATE_COUNT,
-            )
-            if not candidates:
-                continue
-            winner = candidates[0]
-            result = DeepResult(
-                row_index=row_index,
-                grammar_raw=winner.grammar_raw,
-                best_order=winner.order,
-                structure_norm=winner.structure_norm,
-                valency_norm=winner.valency_norm,
-                syntax_coverage=winner.syntax_coverage,
-                phrase_kind=winner.phrase_kind,
-                orders_evaluated=evaluated,
-                order_candidates=candidates,
-            )
-            _apply_deep_result(rows, result)
-            progress(1, evaluated)
-
-    else:
-        payloads = [
-            tuple((i, rows[i].words) for i in batch)
-            for batch in chunked(selected_sorted, batch_size)
-        ]
-
-        if resolved_backend == "thread":
-            global _WORKER_LEX, _WORKER_ORDER_MODE, _WORKER_BEAM_WIDTH
-            global _WORKER_EXACT_MAX_WORDS, _WORKER_ORDER_CANDIDATES
-            _WORKER_LEX = lex
-            _WORKER_ORDER_MODE = order_mode
-            _WORKER_BEAM_WIDTH = beam_width
-            _WORKER_EXACT_MAX_WORDS = exact_max_words
-            _WORKER_ORDER_CANDIDATES = _ORDER_CANDIDATE_COUNT
-            pool_type = ThreadPoolExecutor
-            pool_kwargs = {"max_workers": workers}
-        elif resolved_backend == "process":
-            pool_type = ProcessPoolExecutor
-            pool_kwargs = {
-                "max_workers": workers,
-                "initializer": _worker_init,
-                "initargs": (
-                    str(wordnet_dir),
-                    order_mode,
-                    beam_width,
-                    exact_max_words,
-                    _ORDER_CANDIDATE_COUNT,
-                ),
-            }
-        else:
-            raise ValueError(f"Unsupported backend: {resolved_backend}")
-
-        with pool_type(**pool_kwargs) as pool:
-            futures = [pool.submit(_worker_analyze_batch, payload) for payload in payloads]
-            for fut in as_completed(futures):
-                results = fut.result()
-                order_count = 0
-                for result in results:
-                    _apply_deep_result(rows, result)
-                    order_count += result.orders_evaluated
-                progress(len(results), order_count)
-
-    elapsed = time.perf_counter() - t0
+def _row_to_cache_dict(row: Row) -> dict[str, object]:
     return {
-        "seconds": elapsed,
-        "orders": float(total_orders),
-        "candidates": float(total),
+        "words": list(row.words),
+        "word_count": row.word_count,
+        "old_rank": row.old_rank,
+        "old_pre": row.old_pre,
+        "lex": row.lex,
+        "fam": row.fam,
+        "old_pair": row.old_pair,
+        "hint": row.hint,
+        "zavg": row.zavg,
+        "zmin": row.zmin,
+        "old_pcov": row.old_pcov,
+        "hints": list(row.hints),
+        "wn_coverage": row.wn_coverage,
+        "grammar_potential": row.grammar_potential,
+        "grammar_potential_norm": row.grammar_potential_norm,
+        "v13_pre": row.v13_pre,
+        "family_key": list(row.family_key),
     }
 
 
-def _row_phrase_candidates(row: Row) -> tuple[OrderCandidate, ...]:
-    candidates = _ORDER_CANDIDATES_BY_ROW_ID.get(id(row))
-    if candidates:
-        return candidates
+_CACHE_KEYS = frozenset(_row_to_cache_dict(Row(
+    words=(), word_count=0, old_rank=0, old_pre=0.0, lex=0.0, fam=0.0,
+    old_pair=0.0, hint=0.0, zavg=0.0, zmin=0.0, old_pcov=0.0, hints=(),
+)).keys())
 
-    structure = StructureResult(
-        row.structure_norm,
-        row.valency_norm,
-        row.syntax_coverage,
-        0.5,
-        row.phrase_kind,
-        4.0 * row.structure_norm,
+
+def _row_from_cache_dict(item: object) -> Row | None:
+    if not isinstance(item, dict) or set(item) != _CACHE_KEYS:
+        return None
+
+    def strings(name: str) -> tuple[str, ...] | None:
+        value = item.get(name)
+        if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+            return None
+        return tuple(value)
+
+    words = strings("words")
+    hints = strings("hints")
+    family_key = strings("family_key")
+    if words is None or hints is None or family_key is None:
+        return None
+
+    if not all(
+        isinstance(item.get(key), int) and not isinstance(item.get(key), bool)
+        for key in ("word_count", "old_rank")
+    ):
+        return None
+    numeric = (
+        "old_pre", "lex", "fam", "old_pair", "hint", "zavg", "zmin",
+        "old_pcov", "wn_coverage", "grammar_potential",
+        "grammar_potential_norm", "v13_pre",
     )
-    objective = (
-        0.38 * row.grammar_norm
-        + 0.44 * structure.norm
-        + 0.12 * structure.valency
-        + 0.06 * structure.coverage
+    if not all(
+        isinstance(item.get(key), (int, float)) and not isinstance(item.get(key), bool)
+        for key in numeric
+    ):
+        return None
+
+    return Row(
+        words=words,
+        word_count=int(item["word_count"]),
+        old_rank=int(item["old_rank"]),
+        old_pre=float(item["old_pre"]),
+        lex=float(item["lex"]),
+        fam=float(item["fam"]),
+        old_pair=float(item["old_pair"]),
+        hint=float(item["hint"]),
+        zavg=float(item["zavg"]),
+        zmin=float(item["zmin"]),
+        old_pcov=float(item["old_pcov"]),
+        hints=hints,
+        wn_coverage=float(item["wn_coverage"]),
+        grammar_potential=float(item["grammar_potential"]),
+        grammar_potential_norm=float(item["grammar_potential_norm"]),
+        v13_pre=float(item["v13_pre"]),
+        family_key=family_key,
     )
-    return (
-        OrderCandidate(
-            order=row.best_order,
-            grammar_raw=row.grammar_raw,
-            grammar_norm=row.grammar_norm,
-            structure_norm=row.structure_norm,
-            valency_norm=row.valency_norm,
-            syntax_coverage=row.syntax_coverage,
-            phrase_kind=row.phrase_kind,
-            objective=objective,
-        ),
-    )
+
+
+def load_prepared_cache(cache_path: Path) -> list[Row] | None:
+    """Load validated primitive gzip/JSON data, never executable pickle objects."""
+    try:
+        with gzip.open(cache_path, "rt", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        if not isinstance(payload, dict) or payload.get("schema") != PREPARED_CACHE_SCHEMA:
+            return None
+        raw_rows = payload.get("rows")
+        if not isinstance(raw_rows, list):
+            return None
+        rows: list[Row] = []
+        for item in raw_rows:
+            row = _row_from_cache_dict(item)
+            if row is None:
+                return None
+            rows.append(row)
+        core._reset_deep_fields(rows)
+        return rows
+    except (OSError, EOFError, json.JSONDecodeError, UnicodeError, TypeError, ValueError):
+        return None
+
+
+def save_prepared_cache(cache_path: Path, rows: list[Row]) -> None:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = cache_path.with_suffix(cache_path.suffix + ".tmp")
+    with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=6) as handle:
+        json.dump(
+            {
+                "schema": PREPARED_CACHE_SCHEMA,
+                "rows": [_row_to_cache_dict(row) for row in rows],
+            },
+            handle,
+            ensure_ascii=True,
+            separators=(",", ":"),
+        )
+    tmp.replace(cache_path)
+
+
+def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
+    """Canonicalize unordered bags before any stable sort can observe parse order."""
+    for row in rows:
+        row.words = tuple(sorted(row.words))
+    rows.sort(key=lambda row: (row.word_count, row.words))
+    core.prepare_rows(rows, lex)
+
+
+def _clear_order_side_tables() -> None:
+    for name in ("_ORDER_CANDIDATES_BY_ROW_ID", "_ORDER_CANDIDATES_BY_INDEX"):
+        table = getattr(impl, name, None)
+        if isinstance(table, dict):
+            table.clear()
 
 
 def apply_phrase_rescore(
@@ -458,140 +200,52 @@ def apply_phrase_rescore(
     top_per_group: int,
     bonus_max: float,
 ) -> int:
-    """
-    Rescore a union of strong PRE and strong grammar candidates, then score
-    every retained order for each selected bag.
-
-    Corpus absence remains neutral. Phrase/collocation evidence can therefore
-    rescue a known expression without making unseen but grammatical phrases bad.
-    """
-    by_wc: dict[int, list[Row]] = defaultdict(list)
+    """Canonicalize shortlist tie-breaks and release retained order state afterward."""
     for row in rows:
-        if row.deep:
-            by_wc[row.word_count].append(row)
-
-    rescored = 0
-    for bucket in by_wc.values():
-        by_final = sorted(
-            bucket,
-            key=lambda r: (-r.final, -r.v13_pre, r.words),
-        )[:top_per_group]
-        by_pre = sorted(
-            bucket,
-            key=lambda r: (-r.v13_pre, -r.final, r.words),
-        )[:top_per_group]
-
-        chosen_by_id = {id(row): row for row in (*by_final, *by_pre)}
-        chosen = sorted(
-            chosen_by_id.values(),
-            key=lambda r: (-max(r.final, r.v13_pre), r.words),
+        row.words = tuple(sorted(row.words))
+    try:
+        return impl.apply_phrase_rescore(
+            rows,
+            collocation=collocation,
+            phrase_index=phrase_index,
+            top_per_group=top_per_group,
+            bonus_max=bonus_max,
         )
-
-        for row in chosen:
-            current_order = row.best_order
-            order_results: list[tuple[float, float, float, OrderCandidate]] = []
-
-            for candidate in _row_phrase_candidates(row):
-                colloc = 0.0
-                if collocation is not None:
-                    colloc, _ = collocation.score(candidate.order)
-
-                phrase = 0.0
-                if phrase_index is not None:
-                    phrase, _ = phrase_index.score(candidate.order)
-
-                evidence = max(phrase, 0.55 * colloc)
-                base = _order_base_final(row, candidate)
-                combined = min(100.0, base + bonus_max * evidence)
-                order_results.append((combined, phrase, colloc, candidate))
-
-            if not order_results:
-                continue
-
-            if not any(phrase > 0.0 or colloc > 0.0 for _, phrase, colloc, _ in order_results):
-                row.base_final = row.final
-                row.colloc_norm = 0.0
-                row.phrase_attest_norm = 0.0
-                row.phrase_bonus = 0.0
-                rescored += 1
-                continue
-
-            order_results.sort(
-                key=lambda item: (
-                    -item[0],
-                    -item[1],
-                    -item[2],
-                    0 if item[3].order == current_order else 1,
-                    item[3].order,
-                )
-            )
-            combined, phrase, colloc, winner = order_results[0]
-
-            row.best_order = winner.order
-            row.grammar_raw = winner.grammar_raw
-            row.grammar_norm = winner.grammar_norm
-            row.structure_norm = winner.structure_norm
-            row.valency_norm = winner.valency_norm
-            row.syntax_coverage = winner.syntax_coverage
-            row.phrase_kind = winner.phrase_kind
-            row.base_final = _order_base_final(row, winner)
-            row.colloc_norm = colloc
-            row.phrase_attest_norm = phrase
-            row.phrase_bonus = combined - row.base_final
-            row.final = combined
-            rescored += 1
-
-    return rescored
-
-
-def _consume_int_flag(argv: list[str], flag: str, default: int) -> tuple[list[str], int]:
-    """Consume ``--flag N`` or ``--flag=N`` before core argparse sees it."""
-    out: list[str] = []
-    value = default
-    i = 0
-    while i < len(argv):
-        arg = argv[i]
-        if arg == flag:
-            if i + 1 >= len(argv):
-                raise SystemExit(f"{flag} requires an integer")
-            try:
-                value = int(argv[i + 1])
-            except ValueError as exc:
-                raise SystemExit(f"{flag} requires an integer") from exc
-            i += 2
-            continue
-        if arg.startswith(flag + "="):
-            try:
-                value = int(arg.split("=", 1)[1])
-            except ValueError as exc:
-                raise SystemExit(f"{flag} requires an integer") from exc
-            i += 1
-            continue
-        out.append(arg)
-        i += 1
-    return out, value
-
-
-def _install_overrides() -> None:
-    core.best_order = best_order
-    core.deep_analyze = deep_analyze
-    core.apply_phrase_rescore = apply_phrase_rescore
-    core.DeepResult = DeepResult
-
-
-_install_overrides()
+    finally:
+        _clear_order_side_tables()
 
 
 def main() -> int:
-    global _ORDER_CANDIDATE_COUNT
-    cleaned, count = _consume_int_flag(
-        sys.argv[1:], "--order-candidates", DEFAULT_ORDER_CANDIDATES
+    """Run the legacy core with scoped top-K/safety hooks, restoring it afterward."""
+    original_argv = sys.argv[:]
+    cleaned, count = impl._consume_int_flag(
+        original_argv[1:], "--order-candidates", impl.DEFAULT_ORDER_CANDIDATES
     )
     if count < 1:
         raise SystemExit("--order-candidates must be >= 1")
-    _ORDER_CANDIDATE_COUNT = count
-    sys.argv = [sys.argv[0], *cleaned]
-    return core.main()
+    impl._ORDER_CANDIDATE_COUNT = count
+
+    overrides = {
+        "best_order": impl.best_order,
+        "deep_analyze": impl.deep_analyze,
+        "apply_phrase_rescore": apply_phrase_rescore,
+        "DeepResult": impl.DeepResult,
+        "prepare_rows": prepare_rows,
+        "_prepared_cache_key": _prepared_cache_key,
+        "load_prepared_cache": load_prepared_cache,
+        "save_prepared_cache": save_prepared_cache,
+    }
+    originals = {name: getattr(core, name) for name in overrides}
+    try:
+        for name, value in overrides.items():
+            setattr(core, name, value)
+        sys.argv = [original_argv[0], *cleaned]
+        return core.main()
+    finally:
+        sys.argv = original_argv
+        for name, value in originals.items():
+            setattr(core, name, value)
+        _clear_order_side_tables()
 
 
 if __name__ == "__main__":
