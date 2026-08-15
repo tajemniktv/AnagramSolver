@@ -16,6 +16,7 @@ import argparse
 import math
 import re
 import sys
+import time
 import unicodedata
 import urllib.request
 from collections import Counter, defaultdict
@@ -384,9 +385,14 @@ def solve(
     dead: set[tuple[tuple[int, ...], int, int]] = set()
     min_candidate_len = min(c.length for c in candidates)
     max_candidate_len = max(c.length for c in candidates)
+    sparse_signatures = [
+        tuple((letter, amount) for letter, amount in enumerate(c.sig) if amount)
+        for c in candidates
+    ]
 
     def dfs(
         rem: tuple[int, ...],
+        rem_len: int,
         start: int,
         words_left: int,
         chosen: list[str],
@@ -396,7 +402,6 @@ def solve(
         if max_results > 0 and results_found >= max_results:
             return
 
-        rem_len = sum(rem)
         if words_left == 0:
             if rem_len == 0:
                 results_found += 1
@@ -441,19 +446,35 @@ def solve(
             c = candidates[i]
             if c.length < min_this_len or c.length > max_this_len:
                 continue
-            if not fits(c.sig, rem):
+            sparse = sparse_signatures[i]
+            candidate_fits = True
+            for letter, amount in sparse:
+                if rem[letter] < amount:
+                    candidate_fits = False
+                    break
+            if not candidate_fits:
                 continue
-            new_rem = tuple(r - w for r, w in zip(rem, c.sig))
+            mutable_rem = list(rem)
+            for letter, amount in sparse:
+                mutable_rem[letter] -= amount
+            new_rem = tuple(mutable_rem)
             next_start = i if allow_repeat else i + 1
-            yield from dfs(new_rem, next_start, words_left - 1, chosen + [c.word])
+            yield from dfs(
+                new_rem,
+                rem_len - c.length,
+                next_start,
+                words_left - 1,
+                chosen + [c.word],
+            )
             if max_results > 0 and results_found >= max_results:
                 return
 
         if results_found == before:
             dead.add(state)
 
+    initial_remaining_len = sum(remaining)
     for nwords in range(min_words, max_words + 1):
-        yield from dfs(remaining, 0, nwords, [])
+        yield from dfs(remaining, initial_remaining_len, 0, nwords, [])
         if max_results > 0 and results_found >= max_results:
             break
 
@@ -1268,6 +1289,7 @@ def main() -> int:
     solutions: list[tuple[str, ...]] = []
     generated = 0
     accepted = 0
+    search_started = time.perf_counter()
     try:
         for solution in solve(
             remaining,
@@ -1295,9 +1317,11 @@ def main() -> int:
         if stream is not None:
             stream.close()
 
+    search_seconds = time.perf_counter() - search_started
     print(
         f"Generated {generated:,} exact word set(s); "
-        f"{accepted:,} survived clue constraints.",
+        f"{accepted:,} survived clue constraints. "
+        f"Exact search: {search_seconds:.2f}s.",
         file=sys.stderr,
     )
 

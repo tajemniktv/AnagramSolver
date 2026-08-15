@@ -1,6 +1,6 @@
 # AnagramSolver
 
-A multi-word exact anagram solver that combines exhaustive letter matching with lexical frequency, WordNet grammar/valency, retained word-order candidates, positive bigram evidence, and optional Wikimedia phrase evidence.
+A multi-word exact anagram solver that combines exact letter matching with lexical frequency, WordNet grammar/valency, retained word-order candidates, positive bigram evidence, and optional Wikimedia phrase evidence.
 
 The normal user-facing entry point is `anagram_solver.py`. The lower-level generator, reranker, corpus builder, and benchmark scripts remain available for research and debugging.
 
@@ -14,13 +14,23 @@ python anagram_solver.py "ODITIHNSLSHEEEPT"
 
 On the first run the solver may download/cache its dictionary, WordNet data, and word-frequency data. Later runs reuse those caches.
 
-The default search is exhaustive over generated word bags, because silently missing the correct anagram is a fairly poor feature for an anagram solver. For a faster exploratory pass:
+Normal use runs a **balanced** search capped at 100,000 generated word bags. It is much more responsive than unlimited 2–6-word enumeration, but the cap means it **can miss the answer** if the correct bag occurs later in generation order.
+
+For a faster exploratory pass:
 
 ```powershell
 python anagram_solver.py "ODITIHNSLSHEEEPT" --quick
 ```
 
-`--quick` caps generation at 100,000 candidate word bags and can miss the answer.
+`--quick` caps generation at 20,000 candidate word bags and can miss the answer.
+
+For unlimited **candidate generation** with no generation cap:
+
+```powershell
+python anagram_solver.py "ODITIHNSLSHEEEPT" --exhaustive
+```
+
+`--exhaustive` exhaustively generates matching word bags, but the user-facing reranker still deep-analyzes a bounded shortlist and only those deep-ranked rows are displayed. In other words, it removes **generation** truncation; it is not a promise that every generated bag receives full grammar/phrase analysis. It can become much slower when the word count is unknown or many short/common words fit the letter multiset. Supplying clues or an exact word count can reduce that search space dramatically.
 
 ## Common options
 
@@ -102,7 +112,7 @@ The user-facing frontend stores intermediate candidate/reranked exports under:
 ~/.multi_anagram/solver_runs/
 ```
 
-The cache key includes the generation constraints and generator source hash, so repeating the same search can skip candidate generation while changed constraints/source code create a new cache entry. Use `--rebuild` to force regeneration or `--work-root` to choose a different location.
+The cache key includes the generation constraints, generation mode/cap, and generator source hash, so repeating the same search can skip candidate generation while changed constraints/source code create a new cache entry. Use `--rebuild` to force regeneration or `--work-root` to choose a different location.
 
 ## Research / low-level tools
 
@@ -114,7 +124,7 @@ The cache key includes the generation constraints and generator source hash, so 
 
 `build_wikimedia_phrase_index.py` builds the optional SQLite phrase index.
 
-For example, the old two-step path remains available:
+For example, the low-level exhaustive path remains available:
 
 ```powershell
 python anagram_generate.py "ODITIHNSLSHEEEPT" --all-results --min-zipf 2.7 --export candidates.txt

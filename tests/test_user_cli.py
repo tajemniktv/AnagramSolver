@@ -26,20 +26,44 @@ class UserCliTests(unittest.TestCase):
             solver._validate_args(args)
         return str(caught.exception)
 
-    def test_default_generation_is_exhaustive(self) -> None:
+    def test_default_generation_is_balanced_and_bounded(self) -> None:
         args = self._args()
         with tempfile.TemporaryDirectory() as tmp:
             cmd = solver.build_generator_command(args, Path(tmp) / "candidates.txt")
-        self.assertIn("--all-results", cmd)
-        self.assertNotIn("--max-results", cmd)
+        self.assertNotIn("--all-results", cmd)
+        self.assertEqual(
+            cmd[cmd.index("--max-results") + 1],
+            str(solver.BALANCED_MAX_RESULTS),
+        )
         self.assertEqual(cmd[cmd.index("--min-zipf") + 1], "2.7")
+        self.assertEqual(solver._generation_mode(args), "balanced")
+        self.assertEqual(solver._generation_cap(args), solver.BALANCED_MAX_RESULTS)
 
-    def test_quick_generation_is_explicitly_capped(self) -> None:
+    def test_quick_generation_uses_smaller_cap(self) -> None:
         args = self._args("--quick")
         with tempfile.TemporaryDirectory() as tmp:
             cmd = solver.build_generator_command(args, Path(tmp) / "candidates.txt")
         self.assertNotIn("--all-results", cmd)
-        self.assertEqual(cmd[cmd.index("--max-results") + 1], "100000")
+        self.assertEqual(
+            cmd[cmd.index("--max-results") + 1],
+            str(solver.QUICK_MAX_RESULTS),
+        )
+        self.assertLess(solver.QUICK_MAX_RESULTS, solver.BALANCED_MAX_RESULTS)
+        self.assertEqual(solver._generation_mode(args), "quick")
+        self.assertEqual(solver._generation_cap(args), solver.QUICK_MAX_RESULTS)
+
+    def test_exhaustive_generation_is_explicit(self) -> None:
+        args = self._args("--exhaustive")
+        with tempfile.TemporaryDirectory() as tmp:
+            cmd = solver.build_generator_command(args, Path(tmp) / "candidates.txt")
+        self.assertIn("--all-results", cmd)
+        self.assertNotIn("--max-results", cmd)
+        self.assertIsNone(solver._generation_cap(args))
+        self.assertEqual(solver._generation_mode(args), "exhaustive")
+
+    def test_quick_and_exhaustive_are_mutually_exclusive(self) -> None:
+        with self.assertRaises(SystemExit):
+            solver.build_parser().parse_args(["abcdef", "--quick", "--exhaustive"])
 
     def test_hints_excludes_require_and_word_count_are_forwarded(self) -> None:
         args = self._args(
@@ -132,6 +156,7 @@ not a reranker result
         variants = [
             self._args("--hint", "dont"),
             self._args("--quick"),
+            self._args("--exhaustive"),
             self._args("--min-zipf", "1.5"),
             self._args("--min-word-len", "3"),
             self._args("--min-words", "3"),
