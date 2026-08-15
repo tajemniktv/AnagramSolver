@@ -10,6 +10,7 @@ independent of generator emission order.
 
 from __future__ import annotations
 
+import math
 import multiprocessing
 import sys
 import time
@@ -440,6 +441,120 @@ def _row_phrase_candidates(row: Row) -> tuple[OrderCandidate, ...]:
     )
 
 
+
+def _corpus_probe_scores(
+    bucket: Sequence[core.Row],
+    *,
+    collocation: core.PositiveBigramModel | None,
+    phrase_index: core.PhraseIndex | None,
+) -> dict[int, float]:
+    """Cheap positive-only corpus evidence for phrase-rescore admission.
+
+    Full phrase scoring performs several n-gram lookups per retained order. Doing
+    that for every deep row would erase most of the late-stage shortlist's cost
+    advantage. This probe therefore uses the grammar winner for the broad
+    in-memory bigram check, while whole-phrase database hits may inspect all
+    retained orders so a strongly attested alternative can still rescue a bag.
+
+    Missing corpus evidence remains exactly neutral: a zero score never removes
+    a row selected by PRE or FINAL.
+    """
+    if collocation is None and phrase_index is None:
+        return {}
+
+    scores = {id(row): 0.0 for row in bucket}
+    phrase_owners: dict[str, set[int]] = defaultdict(set)
+
+    for row in bucket:
+        row_id = id(row)
+        candidates = _row_phrase_candidates(row)
+
+        # Bigram probing is intentionally limited to the grammar winner. The
+        # full retained-order collocation scan belongs to the expensive rescore
+        # stage after this bounded admission pass.
+        if collocation is not None and candidates:
+            colloc, _ = collocation.score(candidates[0].order)
+            scores[row_id] = max(scores[row_id], 0.55 * colloc)
+
+        # Whole-phrase hits are cheap to batch and much stronger evidence, so
+        # allow any retained grammatical order to contribute here.
+        if phrase_index is not None:
+            for candidate in candidates:
+                phrase_owners[" ".join(candidate.order)].add(row_id)
+
+    if phrase_index is not None and phrase_owners:
+        # PhraseIndex.counts() batches its SQLite queries internally. Any whole
+        # retained order attested by the corpus is stronger admission evidence
+        # than isolated bigrams, matching PhraseIndex.score()'s hierarchy.
+        for phrase, count in phrase_index.counts(tuple(phrase_owners)).items():
+            if count <= 0:
+                continue
+            exact = min(
+                1.0,
+                0.72 + 0.28 * math.log10(count + 1.0) / 5.0,
+            )
+            for row_id in phrase_owners.get(phrase, ()):
+                scores[row_id] = max(scores[row_id], exact)
+
+    return scores
+
+
+def _select_phrase_rescore_rows(
+    bucket: Sequence[core.Row],
+    *,
+    collocation: core.PositiveBigramModel | None,
+    phrase_index: core.PhraseIndex | None,
+    top_per_group: int,
+) -> tuple[list[core.Row], int]:
+    """Diversified late-stage shortlist without sacrificing existing winners.
+
+    PRE and FINAL keep their historical full quotas. A third bounded channel
+    admits rows whose retained grammatical orders have positive corpus evidence.
+    This improves recall for word bags that look mediocre under order-agnostic
+    lexical scoring but form a strongly attested phrase in one retained order.
+    """
+    by_final = sorted(
+        bucket,
+        key=lambda r: (-r.final, -r.pre_score, r.words),
+    )[:top_per_group]
+    by_pre = sorted(
+        bucket,
+        key=lambda r: (-r.pre_score, -r.final, r.words),
+    )[:top_per_group]
+
+    baseline_by_id = {id(row): row for row in (*by_final, *by_pre)}
+    # Probe only rows that are not already guaranteed a slot via PRE/FINAL.
+    # This both reduces work and prevents baseline rows from consuming the
+    # bounded corpus-admission quota.
+    corpus_pool = [row for row in bucket if id(row) not in baseline_by_id]
+    probe_scores = _corpus_probe_scores(
+        corpus_pool,
+        collocation=collocation,
+        phrase_index=phrase_index,
+    )
+    by_corpus = [
+        row
+        for row in sorted(
+            corpus_pool,
+            key=lambda r: (
+                -probe_scores.get(id(r), 0.0),
+                -max(r.final, r.pre_score),
+                r.words,
+            ),
+        )
+        if probe_scores.get(id(row), 0.0) > 0.0
+    ][:top_per_group]
+
+    corpus_added = len(by_corpus)
+    chosen_by_id = {
+        id(row): row for row in (*by_final, *by_pre, *by_corpus)
+    }
+    chosen = sorted(
+        chosen_by_id.values(),
+        key=lambda r: (-max(r.final, r.pre_score), r.words),
+    )
+    return chosen, corpus_added
+
 def apply_phrase_rescore(
     rows: list[Row],
     *,
@@ -461,20 +576,12 @@ def apply_phrase_rescore(
             by_wc[row.word_count].append(row)
 
     rescored = 0
-    for bucket in by_wc.values():
-        by_final = sorted(
+    for word_count, bucket in sorted(by_wc.items()):
+        chosen, _ = _select_phrase_rescore_rows(
             bucket,
-            key=lambda r: (-r.final, -r.pre_score, r.words),
-        )[:top_per_group]
-        by_pre = sorted(
-            bucket,
-            key=lambda r: (-r.pre_score, -r.final, r.words),
-        )[:top_per_group]
-
-        chosen_by_id = {id(row): row for row in (*by_final, *by_pre)}
-        chosen = sorted(
-            chosen_by_id.values(),
-            key=lambda r: (-max(r.final, r.pre_score), r.words),
+            collocation=collocation,
+            phrase_index=phrase_index,
+            top_per_group=top_per_group,
         )
 
         for row in chosen:

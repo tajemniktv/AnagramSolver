@@ -195,33 +195,16 @@ class OrderingLayerTests(unittest.TestCase):
         middle = self._row(("g", "h", "i"), pre=50.0, final=50.0)
         rows = [best_final, best_pre, middle]
 
-        table = self._candidate_table()
-        for index, row in enumerate(rows):
-            candidate = self._candidate(row.words)
-            table[id(row)] = (candidate,)
-            if hasattr(rerank.impl, "_ORDER_CANDIDATES_BY_INDEX"):
-                rerank.impl._ORDER_CANDIDATES_BY_INDEX[index] = (candidate,)
-            row.best_order = candidate.order
-            row.grammar_raw = candidate.grammar_raw
-            row.grammar_norm = candidate.grammar_norm
-            row.structure_norm = candidate.structure_norm
-            row.valency_norm = candidate.valency_norm
-            row.syntax_coverage = candidate.syntax_coverage
-            row.phrase_kind = candidate.phrase_kind
-
-        class Collocation:
-            def score(self, _order: tuple[str, ...]) -> tuple[float, float]:
-                return 0.5, 1.0
-
-        rescored = rerank.apply_phrase_rescore(
-            rows, collocation=Collocation(), phrase_index=None,
-            top_per_group=1, bonus_max=5.0,
+        chosen, corpus_added = rerank.impl._select_phrase_rescore_rows(
+            rows,
+            collocation=None,
+            phrase_index=None,
+            top_per_group=1,
         )
 
-        self.assertEqual(rescored, 2)
-        self.assertGreater(best_final.phrase_bonus, 0.0)
-        self.assertGreater(best_pre.phrase_bonus, 0.0)
-        self.assertEqual(middle.phrase_bonus, 0.0)
+        self.assertEqual(corpus_added, 0)
+        self.assertEqual({id(row) for row in chosen}, {id(best_final), id(best_pre)})
+        self.assertNotIn(id(middle), {id(row) for row in chosen})
 
     def test_cache_rejects_nonfinite_and_out_of_range_values(self) -> None:
         base = rerank._row_to_cache_dict(self._row(("a", "b", "c")))

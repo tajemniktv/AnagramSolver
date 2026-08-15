@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   corpus-matrix:
-    name: baseline vs Wiktionary vs Wikipedia
+    name: phrase ordering A/B (PR) or full corpus matrix
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -78,14 +78,26 @@ jobs:
             echo "Using cached Wiktionary + Wikipedia phrase index"
           fi
 
-      # Corpus availability and benchmark freshness are separate concerns.
-      # PRs, main pushes, and manual runs always benchmark the checked-out code;
-      # only a scheduled monthly refresh may skip when its corpus key is already
-      # warm (for example after a manual rerun of the same scheduled revision).
-      - name: Run corpus benchmark matrix
+      # PRs keep only the cheap ordering A/B. Full exact-anagram generation and
+      # reranking remains on main/manual runs, where a multi-minute job is useful
+      # rather than a tax on every review iteration.
+      - name: Run fast PR phrase-order matrix
+        if: github.event_name == 'pull_request'
+        run: |
+          python ci_phrase_matrix.py \
+            --wiktionary-db .ci_phrase_cache/wiktionary.db \
+            --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --workers 8 \
+            --order-only
+
+      # Main pushes and manual runs always benchmark the checked-out code end to
+      # end. A scheduled monthly refresh may skip only when that month's corpus
+      # snapshot is already warm.
+      - name: Run full corpus benchmark matrix
         if: >-
-          github.event_name != 'schedule' ||
-          steps.corpus-cache.outputs.cache-hit != 'true'
+          github.event_name != 'pull_request' &&
+          (github.event_name != 'schedule' ||
+           steps.corpus-cache.outputs.cache-hit != 'true')
         run: |
           python ci_phrase_matrix.py \
             --wiktionary-db .ci_phrase_cache/wiktionary.db \
