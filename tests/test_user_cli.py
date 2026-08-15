@@ -185,7 +185,7 @@ not a reranker result
                     solver._generate_candidates(args, candidates)
 
             self.assertEqual(candidates.read_text(encoding="utf-8"), "old-cache\n")
-            self.assertFalse(Path(str(candidates) + ".tmp").exists())
+            self.assertEqual(list(candidates.parent.glob(".candidates.txt.*.tmp")), [])
 
     def test_successful_generation_atomically_replaces_candidate_cache(self) -> None:
         args = self._args()
@@ -202,8 +202,4 @@ not a reranker result
                 solver._generate_candidates(args, candidates)
 
             self.assertEqual(candidates.read_text(encoding="utf-8"), "fresh-cache\n")
-            self.assertFalse(Path(str(candidates) + ".tmp").exists())
-
-
-if __name__ == "__main__":
-    unittest.main()
+            self.assertEqual(list(candidates.parent.glob(".candidates.txt.*.tmp")), [])
