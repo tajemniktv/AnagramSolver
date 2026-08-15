@@ -37,7 +37,7 @@ for _name in dir(impl):
         globals()[_name] = getattr(impl, _name)
 
 ENGINE_LAYER = "top-k-order-reranking-reviewed"
-PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-1"
+PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
@@ -76,7 +76,7 @@ def _row_to_cache_dict(row: Row) -> dict[str, object]:
         "wn_coverage": row.wn_coverage,
         "grammar_potential": row.grammar_potential,
         "grammar_potential_norm": row.grammar_potential_norm,
-        "v13_pre": row.v13_pre,
+        "pre_score": row.pre_score,
         "family_key": list(row.family_key),
     }
 
@@ -101,7 +101,7 @@ _CACHE_FLOAT_RANGES: dict[str, tuple[float, float]] = {
     "wn_coverage": (0.0, 1.0),
     "grammar_potential": (0.0, 1.0),
     "grammar_potential_norm": (0.0, 1.0),
-    "v13_pre": (0.0, 100.0),
+    "pre_score": (0.0, 100.0),
 }
 _MAX_CACHE_WORDS = 64
 _MAX_CACHE_RANK = 1_000_000_000
@@ -167,7 +167,7 @@ def _row_from_cache_dict(item: object) -> Row | None:
         wn_coverage=numeric["wn_coverage"],
         grammar_potential=numeric["grammar_potential"],
         grammar_potential_norm=numeric["grammar_potential_norm"],
-        v13_pre=numeric["v13_pre"],
+        pre_score=numeric["pre_score"],
         family_key=family_key,
     )
 

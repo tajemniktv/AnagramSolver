@@ -27,7 +27,7 @@ class PreparedCacheTests(unittest.TestCase):
         row.wn_coverage = 1.0
         row.grammar_potential = 0.8
         row.grammar_potential_norm = 0.9
-        row.v13_pre = 87.0
+        row.pre_score = 87.0
         row.family_key = ("dont", "hip", "lie", "these")
         row.deep = True
         row.best_order = ("these", "hips", "dont", "lie")
@@ -47,7 +47,7 @@ class PreparedCacheTests(unittest.TestCase):
             assert loaded is not None
             self.assertEqual(loaded[0].words, ("these", "dont", "lie", "hips"))
             self.assertEqual(loaded[0].family_key, ("dont", "hip", "lie", "these"))
-            self.assertEqual(loaded[0].v13_pre, 87.0)
+            self.assertEqual(loaded[0].pre_score, 87.0)
             self.assertFalse(loaded[0].deep)
             self.assertEqual(loaded[0].best_order, ())
             self.assertEqual(loaded[0].final, 0.0)

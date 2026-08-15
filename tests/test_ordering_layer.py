@@ -40,7 +40,7 @@ class OrderingLayerTests(unittest.TestCase):
         )
         row.deep = True
         row.wn_coverage = 1.0
-        row.v13_pre = pre
+        row.pre_score = pre
         if final is not None:
             row.final = final
             row.base_final = final
@@ -230,7 +230,7 @@ class OrderingLayerTests(unittest.TestCase):
             ("hint", float("inf")),
             ("zavg", 1e100),
             ("old_pre", -1.0),
-            ("v13_pre", 101.0),
+            ("pre_score", 101.0),
             ("word_count", 0),
             ("old_rank", 0),
         )

@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 """
-Current AnagramSolver reranker front-end.
+Top-k word-order search and phrase-evidence reranking layer.
 
-The stable V13 implementation lives in ``anagram_rerank_core.py``.  This module
-adds the next ranking layer without duplicating that large, well-tested parser:
-
-* deterministic, input-order-independent word ordering;
-* retention of several strong grammatical orders per word bag;
-* phrase/collocation rescoring across those alternative orders;
-* phrase rescoring over the union of strong PRE and strong grammar candidates.
-
-The core module remains importable so this layer can stay small and easy to
-review.  The public API intentionally mirrors ``anagram_rerank_core`` because
-``anagram_benchmark.py`` imports helper functions directly.
+For each unordered word bag this layer retains several strong grammatical
+orders, then allows positive phrase/collocation evidence to choose among them.
+Input bags are canonicalized before search so tie-breaking is deterministic and
+independent of generator emission order.
 """
 
 from __future__ import annotations
@@ -288,7 +281,7 @@ def _apply_deep_result(rows: list[Row], result: DeepResult) -> None:
     row.valency_norm = result.valency_norm
     row.syntax_coverage = result.syntax_coverage
     row.phrase_kind = result.phrase_kind
-    row.final = score_final_v13(row)
+    row.final = core.score_final(row)
     row.base_final = row.final
     _ORDER_CANDIDATES_BY_ROW_ID[id(row)] = result.order_candidates
 
@@ -471,17 +464,17 @@ def apply_phrase_rescore(
     for bucket in by_wc.values():
         by_final = sorted(
             bucket,
-            key=lambda r: (-r.final, -r.v13_pre, r.words),
+            key=lambda r: (-r.final, -r.pre_score, r.words),
         )[:top_per_group]
         by_pre = sorted(
             bucket,
-            key=lambda r: (-r.v13_pre, -r.final, r.words),
+            key=lambda r: (-r.pre_score, -r.final, r.words),
         )[:top_per_group]
 
         chosen_by_id = {id(row): row for row in (*by_final, *by_pre)}
         chosen = sorted(
             chosen_by_id.values(),
-            key=lambda r: (-max(r.final, r.v13_pre), r.words),
+            key=lambda r: (-max(r.final, r.pre_score), r.words),
         )
 
         for row in chosen:
