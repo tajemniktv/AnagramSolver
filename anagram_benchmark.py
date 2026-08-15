@@ -96,6 +96,23 @@ class OrderResult:
     best_objective: float
 
 
+def compute_order_metrics(results: list[OrderResult]) -> dict[str, float]:
+    """Compute the aggregate exact-order metrics used by reports and CI."""
+    exact = [r for r in results if r.exact_rank is not None]
+    if not exact:
+        return {}
+    ranks = [r.exact_rank for r in exact if r.exact_rank is not None]
+    n = len(ranks)
+    return {
+        "cases": float(n),
+        "recall1": sum(rank <= 1 for rank in ranks) / n,
+        "recall10": sum(rank <= 10 for rank in ranks) / n,
+        "recall50": sum(rank <= 50 for rank in ranks) / n,
+        "mrr": sum(1.0 / rank for rank in ranks) / n,
+        "median_rank": float(sorted(ranks)[n // 2]),
+    }
+
+
 def _objective(v12, order: tuple[str, ...], lex) -> float:
     local_raw = v12.local_grammar_raw(order, lex)
     local_norm = v12.grammar_normalize(local_raw)
@@ -212,21 +229,16 @@ def print_order_summary(results: list[OrderResult]) -> None:
             f"rank={rank_text:<10} best={r.best_order}"
         )
 
-    if exact:
-        n = len(exact)
-        top1 = sum(r.exact_rank <= 1 for r in exact if r.exact_rank is not None) / n
-        top10 = sum(r.exact_rank <= 10 for r in exact if r.exact_rank is not None) / n
-        top50 = sum(r.exact_rank <= 50 for r in exact if r.exact_rank is not None) / n
-        mrr = sum(1.0 / r.exact_rank for r in exact if r.exact_rank) / n
-        median = sorted(r.exact_rank for r in exact if r.exact_rank)[n // 2]
-
+    observed = compute_order_metrics(results)
+    if observed:
+        n = int(observed["cases"])
         print("\nExact-order metrics (<=6 words):")
         print(f"  cases       {n}")
-        print(f"  Recall@1    {top1:.3f}")
-        print(f"  Recall@10   {top10:.3f}")
-        print(f"  Recall@50   {top50:.3f}")
-        print(f"  MRR         {mrr:.3f}")
-        print(f"  median rank {median}")
+        print(f"  Recall@1    {observed['recall1']:.3f}")
+        print(f"  Recall@10   {observed['recall10']:.3f}")
+        print(f"  Recall@50   {observed['recall50']:.3f}")
+        print(f"  MRR         {observed['mrr']:.3f}")
+        print(f"  median rank {int(observed['median_rank'])}")
 
         # Category breakdown catches regressions that an aggregate can hide.
         categories = sorted({r.category for r in exact})
@@ -234,13 +246,12 @@ def print_order_summary(results: list[OrderResult]) -> None:
             print("\nBy category (exact-order cases):")
             for category in categories:
                 group = [r for r in exact if r.category == category]
-                g_n = len(group)
-                g_top10 = sum(r.exact_rank is not None and r.exact_rank <= 10 for r in group) / g_n
-                g_top50 = sum(r.exact_rank is not None and r.exact_rank <= 50 for r in group) / g_n
-                g_mrr = sum(1.0 / r.exact_rank for r in group if r.exact_rank) / g_n
+                group_metrics = compute_order_metrics(group)
                 print(
-                    f"  {category:<24} n={g_n:<3} "
-                    f"R@10={g_top10:.3f} R@50={g_top50:.3f} MRR={g_mrr:.3f}"
+                    f"  {category:<24} n={int(group_metrics['cases']):<3} "
+                    f"R@10={group_metrics['recall10']:.3f} "
+                    f"R@50={group_metrics['recall50']:.3f} "
+                    f"MRR={group_metrics['mrr']:.3f}"
                 )
 
     if beam:
