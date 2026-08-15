@@ -1,0 +1,99 @@
+name: phrase corpus benchmarks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    # Refresh the default-branch corpus snapshot near the start of each month.
+    - cron: "17 3 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phrase-benchmarks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  corpus-matrix:
+    name: baseline vs Wiktionary vs Wikipedia
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Choose monthly corpus snapshot cache key
+        id: corpus-key
+        shell: bash
+        run: echo "month=$(date -u +'%Y-%m')" >> "$GITHUB_OUTPUT"
+
+      - name: Restore language data and phrase indexes
+        id: corpus-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.multi_anagram
+            .ci_phrase_cache
+          key: phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-${{ hashFiles('build_wikimedia_phrase_index.py') }}
+
+      # Prepared rows depend on reranker feature code, while their on-disk key
+      # intentionally uses an explicit schema rather than hashing source files.
+      # Never inherit them across branches/PRs. Rebuilding them is cheap compared
+      # with rebuilding the Wikimedia phrase indexes, and later scenarios in this
+      # same job can still reuse the freshly prepared rows.
+      - name: Drop code-sensitive prepared-feature cache
+        shell: bash
+        run: rm -rf ~/.multi_anagram/prepared_cache
+
+      - name: Build Wiktionary phrase index
+        shell: bash
+        run: |
+          mkdir -p .ci_phrase_cache
+          if [ ! -s .ci_phrase_cache/wiktionary.db ]; then
+            python build_wikimedia_phrase_index.py \
+              --output .ci_phrase_cache/wiktionary.db \
+              --rebuild
+          else
+            echo "Using cached Wiktionary phrase index"
+          fi
+
+      - name: Build Wiktionary + Wikipedia phrase index
+        shell: bash
+        run: |
+          if [ ! -s .ci_phrase_cache/wiktionary-wikipedia.db ]; then
+            python build_wikimedia_phrase_index.py \
+              --include-wikipedia \
+              --output .ci_phrase_cache/wiktionary-wikipedia.db \
+              --rebuild
+          else
+            echo "Using cached Wiktionary + Wikipedia phrase index"
+          fi
+
+      # Corpus availability and benchmark freshness are separate concerns.
+      # PRs, main pushes, and manual runs always benchmark the checked-out code;
+      # only a scheduled monthly refresh may skip when its corpus key is already
+      # warm (for example after a manual rerun of the same scheduled revision).
+      - name: Run corpus benchmark matrix
+        if: >-
+          github.event_name != 'schedule' ||
+          steps.corpus-cache.outputs.cache-hit != 'true'
+        run: |
+          python ci_phrase_matrix.py \
+            --wiktionary-db .ci_phrase_cache/wiktionary.db \
+            --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --workers 8
+
+      - name: Scheduled corpus snapshot already warm
+        if: >-
+          github.event_name == 'schedule' &&
+          steps.corpus-cache.outputs.cache-hit == 'true'
+        run: echo "Corpus cache already exists for this scheduled monthly snapshot; skipping the duplicate scheduled benchmark."
