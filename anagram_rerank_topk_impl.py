@@ -207,14 +207,11 @@ def best_order(
         return local_grammar_raw(words, lex), tuple(words), structure, evaluated
 
     winner = candidates[0]
-    structure = StructureResult(
-        winner.structure_norm,
-        winner.valency_norm,
-        winner.syntax_coverage,
-        0.5,
-        winner.phrase_kind,
-        4.0 * winner.structure_norm,
-    )
+    # OrderCandidate deliberately stores only the structure fields needed by the
+    # ranker. Public callers of best_order historically receive the complete
+    # StructureResult, so recompute it for the single winning order rather than
+    # fabricating the omitted complexity/raw fields.
+    structure = phrase_structure(winner.order, lex)
     return winner.grammar_raw, winner.order, structure, evaluated
 
 
