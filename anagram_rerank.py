@@ -6,11 +6,16 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import math
 import multiprocessing
 import sys
 from pathlib import Path
 
 import anagram_rerank_core as core
+
+# Capture the stable core functions that facade wrappers delegate to. These must
+# not be looked up dynamically after main() installs the facade overrides.
+_CORE_PREPARE_ROWS = core.prepare_rows
 
 # The top-K implementation predates this facade and historically patched core at
 # import time. Capture and restore the frozen core API immediately so merely
@@ -33,10 +38,6 @@ for _name in dir(impl):
 
 ENGINE_LAYER = "top-k-order-reranking-reviewed"
 PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-1"
-
-
-def canonical_bag_key(row: Row) -> tuple[str, ...]:
-    return tuple(sorted(row.words))
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
@@ -85,6 +86,37 @@ _CACHE_KEYS = frozenset(_row_to_cache_dict(Row(
     old_pair=0.0, hint=0.0, zavg=0.0, zmin=0.0, old_pcov=0.0, hints=(),
 )).keys())
 
+# Prepared-cache values come from bounded ranking features. Enforce those
+# invariants at the trust boundary so parseable NaN/Infinity or absurd finite
+# values cannot leak into sorting/scoring.
+_CACHE_FLOAT_RANGES: dict[str, tuple[float, float]] = {
+    "old_pre": (0.0, 100.0),
+    "lex": (0.0, 1.0),
+    "fam": (0.0, 1.0),
+    "old_pair": (0.0, 1.0),
+    "hint": (0.0, 1.0),
+    "zavg": (0.0, 20.0),
+    "zmin": (0.0, 20.0),
+    "old_pcov": (0.0, 1.0),
+    "wn_coverage": (0.0, 1.0),
+    "grammar_potential": (0.0, 1.0),
+    "grammar_potential_norm": (0.0, 1.0),
+    "v13_pre": (0.0, 100.0),
+}
+_MAX_CACHE_WORDS = 64
+_MAX_CACHE_RANK = 1_000_000_000
+
+
+def _bounded_number(item: dict[str, object], name: str) -> float | None:
+    value = item.get(name)
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return None
+    number = float(value)
+    lo, hi = _CACHE_FLOAT_RANGES[name]
+    if not math.isfinite(number) or not lo <= number <= hi:
+        return None
+    return number
+
 
 def _row_from_cache_dict(item: object) -> Row | None:
     if not isinstance(item, dict) or set(item) != _CACHE_KEYS:
@@ -102,39 +134,40 @@ def _row_from_cache_dict(item: object) -> Row | None:
     if words is None or hints is None or family_key is None:
         return None
 
-    if not all(
-        isinstance(item.get(key), int) and not isinstance(item.get(key), bool)
-        for key in ("word_count", "old_rank")
+    word_count = item.get("word_count")
+    old_rank = item.get("old_rank")
+    if (
+        not isinstance(word_count, int)
+        or isinstance(word_count, bool)
+        or not 1 <= word_count <= _MAX_CACHE_WORDS
+        or word_count != len(words)
+        or not isinstance(old_rank, int)
+        or isinstance(old_rank, bool)
+        or not 1 <= old_rank <= _MAX_CACHE_RANK
     ):
         return None
-    numeric = (
-        "old_pre", "lex", "fam", "old_pair", "hint", "zavg", "zmin",
-        "old_pcov", "wn_coverage", "grammar_potential",
-        "grammar_potential_norm", "v13_pre",
-    )
-    if not all(
-        isinstance(item.get(key), (int, float)) and not isinstance(item.get(key), bool)
-        for key in numeric
-    ):
+
+    numeric = {name: _bounded_number(item, name) for name in _CACHE_FLOAT_RANGES}
+    if any(value is None for value in numeric.values()):
         return None
 
     return Row(
         words=words,
-        word_count=int(item["word_count"]),
-        old_rank=int(item["old_rank"]),
-        old_pre=float(item["old_pre"]),
-        lex=float(item["lex"]),
-        fam=float(item["fam"]),
-        old_pair=float(item["old_pair"]),
-        hint=float(item["hint"]),
-        zavg=float(item["zavg"]),
-        zmin=float(item["zmin"]),
-        old_pcov=float(item["old_pcov"]),
+        word_count=word_count,
+        old_rank=old_rank,
+        old_pre=numeric["old_pre"],
+        lex=numeric["lex"],
+        fam=numeric["fam"],
+        old_pair=numeric["old_pair"],
+        hint=numeric["hint"],
+        zavg=numeric["zavg"],
+        zmin=numeric["zmin"],
+        old_pcov=numeric["old_pcov"],
         hints=hints,
-        wn_coverage=float(item["wn_coverage"]),
-        grammar_potential=float(item["grammar_potential"]),
-        grammar_potential_norm=float(item["grammar_potential_norm"]),
-        v13_pre=float(item["v13_pre"]),
+        wn_coverage=numeric["wn_coverage"],
+        grammar_potential=numeric["grammar_potential"],
+        grammar_potential_norm=numeric["grammar_potential_norm"],
+        v13_pre=numeric["v13_pre"],
         family_key=family_key,
     )
 
@@ -172,17 +205,18 @@ def save_prepared_cache(cache_path: Path, rows: list[Row]) -> None:
             },
             handle,
             ensure_ascii=True,
+            allow_nan=False,
             separators=(",", ":"),
         )
     tmp.replace(cache_path)
 
 
 def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
-    """Canonicalize unordered bags before any stable sort can observe parse order."""
+    """Canonicalize unordered bags, then delegate to the captured core function."""
     for row in rows:
         row.words = tuple(sorted(row.words))
     rows.sort(key=lambda row: (row.word_count, row.words))
-    core.prepare_rows(rows, lex)
+    _CORE_PREPARE_ROWS(rows, lex)
 
 
 def _clear_order_side_tables() -> None:
