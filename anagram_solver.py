@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
 import subprocess
 import sys
@@ -25,8 +24,8 @@ RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_RUN_ROOT = Path.home() / ".multi_anagram" / "solver_runs"
 
 _RESULT_RE = re.compile(
-    r"^\s*(?P<rank>\d+)\.\s+FINAL=(?P<score>[\d.]+).*?"
-    r"PBONUS=[\d.]+\s+(?P<phrase>.*?)\s+\[CANON=",
+    r"^\s*(?P<rank>\d+)\.\s+FINAL=\s*(?P<score>[\d.]+).*?"
+    r"PBONUS=\s*[\d.]+\s+(?P<phrase>.*?)\s+\[CANON=",
 )
 _SECTION_RE = re.compile(r"^===\s+(?P<words>\d+)-WORD\s+RERANKED")
 
