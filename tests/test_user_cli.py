@@ -39,6 +39,12 @@ class UserCliTests(unittest.TestCase):
         self.assertEqual(solver._generation_mode(args), "balanced")
         self.assertEqual(solver._generation_cap(args), solver.BALANCED_MAX_RESULTS)
 
+    def test_generator_export_requests_reranker_components(self) -> None:
+        args = self._args()
+        with tempfile.TemporaryDirectory() as tmp:
+            cmd = solver.build_generator_command(args, Path(tmp) / "candidates.txt")
+        self.assertIn("--show-components", cmd)
+
     def test_quick_generation_uses_smaller_cap(self) -> None:
         args = self._args("--quick")
         with tempfile.TemporaryDirectory() as tmp:
