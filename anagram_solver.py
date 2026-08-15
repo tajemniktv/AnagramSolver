@@ -154,16 +154,21 @@ def parse_results(path: Path, top: int) -> list[Result]:
 
 
 def _run(cmd: Sequence[str], *, verbose: bool) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(cmd, text=True, capture_output=True)
+    # List-form argv with shell=False (the subprocess default) keeps user text as
+    # an argument rather than executable shell syntax. In verbose mode inherit
+    # the terminal streams so long searches show progress immediately.
     if verbose:
-        if proc.stdout:
-            print(proc.stdout, end="")
-        if proc.stderr:
-            print(proc.stderr, end="", file=sys.stderr)
+        proc = subprocess.run(cmd, text=True)
+    else:
+        proc = subprocess.run(cmd, text=True, capture_output=True)
+
     if proc.returncode != 0:
-        detail = (proc.stderr or proc.stdout).strip()
-        if len(detail) > 2000:
-            detail = detail[-2000:]
+        if verbose:
+            detail = "See the streamed command output above."
+        else:
+            detail = (proc.stderr or proc.stdout or "").strip()
+            if len(detail) > 2000:
+                detail = detail[-2000:]
         raise SystemExit(
             f"Command failed with exit code {proc.returncode}:\n"
             f"  {' '.join(map(str, cmd[:3]))}\n\n{detail}"
@@ -207,7 +212,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Faster exploratory search; caps generation at 100k word bags and may miss the answer",
     )
     parser.add_argument("--rebuild", action="store_true", help="Regenerate the cached candidate export")
-    parser.add_argument("--verbose", action="store_true", help="Show generator/reranker diagnostic output")
+    parser.add_argument("--verbose", action="store_true", help="Show generator/reranker diagnostic output live")
     parser.add_argument("--json", action="store_true", help="Emit final results as JSON")
     parser.add_argument(
         "--work-root",
@@ -236,7 +241,7 @@ def _validate_args(args: argparse.Namespace) -> None:
     if args.workers < 0:
         raise SystemExit("--workers must be >= 0")
     if args.phrase_db is not None and not args.phrase_db.expanduser().is_file():
-        raise SystemExit(f"Phrase DB not found: {args.phrase_db}")
+        raise SystemExit(f"--phrase-db not found: {args.phrase_db}")
 
 
 def _print_results(args: argparse.Namespace, results: Sequence[Result], run_dir: Path) -> None:
