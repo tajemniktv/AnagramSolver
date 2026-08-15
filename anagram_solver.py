@@ -240,6 +240,8 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--top must be >= 1")
     if args.workers < 0:
         raise SystemExit("--workers must be >= 0")
+    if args.json and args.verbose:
+        raise SystemExit("--json cannot be combined with --verbose; verbose child output would corrupt JSON stdout")
     if args.phrase_db is not None and not args.phrase_db.expanduser().is_file():
         raise SystemExit(f"--phrase-db not found: {args.phrase_db}")
 
@@ -281,6 +283,21 @@ def _print_results(args: argparse.Namespace, results: Sequence[Result], run_dir:
         print(f"\nCached run files: {run_dir}")
 
 
+def _generate_candidates(args: argparse.Namespace, candidates: Path) -> None:
+    """Generate into a temporary file, publishing the cache only on success."""
+    temporary = candidates.with_name(candidates.name + ".tmp")
+    temporary.unlink(missing_ok=True)
+    try:
+        _run(build_generator_command(args, temporary), verbose=args.verbose)
+        if not temporary.is_file():
+            raise SystemExit(
+                f"Generator completed without writing its candidate export: {temporary}"
+            )
+        temporary.replace(candidates)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     _validate_args(args)
@@ -294,7 +311,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.json:
             mode = "quick" if args.quick else "exhaustive"
             print(f"Generating exact candidate word bags ({mode}) ...")
-        _run(build_generator_command(args, candidates), verbose=args.verbose)
+        _generate_candidates(args, candidates)
     elif not args.json:
         print("Using cached candidate word bags ...")
 
