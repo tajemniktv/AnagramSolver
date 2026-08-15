@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -192,6 +193,18 @@ class PhraseBenchmarkTests(unittest.TestCase):
         self.assertNotIn("--order-candidates", cmd)
         # Existing positive-bigram rescoring remains part of the baseline.
         self.assertIn("--phrase-rescore-top", cmd)
+
+    def test_voldemort_benchmark_source_is_exact_anagram(self):
+        cases_path = Path(__file__).resolve().parents[1] / "anagram_benchmarks.json"
+        payload = json.loads(cases_path.read_text(encoding="utf-8"))
+        case = next(row for row in payload["cases"] if row["id"] == "voldemort_reveal")
+
+        source_letters = sorted("".join(benchmark.tokens(case["source"])))
+        answer_letters = sorted("".join(benchmark.tokens(case["answer"])))
+        self.assertEqual(source_letters, answer_letters)
+        self.assertEqual(case["answer"], "i am lord voldemort")
+        self.assertIn("voldemort", case["hints"])
+        self.assertTrue(case["full"])
 
 
 if __name__ == "__main__":
