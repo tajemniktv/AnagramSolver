@@ -30,6 +30,7 @@ _RESULT_RE = re.compile(
     r"PBONUS=\s*[\d.]+\s+(?P<phrase>.*?)\s+\[CANON=",
 )
 _SECTION_RE = re.compile(r"^===\s+(?P<words>\d+)-WORD\s+RERANKED")
+_REQUIRED_TOKEN_RE = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?")
 
 
 @dataclass(slots=True, frozen=True)
@@ -58,7 +59,7 @@ def _normalized_target(text: str) -> str:
 
 
 def _normalized_words(values: Sequence[str]) -> list[str]:
-    """Canonicalize word constraints using the generator's token semantics."""
+    """Canonicalize set-like word constraints for cache keys."""
     return sorted(
         {
             normalized
@@ -66,6 +67,17 @@ def _normalized_words(values: Sequence[str]) -> list[str]:
             if (normalized := _normalized_target(word))
         }
     )
+
+
+def _normalized_required_words(values: Sequence[str]) -> list[str]:
+    """Mirror generator --require tokenization without losing order or repeats."""
+    out: list[str] = []
+    for chunk in _csv_words(values):
+        for token in _REQUIRED_TOKEN_RE.findall(chunk):
+            normalized = _normalized_target(token)
+            if normalized:
+                out.append(normalized)
+    return out
 
 
 def _source_hash(path: Path) -> str:
@@ -81,7 +93,7 @@ def _run_key(args: argparse.Namespace) -> str:
         "min_zipf": args.min_zipf,
         "hints": _normalized_words(args.hint),
         "exclude": _normalized_words(args.exclude),
-        "require": _normalized_words(args.require),
+        "require": _normalized_required_words(args.require),
         "quick": args.quick,
         "generator": _source_hash(GENERATOR),
     }
