@@ -2633,7 +2633,7 @@ def write_export(path: Path, buckets: dict[int, list[Row]]) -> None:
             bucket = buckets[wc]
             deep_count = sum(1 for r in bucket if r.deep)
             f.write(
-                f"=== {wc}-WORD current reranker RANKING "
+                f"=== {wc}-WORD RERANKED CANDIDATES "
                 f"({len(bucket)} total; {deep_count} deep-analyzed) ===\n"
             )
 
@@ -2705,7 +2705,7 @@ def benchmark(answer: str, rows: list[Row]) -> None:
         print(f"  phrase prior:{target.phrase_attest_norm:.3f}")
         print(f"  phrase bonus:{target.phrase_bonus:.3f}")
     else:
-        print("  current reranker FINAL: not deep-analyzed; increase --deep-per-group or use --deep-all")
+        print("  FINAL: not deep-analyzed; increase --deep-per-group or use --deep-all")
 
 
 def main() -> int:

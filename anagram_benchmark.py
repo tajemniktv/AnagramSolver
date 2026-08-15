@@ -525,11 +525,10 @@ def main() -> int:
     ap.add_argument("--case", action="append", default=[], dest="case_ids")
     ap.add_argument(
         "--reranker",
-        "--reranker",
         dest="reranker",
         type=Path,
         default=DEFAULT_RERANKER,
-        help="Reranker module/script to benchmark (the --reranker alias is kept for old commands)",
+        help="Reranker module/script to benchmark",
     )
     ap.add_argument("--generator", type=Path, default=DEFAULT_GENERATOR)
     ap.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE)
