@@ -12,7 +12,7 @@ order (default)
     Reports Top-1/10/50, MRR, and the chosen order.
 
 full
-    Slow on first run, cached afterward. Uses multi_anagram_v8_analyzer.py to
+    Slow on first run, cached afterward. Uses anagram_generate.py to
     generate exact same-letter word bags for cases marked "full": true, then
     invokes the selected reranker and records PRE/FINAL ranks.
 
@@ -45,7 +45,7 @@ from typing import Iterable, Sequence
 HERE = Path(__file__).resolve().parent
 DEFAULT_CASES = HERE / "anagram_benchmarks.json"
 DEFAULT_RERANKER = HERE / "anagram_rerank.py"
-DEFAULT_V8 = HERE / "multi_anagram_v8_analyzer.py"
+DEFAULT_GENERATOR = HERE / "anagram_generate.py"
 DEFAULT_CACHE = HERE / ".anagram_bench_cache"
 
 
@@ -113,10 +113,10 @@ def compute_order_metrics(results: list[OrderResult]) -> dict[str, float]:
     }
 
 
-def _objective(v12, order: tuple[str, ...], lex) -> float:
-    local_raw = v12.local_grammar_raw(order, lex)
-    local_norm = v12.grammar_normalize(local_raw)
-    structure = v12.phrase_structure(order, lex)
+def _objective(reranker, order: tuple[str, ...], lex) -> float:
+    local_raw = reranker.local_grammar_raw(order, lex)
+    local_norm = reranker.grammar_normalize(local_raw)
+    structure = reranker.phrase_structure(order, lex)
     return (
         0.38 * local_norm
         + 0.44 * structure.norm
@@ -125,7 +125,7 @@ def _objective(v12, order: tuple[str, ...], lex) -> float:
     )
 
 
-def run_order_case(v12, lex, case: dict) -> OrderResult:
+def run_order_case(reranker, lex, case: dict) -> OrderResult:
     answer = str(case["answer"])
     bag = tokens(answer)
     acceptable = {
@@ -134,7 +134,7 @@ def run_order_case(v12, lex, case: dict) -> OrderResult:
     }
 
     # The reranker's own selected order.
-    _, best, _, _ = v12.best_order(
+    _, best, _, _ = reranker.best_order(
         bag,
         lex,
         order_mode="exact" if len(bag) <= 6 else "beam",
@@ -142,7 +142,7 @@ def run_order_case(v12, lex, case: dict) -> OrderResult:
         exact_max_words=6,
     )
     best_key = phrase_key(best)
-    best_obj = _objective(v12, best_key, lex)
+    best_obj = _objective(reranker, best_key, lex)
 
     if len(bag) > 6:
         return OrderResult(
@@ -160,18 +160,18 @@ def run_order_case(v12, lex, case: dict) -> OrderResult:
 
     # Exact unique phrase-order ranking. Repeated words generate duplicate
     # position permutations, so dedupe by the realized token sequence.
-    pair, starts, ends = v12._order_local_tables(tuple(bag), lex)
+    pair, starts, ends = reranker._order_local_tables(tuple(bag), lex)
     scored: dict[tuple[str, ...], float] = {}
     index_to_word = tuple(bag)
 
-    for idx_order in v12._exact_index_orders(len(bag)):
+    for idx_order in reranker._exact_index_orders(len(bag)):
         realized = tuple(index_to_word[i] for i in idx_order)
         if realized in scored:
             continue
 
-        local_raw = v12._local_raw_indices(idx_order, pair, starts, ends)
-        local_norm = v12.grammar_normalize(local_raw)
-        structure = v12.phrase_structure(realized, lex)
+        local_raw = reranker._local_raw_indices(idx_order, pair, starts, ends)
+        local_norm = reranker.grammar_normalize(local_raw)
+        structure = reranker.phrase_structure(realized, lex)
         obj = (
             0.38 * local_norm
             + 0.44 * structure.norm
@@ -261,8 +261,8 @@ def print_order_summary(results: list[OrderResult]) -> None:
         )
 
 
-FINAL_RE = re.compile(r"V\d+ FINAL rank:\s+([\d,]+)\s+/\s+([\d,]+)")
-PRE_RE = re.compile(r"V\d+ PRE rank:\s+([\d,]+)\s+/\s+([\d,]+)")
+FINAL_RE = re.compile(r"FINAL rank:\s+([\d,]+)\s+/\s+([\d,]+)")
+PRE_RE = re.compile(r"PRE rank:\s+([\d,]+)\s+/\s+([\d,]+)")
 NOT_FOUND_RE = re.compile(r"NOT FOUND in input export")
 BEST_ORDER_RE = re.compile(r"best order:\s+(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
 
@@ -281,9 +281,9 @@ class FullResult:
     note: str = ""
 
 
-def make_v8_command(
+def make_generator_command(
     case: dict,
-    v8: Path,
+    generator: Path,
     export: Path,
 ) -> list[str]:
     answer = str(case["answer"])
@@ -301,7 +301,7 @@ def make_v8_command(
 
     cmd = [
         sys.executable,
-        str(v8),
+        str(generator),
         target,
         "--min-word-len", str(min_word_len),
         "--min-words", str(len(words)),
@@ -335,7 +335,7 @@ def make_v8_command(
 def run_full_case(
     case: dict,
     *,
-    v8: Path,
+    generator: Path,
     reranker: Path,
     cache_dir: Path,
     workers: int,
@@ -344,14 +344,14 @@ def run_full_case(
     case_id = str(case["id"])
     answer = str(case["answer"])
     cache_dir.mkdir(parents=True, exist_ok=True)
-    export = cache_dir / f"{slug(case_id)}_v8_ALL.txt"
+    export = cache_dir / f"{slug(case_id)}_candidates.txt"
 
     t0 = time.perf_counter()
     generated = False
 
     if rebuild or not export.exists():
         generated = True
-        cmd = make_v8_command(case, v8, export)
+        cmd = make_generator_command(case, generator, export)
         print(f"\n[{case_id}] generating exact candidate bags ...")
         proc = subprocess.run(cmd, text=True, capture_output=True)
         if proc.returncode != 0:
@@ -525,13 +525,13 @@ def main() -> int:
     ap.add_argument("--case", action="append", default=[], dest="case_ids")
     ap.add_argument(
         "--reranker",
-        "--v12",
+        "--reranker",
         dest="reranker",
         type=Path,
         default=DEFAULT_RERANKER,
-        help="Reranker module/script to benchmark (the --v12 alias is kept for old commands)",
+        help="Reranker module/script to benchmark (the --reranker alias is kept for old commands)",
     )
-    ap.add_argument("--v8", type=Path, default=DEFAULT_V8)
+    ap.add_argument("--generator", type=Path, default=DEFAULT_GENERATOR)
     ap.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--rebuild", action="store_true")
@@ -543,23 +543,23 @@ def main() -> int:
     if args.mode == "order":
         if not args.reranker.is_file():
             raise SystemExit(f"Reranker not found: {args.reranker}")
-        v12 = load_module(args.reranker, "anagram_reranker_bench")
-        wn_dir = v12.ensure_wordnet(v12.DEFAULT_WORDNET_DIR)
+        reranker = load_module(args.reranker, "anagram_reranker_bench")
+        wn_dir = reranker.ensure_wordnet(reranker.DEFAULT_WORDNET_DIR)
         print(f"Loading WordNet from {wn_dir} ...")
-        lex = v12.WordNetLexicon.load(wn_dir)
+        lex = reranker.WordNetLexicon.load(wn_dir)
 
         results = []
         t0 = time.perf_counter()
         for case in cases:
-            result = run_order_case(v12, lex, case)
+            result = run_order_case(reranker, lex, case)
             results.append(result)
         print_order_summary(results)
         print(f"\nSuite wall time: {time.perf_counter() - t0:.2f}s")
         return 0
 
     # Full mode.
-    if not args.v8.is_file():
-        raise SystemExit(f"V8 generator not found: {args.v8}")
+    if not args.generator.is_file():
+        raise SystemExit(f"Generator not found: {args.generator}")
     if not args.reranker.is_file():
         raise SystemExit(f"Reranker not found: {args.reranker}")
 
@@ -567,7 +567,7 @@ def main() -> int:
     results = [
         run_full_case(
             case,
-            v8=args.v8,
+            generator=args.generator,
             reranker=args.reranker,
             cache_dir=args.cache_dir,
             workers=args.workers,

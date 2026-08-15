@@ -1,24 +1,13 @@
 #!/usr/bin/env python3
 """
-multi_anagram_v8_analyzer.py
+Exact multi-word anagram candidate generator and lexical pre-ranker.
 
-Exact multi-word anagram solver + non-LLM phrase analyzer.
+The generator searches exact letter decompositions, applies lexical/clue filters,
+groups morphology variants, and emits a stable candidate export consumed by the
+linguistic reranker. Optional Norvig unigram/bigram data is cached under
+~/.multi_anagram/ngrams.
 
-Design goals:
-  * Never confuse generation with ranking.
-  * Preserve exhaustive exports.
-  * Use lexical frequency only as a SOFT signal.
-  * Exploit clue/hint specificity.
-  * Group simple morphological variants (hip/hips, lie/lies).
-  * Use real word-bigram statistics to estimate whether a bag of words can
-    form a natural phrase.
-  * Search the best word order exactly for a configurable shortlist.
-  * Keep dependencies to the Python standard library.
-
-Language data:
-  Peter Norvig's count_1w.txt and count_2w.txt, derived from the
-  Google Web Trillion Word Corpus. The files are cached under
-  ~/.multi_anagram/ngrams by default.
+Python standard library only.
 """
 
 from __future__ import annotations
@@ -144,7 +133,7 @@ def download_file(url: str, path: Path, refresh: bool = False) -> Path:
         return path
     path.parent.mkdir(parents=True, exist_ok=True)
     print(f"Downloading {url} -> {path}", file=sys.stderr)
-    req = urllib.request.Request(url, headers={"User-Agent": "multi-anagram-v8/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "multi-anagram-generator/1.0"})
     with urllib.request.urlopen(req, timeout=60) as response, path.open("wb") as f:
         while True:
             chunk = response.read(1024 * 1024)

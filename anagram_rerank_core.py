@@ -1,59 +1,19 @@
 #!/usr/bin/env python3
 """
-anagram_rerank_v13.py
+Core linguistic reranker for exact multi-word anagram candidate exports.
 
-Analyzer-only reranker for multi_anagram_v8_analyzer.py exports.
+The reranker combines lexical/commonness evidence, morphology families, clue
+informativeness, WordNet POS/morphology coverage, lightweight English grammar,
+WordNet verb frames/valency, and whole-phrase structure. Short bags can be
+ordered exactly; longer bags use k-best search before the more expensive global
+structure scorer. Independent candidate bags can be analyzed across CPU cores.
 
-Why this exists
----------------
-V8 successfully generated valid word bags, but a sparse surface-bigram model
-could actively punish natural phrases whose exact adjacent word pairs were
-missing from its corpus. This reranker deliberately separates:
+Sparse corpus evidence is positive-only: missing n-grams are treated as unknown,
+not as negative evidence. A benchmark answer, when supplied, is used only after
+ranking and never contributes to scoring.
 
-  * lexical/commonness evidence already exported by V8,
-  * morphology-family evidence already exported by V8,
-  * clue informativeness already exported by V8,
-  * WordNet-backed POS/morphology coverage,
-  * lightweight English grammar/agreement,
-  * WordNet verb sentence frames / valency,
-  * global clause / noun-phrase completeness,
-  * exact best ordering for short bags and k-best ordering search for longer bags,
-  * multicore deep analysis on normal GIL-enabled CPython,
-  * timing / throughput instrumentation.
-
-V13 keeps V10's linguistic scoring model but removes the factorial hot path.
-It uses exact enumeration for short bags and a k-best dynamic program for long
-bags, then applies the expensive whole-clause/valency scorer only to the most
-promising complete orders. Candidate bags are independent, so deep analysis can
-also be distributed across CPU cores.
-
-V13 specifically fixes two V9 false-positive classes:
-  * locally plausible word chains that do not form a complete clause/phrase;
-  * predicates given complements their WordNet verb frames do not license.
-
-Sparse corpus bigrams remain excluded from the final score. Missing n-grams are
-treated as "unknown", not as negative evidence.
-
-The known benchmark answer is NEVER used in scoring. It is only looked up after
-ranking, so it can tell us whether a scoring change helped or hurt.
-
-Dependencies
-------------
-Python standard library only.
-
-On first use, the script downloads the official WordNet 3.1 dictionary archive
-from Princeton (~16 MB) and caches/extracts it under:
-    ~/.multi_anagram/wordnet31
-
-Typical use
------------
-python anagram_rerank_v13.py v8_ALL.txt ^
-    --benchmark-answer "these hips dont lie" ^
-    --deep-per-group 10000 ^
-    --top-per-group 100 ^
-    --export v13_RERANKED.txt
-
-PowerShell line continuations can use backticks instead of ^.
+Python standard library only. WordNet is downloaded on first use and cached
+under ~/.multi_anagram/wordnet31.
 """
 
 from __future__ import annotations
@@ -87,7 +47,7 @@ DEFAULT_PREPARED_CACHE_DIR = Path.home() / ".multi_anagram" / "prepared_cache"
 DEFAULT_NGRAM_DIR = Path.home() / ".multi_anagram" / "ngrams"
 NORVIG_1W_URL = "https://norvig.com/ngrams/count_1w.txt"
 NORVIG_2W_URL = "https://norvig.com/ngrams/count_2w.txt"
-PREPARED_CACHE_SCHEMA = "v13-prepared-1"
+PREPARED_CACHE_SCHEMA = "core-prepared-1"
 
 PRETTY = {
     "dont": "don't",
@@ -168,7 +128,7 @@ FUNCTION_WORDS = (
     | PREPOSITIONS | CONJUNCTIONS | NEG_PARTICLES
 )
 
-V8_LINE_RE = re.compile(
+GENERATOR_LINE_RE = re.compile(
     r"^\s*(?P<rank>\d+)\.\s+"
     r"PRE=\s*(?P<pre>[-+]?\d+(?:\.\d+)?)\s+"
     r"LEX=(?P<lex>\d+(?:\.\d+)?)\s+"
@@ -217,7 +177,7 @@ def safe_extract_tar(archive: Path, destination: Path) -> None:
 
 def download(url: str, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    req = urllib.request.Request(url, headers={"User-Agent": "anagram-rerank-v13/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "anagram-solver/1.0"})
     with urllib.request.urlopen(req, timeout=90) as response, path.open("wb") as f:
         shutil.copyfileobj(response, f)
 
@@ -298,7 +258,7 @@ def load_exceptions(path: Path) -> dict[str, tuple[str, ...]]:
 
 
 # ---------------------------------------------------------------------------
-# V13 performance/runtime helpers
+# Performance/runtime helpers
 # ---------------------------------------------------------------------------
 
 _WORKER_LEX = None
@@ -353,8 +313,8 @@ def chunked(seq: Sequence[int], size: int) -> list[tuple[int, ...]]:
 
 # WordNet 3.1 generic verb-frame groups.
 #
-# V10-V12 intentionally used coarse buckets. The regression suite exposed that
-# some of those buckets were semantically wrong: frames 6/7 are predicative
+# Earlier revisions used coarse frame buckets. The regression suite exposed that
+# frames 6/7 are predicative
 # complements ("Something ----s Adjective/Noun"), not intransitives.
 #
 # Source taxonomy follows Princeton WordNet's published 35 generic frames.
@@ -645,7 +605,7 @@ class Row:
     wn_coverage: float = 0.0
     grammar_potential: float = 0.0
     grammar_potential_norm: float = 0.0
-    v13_pre: float = 0.0
+    pre_score: float = 0.0
 
     deep: bool = False
     best_order: tuple[str, ...] = ()
@@ -962,7 +922,7 @@ def apply_phrase_rescore(
 
     rescored = 0
     for wc, bucket in by_wc.items():
-        bucket.sort(key=lambda r: (r.final, r.v13_pre), reverse=True)
+        bucket.sort(key=lambda r: (r.final, r.pre_score), reverse=True)
         chosen = bucket[:top_per_group]
         vocabulary = None  # merely documents that order is already fixed
         for row in chosen:
@@ -988,7 +948,7 @@ def apply_phrase_rescore(
     return rescored
 
 
-def parse_v8(path: Path) -> list[Row]:
+def parse_candidates(path: Path) -> list[Row]:
     rows: list[Row] = []
     section: int | None = None
     with path.open("r", encoding="utf-8", errors="ignore") as f:
@@ -999,7 +959,7 @@ def parse_v8(path: Path) -> list[Row]:
                 continue
             if section is None:
                 continue
-            m = V8_LINE_RE.match(line.rstrip())
+            m = GENERATOR_LINE_RE.match(line.rstrip())
             if not m:
                 continue
 
@@ -1345,9 +1305,9 @@ def _np_span_ending_at(
     """
     Return (start_index, coherence) for a compact NP ending at head_idx.
 
-    V12 greedily allowed any noun before another noun. Because English words are
+    earlier reranker greedily allowed any noun before another noun. Because English words are
     wildly POS-ambiguous in WordNet, that let nonsense such as
-    "practice perfect" become a high-confidence subject NP. V13 prefers
+    "practice perfect" become a high-confidence subject NP. current reranker prefers
     adjectival modifiers and only accepts a noun modifier when it is relatively
     unambiguous (noun but not verb/adjective).
     """
@@ -1868,7 +1828,7 @@ def phrase_structure(words: Sequence[str], lex: WordNetLexicon) -> StructureResu
     """
     Evaluate the complete order using several general English constructions.
 
-    V13 adds:
+    current reranker adds:
       * real copular clauses (NP + be + NP/Adj/comparative)
       * predicative/result complements from WordNet frames
       * subordinate clauses
@@ -2177,7 +2137,7 @@ def _order_local_tables(
     """
     Precompute all local ordering evidence once per word bag.
 
-    V10 recomputed pair_grammar(), function classes and feature lookups inside
+    earlier reranker recomputed pair_grammar(), function classes and feature lookups inside
     every permutation. A six-word bag has only 30 directed pairs, so caching
     this matrix turns the ordering search into mostly tuple indexing + floats.
     """
@@ -2213,7 +2173,7 @@ def _local_raw_indices(
 def _exact_index_orders(n: int) -> Iterator[tuple[int, ...]]:
     """
     Allocation-light exact permutation generator for 1..6 unique positions.
-    Avoids V10's set(permutations(...)) tuple hashing/allocation festival.
+    Avoids earlier reranker's set(permutations(...)) tuple hashing/allocation festival.
     """
     path = [0] * n
 
@@ -2308,7 +2268,7 @@ def best_order(
     * beam:  evaluate only k-best locally plausible full orders
     * auto:  exact through exact_max_words, k-best above it
 
-    V10's linguistic objective is preserved. Only candidate-order generation
+    earlier reranker's linguistic objective is preserved. Only candidate-order generation
     changes for bags above exact_max_words.
     """
     words = tuple(words)
@@ -2366,9 +2326,9 @@ def grammar_normalize(raw_per_edge: float) -> float:
     return sigmoid((raw_per_edge - 0.85) * 1.25)
 
 
-def score_pre_v13(row: Row) -> float:
+def score_pre(row: Row) -> float:
     """
-    Shortlist score. Kept intentionally close to V9 because V9 already moved
+    Shortlist score. Kept intentionally close to earlier reranker because earlier reranker already moved
     the benchmark from #1749 to #29 before deep analysis.
     """
     return 100.0 * (
@@ -2380,9 +2340,9 @@ def score_pre_v13(row: Row) -> float:
     )
 
 
-def score_final_v13(row: Row) -> float:
+def score_final(row: Row) -> float:
     """
-    V13 final score.
+    current reranker final score.
 
     Local grammar still matters, but a candidate must also form a coherent
     global phrase/clause. WordNet valency is independent evidence rather than
@@ -2404,14 +2364,14 @@ def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
         row.wn_coverage = content_coverage(row.words, lex)
         row.grammar_potential_norm = grammar_potential(row.words, lex)
         row.family_key = morphology_family(row.words, lex)
-        row.v13_pre = score_pre_v13(row)
+        row.pre_score = score_pre(row)
         if idx % 25000 == 0:
             print(f"  prepared {idx:,} / {len(rows):,}")
 
 
 def choose_deep(rows: list[Row], per_group: int, deep_all: bool) -> set[int]:
     """
-    Choose rows by V13 PRE, then expand every selected morphology family.
+    Choose rows by current reranker PRE, then expand every selected morphology family.
     That prevents a high-frequency bad inflection from hiding its grammatically
     correct sibling.
     """
@@ -2424,7 +2384,7 @@ def choose_deep(rows: list[Row], per_group: int, deep_all: bool) -> set[int]:
     selected_families: set[tuple[int, tuple[str, ...]]] = set()
 
     for wc, bucket in sorted(by_wc.items()):
-        bucket.sort(key=lambda ir: (ir[1].v13_pre, ir[1].fam, ir[1].lex), reverse=True)
+        bucket.sort(key=lambda ir: (ir[1].pre_score, ir[1].fam, ir[1].lex), reverse=True)
         chosen = bucket if deep_all else bucket[:per_group]
         print(f"Deep shortlist {wc} words: {len(chosen):,} / {len(bucket):,}")
         for i, row in chosen:
@@ -2497,7 +2457,7 @@ def _apply_deep_result(rows: list[Row], result: DeepResult) -> None:
     row.valency_norm = result.valency_norm
     row.syntax_coverage = result.syntax_coverage
     row.phrase_kind = result.phrase_kind
-    row.final = score_final_v13(row)
+    row.final = score_final(row)
     row.base_final = row.final
 
 
@@ -2631,7 +2591,7 @@ def format_row(rank: int, row: Row) -> str:
     if row.deep:
         phrase = pretty_phrase(row.best_order)
         return (
-            f"{rank:7d}. FINAL={row.final:6.2f} PRE13={row.v13_pre:6.2f} "
+            f"{rank:7d}. FINAL={row.final:6.2f} PRE={row.pre_score:6.2f} "
             f"GRAM={row.grammar_norm:5.3f} STRUCT={row.structure_norm:5.3f} "
             f"VAL={row.valency_norm:4.2f} COV={row.syntax_coverage:4.2f} "
             f"KIND={row.phrase_kind:<11} WN={row.wn_coverage:4.2f} "
@@ -2642,7 +2602,7 @@ def format_row(rank: int, row: Row) -> str:
             f"OLDPRE={row.old_pre:.2f}; OLDRANK={row.old_rank}]"
         )
     return (
-        f"{rank:7d}. PRE13={row.v13_pre:6.2f} GPOT={row.grammar_potential_norm:5.3f} "
+        f"{rank:7d}. PRE={row.pre_score:6.2f} GPOT={row.grammar_potential_norm:5.3f} "
         f"WN={row.wn_coverage:4.2f} LEX={row.lex:5.3f} FAM={row.fam:5.3f} "
         f"HINT={row.hint:5.3f} {' '.join(row.words)} "
         f"[OLDPRE={row.old_pre:.2f}; OLDRANK={row.old_rank}]"
@@ -2658,8 +2618,8 @@ def rank_buckets(rows: list[Row]) -> dict[int, list[Row]]:
         bucket.sort(
             key=lambda r: (
                 1 if r.deep else 0,
-                r.final if r.deep else r.v13_pre,
-                r.v13_pre,
+                r.final if r.deep else r.pre_score,
+                r.pre_score,
             ),
             reverse=True,
         )
@@ -2673,19 +2633,19 @@ def write_export(path: Path, buckets: dict[int, list[Row]]) -> None:
             bucket = buckets[wc]
             deep_count = sum(1 for r in bucket if r.deep)
             f.write(
-                f"=== {wc}-WORD V13 RANKING "
+                f"=== {wc}-WORD current reranker RANKING "
                 f"({len(bucket)} total; {deep_count} deep-analyzed) ===\n"
             )
 
-            # Deep rows first, ranked by FINAL. Then non-deep by PRE13.
+            # Deep rows first, ranked by FINAL. Then non-deep by PRE.
             deep_rows = sorted(
                 (r for r in bucket if r.deep),
-                key=lambda r: (r.final, r.v13_pre),
+                key=lambda r: (r.final, r.pre_score),
                 reverse=True,
             )
             pre_rows = sorted(
                 (r for r in bucket if not r.deep),
-                key=lambda r: r.v13_pre,
+                key=lambda r: r.pre_score,
                 reverse=True,
             )
 
@@ -2695,7 +2655,7 @@ def write_export(path: Path, buckets: dict[int, list[Row]]) -> None:
                 rank += 1
 
             if pre_rows:
-                f.write("--- NOT DEEP-ANALYZED; PRE13 ONLY ---\n")
+                f.write("--- NOT DEEP-ANALYZED; PRE ONLY ---\n")
                 for r in pre_rows:
                     f.write(format_row(rank, r) + "\n")
                     rank += 1
@@ -2716,11 +2676,11 @@ def benchmark(answer: str, rows: list[Row]) -> None:
     bucket = [r for r in rows if r.word_count == target.word_count]
 
     old_rank = target.old_rank
-    pre_sorted = sorted(bucket, key=lambda r: r.v13_pre, reverse=True)
+    pre_sorted = sorted(bucket, key=lambda r: r.pre_score, reverse=True)
     pre_rank = pre_sorted.index(target) + 1
 
-    print(f"  V8 PRE rank: {old_rank:,} / {len(bucket):,}")
-    print(f"  V13 PRE rank: {pre_rank:,} / {len(bucket):,}  ({target.v13_pre:.2f})")
+    print(f"  generator PRE rank: {old_rank:,} / {len(bucket):,}")
+    print(f"  PRE rank: {pre_rank:,} / {len(bucket):,}  ({target.pre_score:.2f})")
     print(f"  canonical:   {' '.join(target.words)}")
     print(f"  family:      {' / '.join(target.family_key)}")
     print(f"  WN coverage: {target.wn_coverage:.2f}")
@@ -2729,10 +2689,10 @@ def benchmark(answer: str, rows: list[Row]) -> None:
 
     if target.deep:
         deep_bucket = [r for r in bucket if r.deep]
-        final_sorted = sorted(deep_bucket, key=lambda r: (r.final, r.v13_pre), reverse=True)
+        final_sorted = sorted(deep_bucket, key=lambda r: (r.final, r.pre_score), reverse=True)
         final_rank = final_sorted.index(target) + 1
         print(
-            f"  V13 FINAL rank: {final_rank:,} / {len(deep_bucket):,} "
+            f"  FINAL rank: {final_rank:,} / {len(deep_bucket):,} "
             f"({target.final:.2f})"
         )
         print(f"  best order:  {pretty_phrase(target.best_order)}")
@@ -2745,15 +2705,15 @@ def benchmark(answer: str, rows: list[Row]) -> None:
         print(f"  phrase prior:{target.phrase_attest_norm:.3f}")
         print(f"  phrase bonus:{target.phrase_bonus:.3f}")
     else:
-        print("  V13 FINAL: not deep-analyzed; increase --deep-per-group or use --deep-all")
+        print("  current reranker FINAL: not deep-analyzed; increase --deep-per-group or use --deep-all")
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Fast WordNet + phrase-prior reranker for V8 anagram exports.",
+        description="Fast WordNet + phrase-prior reranker for generator anagram exports.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    ap.add_argument("input", type=Path, help="v8_ALL.txt produced by multi_anagram_v8_analyzer.py")
+    ap.add_argument("input", type=Path, help="candidates.txt produced by anagram_generate.py")
     ap.add_argument("--wordnet-dir", type=Path, default=DEFAULT_WORDNET_DIR)
     ap.add_argument("--refresh-wordnet", action="store_true")
     ap.add_argument(
@@ -2800,7 +2760,7 @@ def main() -> int:
         help="In auto mode, use exact ordering through this many words",
     )
     ap.add_argument("--top-per-group", type=int, default=100)
-    ap.add_argument("--export", type=Path, default=Path("v13_RERANKED.txt"))
+    ap.add_argument("--export", type=Path, default=Path("reranked.txt"))
 
     ap.add_argument(
         "--prepared-cache-dir",
@@ -2892,10 +2852,10 @@ def main() -> int:
     if rows is None:
         print(f"Parsing {args.input} ...")
         _stage_t0 = time.perf_counter()
-        rows = parse_v8(args.input)
+        rows = parse_candidates(args.input)
         stage_times["parse"] = time.perf_counter() - _stage_t0
         if not rows:
-            raise SystemExit("No V8 PRE-ranked records found. Is this a v8_ALL.txt export?")
+            raise SystemExit("No generator PRE-ranked records found. Is this a candidates.txt export?")
         print(f"Parsed {len(rows):,} candidate word set(s).")
 
         print("Preparing grammar/morphology features ...")
@@ -2978,12 +2938,12 @@ def main() -> int:
         bucket = buckets[wc]
         deep_rows = sorted(
             (r for r in bucket if r.deep),
-            key=lambda r: (r.final, r.v13_pre),
+            key=lambda r: (r.final, r.pre_score),
             reverse=True,
         )
         print()
         print(
-            f"=== {wc}-WORD V13 FINAL "
+            f"=== {wc}-WORD current reranker FINAL "
             f"(showing {min(args.top_per_group, len(deep_rows))} "
             f"of {len(deep_rows)} deep; {len(bucket)} total) ==="
         )
@@ -2999,7 +2959,7 @@ def main() -> int:
         benchmark(args.benchmark_answer, rows)
 
     total_elapsed = time.perf_counter() - overall_t0
-    print("\n=== V13 TIMINGS ===")
+    print("\n=== current reranker TIMINGS ===")
     for name in (
         "wordnet", "cache_load", "parse", "prepare", "cache_save",
         "shortlist", "deep", "phrase", "rank", "export"

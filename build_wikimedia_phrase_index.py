@@ -2,7 +2,7 @@
 """
 build_wikimedia_phrase_index.py
 
-Build a local phrase-title index compatible with anagram_rerank_v13.py's
+Build a local phrase-title index compatible with anagram_rerank.py's
 --phrase-db option, using Wikimedia's official main-namespace title dumps.
 
 Default source:
@@ -33,7 +33,7 @@ Add Wikipedia too:
       --output wikimedia_phrases.db
 
 Then:
-  python anagram_rerank_v13.py v8_ALL.txt ^
+  python anagram_rerank.py candidates.txt ^
       --phrase-db wikimedia_phrases.db ...
 """
 
