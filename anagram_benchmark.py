@@ -9,7 +9,8 @@ Modes
 order (default)
     Fast. Given each known phrase's unordered word bag, rank all word orders
     (exactly for <=6 words) using the selected reranker's grammar/structure objective.
-    Reports Top-1/10/50, MRR, and the chosen order.
+    When --phrase-db is supplied, also rerank the grammar-retained top-K orders
+    with positive phrase-title evidence and report an A/B comparison.
 
 full
     Slow on first run, cached afterward. Uses anagram_generate.py to
@@ -23,6 +24,7 @@ Examples
 --------
 python anagram_benchmark.py --mode order
 python anagram_benchmark.py --mode full --workers 8
+python anagram_benchmark.py --mode order --phrase-db wikimedia_phrases.db
 python anagram_benchmark.py --mode order --case better_late --case shakira_control
 """
 
@@ -94,6 +96,37 @@ class OrderResult:
     exact_best: bool
     answer_objective: float | None
     best_objective: float
+
+
+@dataclass(slots=True)
+class PhraseOrderResult:
+    case_id: str
+    answer: str
+    category: str
+    retained_rank: int | None
+    retained_total: int
+    best_order: str
+    exact_best: bool
+    target_retained: bool
+    best_phrase_score: float
+
+
+def compute_phrase_order_metrics(results: list[PhraseOrderResult]) -> dict[str, float]:
+    """Metrics for phrase-aware ordering; dropped targets count as misses."""
+    if not results:
+        return {}
+    n = len(results)
+    ranks = [r.retained_rank for r in results]
+    retained = sum(rank is not None for rank in ranks)
+    return {
+        "cases": float(n),
+        "retained": float(retained),
+        "retained_rate": retained / n,
+        "recall1": sum(rank is not None and rank <= 1 for rank in ranks) / n,
+        "recall10": sum(rank is not None and rank <= 10 for rank in ranks) / n,
+        "recall50": sum(rank is not None and rank <= 50 for rank in ranks) / n,
+        "mrr": sum((1.0 / rank) if rank else 0.0 for rank in ranks) / n,
+    }
 
 
 def compute_order_metrics(results: list[OrderResult]) -> dict[str, float]:
@@ -204,6 +237,122 @@ def run_order_case(reranker, lex, case: dict) -> OrderResult:
         answer_objective=answer_obj,
         best_objective=best_obj,
     )
+
+
+def _candidate_final_order_component(candidate) -> float:
+    """Order-dependent part of FINAL; bag-level terms cancel within one bag."""
+    return 100.0 * (
+        0.22 * candidate.grammar_norm
+        + 0.28 * candidate.structure_norm
+        + 0.08 * candidate.valency_norm
+    )
+
+
+def run_phrase_order_case(
+    reranker,
+    lex,
+    case: dict,
+    phrase_index,
+    *,
+    order_candidates: int,
+    phrase_bonus_max: float,
+) -> PhraseOrderResult:
+    """Rerank grammar-retained orders with positive phrase-index evidence."""
+    answer = str(case["answer"])
+    bag = tokens(answer)
+    acceptable = {
+        phrase_key(x)
+        for x in case.get("acceptable_orders", [answer])
+    }
+
+    candidates, _ = reranker.rank_orders(
+        bag,
+        lex,
+        order_mode="exact" if len(bag) <= 6 else "beam",
+        beam_width=256,
+        exact_max_words=6,
+        top_k=order_candidates,
+    )
+
+    scored: list[tuple[float, float, tuple[str, ...]]] = []
+    for candidate in candidates:
+        phrase_score, _ = phrase_index.score(candidate.order)
+        combined = (
+            _candidate_final_order_component(candidate)
+            + phrase_bonus_max * phrase_score
+        )
+        scored.append((combined, phrase_score, candidate.order))
+
+    scored.sort(key=lambda item: (-item[0], -item[1], item[2]))
+    ranks = [
+        i
+        for i, (_, _, order) in enumerate(scored, 1)
+        if phrase_key(order) in acceptable
+    ]
+    retained_rank = min(ranks) if ranks else None
+    best_order = scored[0][2] if scored else tuple()
+    best_phrase_score = scored[0][1] if scored else 0.0
+
+    return PhraseOrderResult(
+        case_id=str(case["id"]),
+        answer=answer,
+        category=str(case.get("category", "uncategorized")),
+        retained_rank=retained_rank,
+        retained_total=len(scored),
+        best_order=" ".join(best_order),
+        exact_best=phrase_key(best_order) in acceptable,
+        target_retained=retained_rank is not None,
+        best_phrase_score=best_phrase_score,
+    )
+
+
+def print_phrase_order_summary(
+    results: list[PhraseOrderResult],
+    *,
+    grammar_results: list[OrderResult],
+    order_candidates: int,
+    phrase_db: Path,
+) -> None:
+    print("\n=== PHRASE-AWARE FINAL ORDER A/B ===")
+    print(f"Phrase DB: {phrase_db}")
+    print(f"Grammar-retained orders per bag: {order_candidates}")
+    for result in results:
+        if result.retained_rank is None:
+            status = "DROP"
+            rank_text = f"-/{result.retained_total}"
+        else:
+            status = (
+                "TOP1" if result.retained_rank == 1
+                else "TOP10" if result.retained_rank <= 10
+                else "TOP50" if result.retained_rank <= 50
+                else "MISS"
+            )
+            rank_text = f"{result.retained_rank}/{result.retained_total}"
+        print(
+            f"{status:5}  {result.case_id:<24} [{result.category:<20}] "
+            f"rank={rank_text:<8} phrase={result.best_phrase_score:5.3f} "
+            f"best={result.best_order}"
+        )
+
+    observed = compute_phrase_order_metrics(results)
+    print("\nPhrase-aware retained-order metrics:")
+    print(f"  cases          {int(observed['cases'])}")
+    print(
+        f"  target retained {int(observed['retained'])}/{int(observed['cases'])} "
+        f"({observed['retained_rate']:.3f})"
+    )
+    print(f"  Recall@1       {observed['recall1']:.3f}")
+    print(f"  Recall@10      {observed['recall10']:.3f}")
+    print(f"  Recall@50      {observed['recall50']:.3f}")
+    print(f"  MRR            {observed['mrr']:.3f}")
+
+    grammar = compute_order_metrics(grammar_results)
+    if grammar and int(grammar["cases"]) == int(observed["cases"]):
+        print("\nA/B delta vs grammar-only exact ordering:")
+        print(f"  Recall@1   {observed['recall1'] - grammar['recall1']:+.3f}")
+        print(f"  Recall@10  {observed['recall10'] - grammar['recall10']:+.3f}")
+        print(f"  Recall@50  {observed['recall50'] - grammar['recall50']:+.3f}")
+        print(f"  MRR        {observed['mrr'] - grammar['mrr']:+.3f}")
 
 
 def print_order_summary(results: list[OrderResult]) -> None:
@@ -332,6 +481,37 @@ def make_generator_command(
     return cmd
 
 
+def make_reranker_command(
+    case: dict,
+    *,
+    reranker: Path,
+    export: Path,
+    output: Path,
+    workers: int,
+    phrase_db: Path | None,
+    phrase_bonus_max: float,
+    order_candidates: int,
+) -> list[str]:
+    cmd = [
+        sys.executable,
+        str(reranker),
+        str(export),
+        "--benchmark-answer", str(case["answer"]),
+        "--workers", str(workers),
+        "--backend", "auto",
+        "--deep-per-group", str(int(case.get("deep_per_group", 5000))),
+        "--beam-width", "128",
+        "--phrase-rescore-top", "300",
+        "--phrase-bonus-max", str(phrase_bonus_max),
+        "--order-candidates", str(order_candidates),
+        "--top-per-group", "1",
+        "--export", str(output),
+    ]
+    if phrase_db is not None:
+        cmd += ["--phrase-db", str(phrase_db)]
+    return cmd
+
+
 def run_full_case(
     case: dict,
     *,
@@ -340,6 +520,9 @@ def run_full_case(
     cache_dir: Path,
     workers: int,
     rebuild: bool,
+    phrase_db: Path | None,
+    phrase_bonus_max: float,
+    order_candidates: int,
 ) -> FullResult:
     case_id = str(case["id"])
     answer = str(case["answer"])
@@ -362,19 +545,16 @@ def run_full_case(
             )
 
     print(f"[{case_id}] reranking {export.name} ...")
-    cmd = [
-        sys.executable,
-        str(reranker),
-        str(export),
-        "--benchmark-answer", answer,
-        "--workers", str(workers),
-        "--backend", "auto",
-        "--deep-per-group", str(int(case.get("deep_per_group", 5000))),
-        "--beam-width", "128",
-        "--phrase-rescore-top", "300",
-        "--top-per-group", "1",
-        "--export", str(cache_dir / f"{slug(case_id)}_reranked.txt"),
-    ]
+    cmd = make_reranker_command(
+        case,
+        reranker=reranker,
+        export=export,
+        output=cache_dir / f"{slug(case_id)}_reranked.txt",
+        workers=workers,
+        phrase_db=phrase_db,
+        phrase_bonus_max=phrase_bonus_max,
+        order_candidates=order_candidates,
+    )
     proc = subprocess.run(cmd, text=True, capture_output=True)
     elapsed = time.perf_counter() - t0
 
@@ -534,7 +714,36 @@ def main() -> int:
     ap.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--rebuild", action="store_true")
+    ap.add_argument(
+        "--phrase-db",
+        type=Path,
+        help=(
+            "Optional SQLite phrase index. In order mode this enables phrase-aware "
+            "top-K A/B metrics; in full mode it is forwarded to the reranker."
+        ),
+    )
+    ap.add_argument(
+        "--phrase-bonus-max",
+        type=float,
+        default=5.0,
+        help="Maximum additive phrase-evidence bonus used by the A/B and full reranker",
+    )
+    ap.add_argument(
+        "--order-candidates",
+        type=int,
+        default=16,
+        help="Grammar-retained orders per bag available to phrase-aware selection",
+    )
     args = ap.parse_args()
+
+    if args.phrase_bonus_max < 0:
+        raise SystemExit("--phrase-bonus-max must be >= 0")
+    if args.order_candidates < 1:
+        raise SystemExit("--order-candidates must be >= 1")
+
+    phrase_db = args.phrase_db.expanduser() if args.phrase_db else None
+    if phrase_db is not None and not phrase_db.is_file():
+        raise SystemExit(f"--phrase-db not found: {phrase_db}")
 
     selected = set(args.case_ids)
     cases = load_cases(args.cases, selected)
@@ -553,6 +762,32 @@ def main() -> int:
             result = run_order_case(reranker, lex, case)
             results.append(result)
         print_order_summary(results)
+
+        if phrase_db is not None:
+            phrase_index = reranker.PhraseIndex.open(phrase_db)
+            try:
+                phrase_results = [
+                    run_phrase_order_case(
+                        reranker,
+                        lex,
+                        case,
+                        phrase_index,
+                        order_candidates=args.order_candidates,
+                        phrase_bonus_max=args.phrase_bonus_max,
+                    )
+                    for case in cases
+                ]
+                print_phrase_order_summary(
+                    phrase_results,
+                    grammar_results=results,
+                    order_candidates=args.order_candidates,
+                    phrase_db=phrase_db,
+                )
+            finally:
+                close = getattr(phrase_index, "close", None)
+                if callable(close):
+                    close()
+
         print(f"\nSuite wall time: {time.perf_counter() - t0:.2f}s")
         return 0
 
@@ -571,6 +806,9 @@ def main() -> int:
             cache_dir=args.cache_dir,
             workers=args.workers,
             rebuild=args.rebuild,
+            phrase_db=phrase_db,
+            phrase_bonus_max=args.phrase_bonus_max,
+            order_candidates=args.order_candidates,
         )
         for case in full_cases
     ]
