@@ -37,7 +37,7 @@ for _name in dir(impl):
         globals()[_name] = getattr(impl, _name)
 
 ENGINE_LAYER = "top-k-order-reranking-reviewed"
-PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-1"
+PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:

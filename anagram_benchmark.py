@@ -261,8 +261,8 @@ def print_order_summary(results: list[OrderResult]) -> None:
         )
 
 
-FINAL_RE = re.compile(r"FINAL rank:\s+([\d,]+)\s+/\s+([\d,]+)")
-PRE_RE = re.compile(r"PRE rank:\s+([\d,]+)\s+/\s+([\d,]+)")
+FINAL_RE = re.compile(r"^\s*FINAL rank:\s+([\d,]+)\s+/\s+([\d,]+)", re.MULTILINE)
+PRE_RE = re.compile(r"^\s*PRE rank:\s+([\d,]+)\s+/\s+([\d,]+)", re.MULTILINE)
 NOT_FOUND_RE = re.compile(r"NOT FOUND in input export")
 BEST_ORDER_RE = re.compile(r"best order:\s+(.+?)\s*$", re.MULTILINE | re.IGNORECASE)
 

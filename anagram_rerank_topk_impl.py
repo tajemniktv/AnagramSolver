@@ -281,7 +281,7 @@ def _apply_deep_result(rows: list[Row], result: DeepResult) -> None:
     row.valency_norm = result.valency_norm
     row.syntax_coverage = result.syntax_coverage
     row.phrase_kind = result.phrase_kind
-    row.final = score_final(row)
+    row.final = core.score_final(row)
     row.base_final = row.final
     _ORDER_CANDIDATES_BY_ROW_ID[id(row)] = result.order_candidates
 

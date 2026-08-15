@@ -1307,7 +1307,7 @@ def _np_span_ending_at(
 
     earlier reranker greedily allowed any noun before another noun. Because English words are
     wildly POS-ambiguous in WordNet, that let nonsense such as
-    "practice perfect" become a high-confidence subject NP. current reranker prefers
+    "practice perfect" become a high-confidence subject NP. linguistic reranker prefers
     adjectival modifiers and only accepts a noun modifier when it is relatively
     unambiguous (noun but not verb/adjective).
     """
@@ -1828,7 +1828,7 @@ def phrase_structure(words: Sequence[str], lex: WordNetLexicon) -> StructureResu
     """
     Evaluate the complete order using several general English constructions.
 
-    current reranker adds:
+    linguistic reranker adds:
       * real copular clauses (NP + be + NP/Adj/comparative)
       * predicative/result complements from WordNet frames
       * subordinate clauses
@@ -2342,7 +2342,7 @@ def score_pre(row: Row) -> float:
 
 def score_final(row: Row) -> float:
     """
-    current reranker final score.
+    linguistic reranker final score.
 
     Local grammar still matters, but a candidate must also form a coherent
     global phrase/clause. WordNet valency is independent evidence rather than
@@ -2371,7 +2371,7 @@ def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
 
 def choose_deep(rows: list[Row], per_group: int, deep_all: bool) -> set[int]:
     """
-    Choose rows by current reranker PRE, then expand every selected morphology family.
+    Choose rows by linguistic reranker PRE, then expand every selected morphology family.
     That prevents a high-frequency bad inflection from hiding its grammatically
     correct sibling.
     """
@@ -2943,7 +2943,7 @@ def main() -> int:
         )
         print()
         print(
-            f"=== {wc}-WORD current reranker FINAL "
+            f"=== {wc}-WORD linguistic reranker FINAL "
             f"(showing {min(args.top_per_group, len(deep_rows))} "
             f"of {len(deep_rows)} deep; {len(bucket)} total) ==="
         )
@@ -2959,7 +2959,7 @@ def main() -> int:
         benchmark(args.benchmark_answer, rows)
 
     total_elapsed = time.perf_counter() - overall_t0
-    print("\n=== current reranker TIMINGS ===")
+    print("\n=== linguistic reranker TIMINGS ===")
     for name in (
         "wordnet", "cache_load", "parse", "prepare", "cache_save",
         "shortlist", "deep", "phrase", "rank", "export"
