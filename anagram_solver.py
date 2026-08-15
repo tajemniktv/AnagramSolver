@@ -26,7 +26,7 @@ RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_RUN_ROOT = Path.home() / ".multi_anagram" / "solver_runs"
 BALANCED_MAX_RESULTS = 100_000
 QUICK_MAX_RESULTS = 20_000
-GENERATION_CACHE_SCHEMA = 2
+GENERATION_CACHE_SCHEMA = 3
 
 _RESULT_RE = re.compile(
     r"^\s*(?P<rank>\d+)\.\s+FINAL=\s*(?P<score>[\d.]+).*?"
@@ -130,6 +130,10 @@ def build_generator_command(args: argparse.Namespace, output: Path) -> list[str]
         "--max-words", str(args.max_words),
         "--min-zipf", str(args.min_zipf),
         "--short-word-policy", "common",
+        # The reranker consumes the generator's component-rich PRE export.
+        # Without this flag the generator writes only PRE score + phrase, which
+        # is valid human output but intentionally does not match its parser.
+        "--show-components",
         "--top-per-group", "1",
         "--export", str(output),
     ]
