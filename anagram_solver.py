@@ -233,7 +233,12 @@ def _run(cmd: Sequence[str], *, verbose: bool) -> subprocess.CompletedProcess[st
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Solve and rank exact multi-word anagrams in one command.",
+        description=(
+            "Solve and rank exact multi-word anagrams in one command. "
+            f"The default balanced search caps candidate generation at "
+            f"{BALANCED_MAX_RESULTS:,} bags and may miss the answer; "
+            "--exhaustive removes the generation cap."
+        ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
         epilog=(
             'Examples:\n'
@@ -270,7 +275,10 @@ def build_parser() -> argparse.ArgumentParser:
     search_mode.add_argument(
         "--exhaustive",
         action="store_true",
-        help="Enumerate every matching word bag; complete but potentially much slower",
+        help=(
+            "Enumerate every matching candidate word bag with no generation cap; "
+            "final deep reranking remains bounded and displayed results are not exhaustive"
+        ),
     )
     parser.add_argument("--rebuild", action="store_true", help="Regenerate the cached candidate export")
     parser.add_argument("--verbose", action="store_true", help="Show generator/reranker diagnostic output live")

@@ -37,6 +37,7 @@ class UserCliTests(unittest.TestCase):
         )
         self.assertEqual(cmd[cmd.index("--min-zipf") + 1], "2.7")
         self.assertEqual(solver._generation_mode(args), "balanced")
+        self.assertEqual(solver._generation_cap(args), solver.BALANCED_MAX_RESULTS)
 
     def test_quick_generation_uses_smaller_cap(self) -> None:
         args = self._args("--quick")
@@ -49,6 +50,7 @@ class UserCliTests(unittest.TestCase):
         )
         self.assertLess(solver.QUICK_MAX_RESULTS, solver.BALANCED_MAX_RESULTS)
         self.assertEqual(solver._generation_mode(args), "quick")
+        self.assertEqual(solver._generation_cap(args), solver.QUICK_MAX_RESULTS)
 
     def test_exhaustive_generation_is_explicit(self) -> None:
         args = self._args("--exhaustive")
@@ -58,6 +60,10 @@ class UserCliTests(unittest.TestCase):
         self.assertNotIn("--max-results", cmd)
         self.assertIsNone(solver._generation_cap(args))
         self.assertEqual(solver._generation_mode(args), "exhaustive")
+
+    def test_quick_and_exhaustive_are_mutually_exclusive(self) -> None:
+        with self.assertRaises(SystemExit):
+            solver.build_parser().parse_args(["abcdef", "--quick", "--exhaustive"])
 
     def test_hints_excludes_require_and_word_count_are_forwarded(self) -> None:
         args = self._args(

@@ -14,7 +14,7 @@ python anagram_solver.py "ODITIHNSLSHEEEPT"
 
 On the first run the solver may download/cache its dictionary, WordNet data, and word-frequency data. Later runs reuse those caches.
 
-Normal use runs a balanced search capped at 100,000 generated word bags. This avoids silently turning every simple solve into an unlimited 2–6-word enumeration while still giving the reranker a large candidate population.
+Normal use runs a **balanced** search capped at 100,000 generated word bags. It is much more responsive than unlimited 2–6-word enumeration, but the cap means it **can miss the answer** if the correct bag occurs later in generation order.
 
 For a faster exploratory pass:
 
@@ -24,13 +24,13 @@ python anagram_solver.py "ODITIHNSLSHEEEPT" --quick
 
 `--quick` caps generation at 20,000 candidate word bags and can miss the answer.
 
-For complete enumeration with no generation cap:
+For unlimited **candidate generation** with no generation cap:
 
 ```powershell
 python anagram_solver.py "ODITIHNSLSHEEEPT" --exhaustive
 ```
 
-`--exhaustive` is the universal completeness mode. It can become much slower when the word count is unknown or many short/common words fit the letter multiset. Supplying clues or an exact word count can reduce that search space dramatically.
+`--exhaustive` exhaustively generates matching word bags, but the user-facing reranker still deep-analyzes a bounded shortlist and only those deep-ranked rows are displayed. In other words, it removes **generation** truncation; it is not a promise that every generated bag receives full grammar/phrase analysis. It can become much slower when the word count is unknown or many short/common words fit the letter multiset. Supplying clues or an exact word count can reduce that search space dramatically.
 
 ## Common options
 
