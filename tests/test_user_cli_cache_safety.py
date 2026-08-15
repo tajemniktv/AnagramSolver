@@ -68,7 +68,3 @@ class UserCliCacheSafetyTests(unittest.TestCase):
             self.assertNotEqual(export_paths[0], export_paths[1])
             self.assertTrue(candidates.is_file())
             self.assertTrue(all(not path.exists() for path in export_paths))
-
-
-if __name__ == "__main__":
-    unittest.main()
