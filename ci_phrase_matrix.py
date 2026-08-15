@@ -124,6 +124,42 @@ def full_metrics(text: str) -> dict[str, float | None]:
     }
 
 
+def _require_metrics(
+    label: str,
+    metrics: dict[str, float | None],
+    required: tuple[str, ...],
+) -> None:
+    missing = [name for name in required if metrics.get(name) is None]
+    if missing:
+        raise RuntimeError(
+            f"{label} output is missing required metrics: {', '.join(missing)}"
+        )
+
+
+def validate_metrics(
+    scenario: Scenario,
+    order: dict[str, float | None],
+    full: dict[str, float | None],
+) -> None:
+    """Treat benchmark output format drift as a CI failure, not a blank cell."""
+    order_required = ("grammar_r1", "grammar_r10", "grammar_mrr")
+    if scenario.phrase_db is not None:
+        order_required += (
+            "retained_r1",
+            "phrase_r1",
+            "phrase_r10",
+            "phrase_mrr",
+            "delta_r1",
+            "delta_mrr",
+        )
+    _require_metrics(f"{scenario.name} ordering benchmark", order, order_required)
+    _require_metrics(
+        f"{scenario.name} full benchmark",
+        full,
+        ("bag_r10", "bag_mrr", "exact_r1", "exact_r10", "exact_mrr"),
+    )
+
+
 def append_summary(rows: list[tuple[Scenario, dict, dict]]) -> None:
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if not summary_path:
@@ -210,7 +246,10 @@ def main() -> int:
             full_cmd,
             RESULTS_DIR / f"{scenario.slug}-full.txt",
         )
-        rows.append((scenario, order_metrics(order_text), full_metrics(full_text)))
+        order = order_metrics(order_text)
+        full = full_metrics(full_text)
+        validate_metrics(scenario, order, full)
+        rows.append((scenario, order, full))
 
     print("\n=== CORPUS MATRIX SUMMARY ===")
     for scenario, order, full in rows:
