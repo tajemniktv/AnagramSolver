@@ -24,6 +24,9 @@ HERE = Path(__file__).resolve().parent
 GENERATOR = HERE / "anagram_generate.py"
 RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_RUN_ROOT = Path.home() / ".multi_anagram" / "solver_runs"
+BALANCED_MAX_RESULTS = 100_000
+QUICK_MAX_RESULTS = 20_000
+GENERATION_CACHE_SCHEMA = 2
 
 _RESULT_RE = re.compile(
     r"^\s*(?P<rank>\d+)\.\s+FINAL=\s*(?P<score>[\d.]+).*?"
@@ -80,12 +83,27 @@ def _normalized_required_words(values: Sequence[str]) -> list[str]:
     return out
 
 
+def _generation_mode(args: argparse.Namespace) -> str:
+    if args.exhaustive:
+        return "exhaustive"
+    if args.quick:
+        return "quick"
+    return "balanced"
+
+
+def _generation_cap(args: argparse.Namespace) -> int | None:
+    if args.exhaustive:
+        return None
+    return QUICK_MAX_RESULTS if args.quick else BALANCED_MAX_RESULTS
+
+
 def _source_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
 
 
 def _run_key(args: argparse.Namespace) -> str:
     payload = {
+        "schema": GENERATION_CACHE_SCHEMA,
         "text": _normalized_target(args.text),
         "min_word_len": args.min_word_len,
         "min_words": args.min_words,
@@ -94,7 +112,8 @@ def _run_key(args: argparse.Namespace) -> str:
         "hints": _normalized_words(args.hint),
         "exclude": _normalized_words(args.exclude),
         "require": _normalized_required_words(args.require),
-        "quick": args.quick,
+        "generation_mode": _generation_mode(args),
+        "generation_cap": _generation_cap(args),
         "generator": _source_hash(GENERATOR),
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -115,10 +134,11 @@ def build_generator_command(args: argparse.Namespace, output: Path) -> list[str]
         "--export", str(output),
     ]
 
-    if args.quick:
-        cmd += ["--max-results", "100000"]
-    else:
+    cap = _generation_cap(args)
+    if cap is None:
         cmd.append("--all-results")
+    else:
+        cmd += ["--max-results", str(cap)]
 
     hints = _csv_words(args.hint)
     if hints:
@@ -241,10 +261,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--top", type=int, default=10, metavar="N", help="Results shown per word-count bucket")
     parser.add_argument("--workers", type=int, default=0, metavar="N", help="Reranker workers; 0 chooses automatically")
     parser.add_argument("--phrase-db", type=Path, metavar="FILE", help="Optional Wikimedia phrase SQLite index")
-    parser.add_argument(
+    search_mode = parser.add_mutually_exclusive_group()
+    search_mode.add_argument(
         "--quick",
         action="store_true",
-        help="Faster exploratory search; caps generation at 100k word bags and may miss the answer",
+        help=f"Fast exploratory search; cap generation at {QUICK_MAX_RESULTS:,} word bags and may miss the answer",
+    )
+    search_mode.add_argument(
+        "--exhaustive",
+        action="store_true",
+        help="Enumerate every matching word bag; complete but potentially much slower",
     )
     parser.add_argument("--rebuild", action="store_true", help="Regenerate the cached candidate export")
     parser.add_argument("--verbose", action="store_true", help="Show generator/reranker diagnostic output live")
@@ -345,8 +371,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.rebuild or not candidates.is_file():
         if not args.json:
-            mode = "quick" if args.quick else "exhaustive"
-            print(f"Generating exact candidate word bags ({mode}) ...")
+            mode = _generation_mode(args)
+            cap = _generation_cap(args)
+            if cap is None:
+                detail = "unlimited exact enumeration"
+            else:
+                detail = f"up to {cap:,} candidate bags"
+            print(f"Generating exact candidate word bags ({mode}; {detail}) ...")
         _generate_candidates(args, candidates)
     elif not args.json:
         print("Using cached candidate word bags ...")
