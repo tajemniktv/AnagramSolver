@@ -18,32 +18,39 @@ jobs:
           python anagram_generate.py IAMTESTINGANAGRAMS \
             --min-word-len 2 --min-words 2 --max-words 2 \
             --min-zipf 2.7 --short-word-policy common \
-            --max-results 1 --top-per-group 1 --export /tmp/warm.txt >/dev/null
-      - name: Measure exact-search buckets
+            --workers 1 --max-results 1 --top-per-group 1 \
+            --export /tmp/warm.txt >/dev/null
+      - name: Compare one worker with process parallelism
         shell: bash
         run: |
-          set +e
+          set -e
           echo "CPU count: $(nproc)"
           measure() {
-            label="$1"; minw="$2"; maxw="$3"
-            echo "=== $label ($minw..$maxw words, cap 20k) ==="
+            label="$1"; workers="$2"; cap="$3"
+            echo "=== $label: workers=$workers cap=$cap ==="
             /usr/bin/time -f "WALL=%e USER=%U SYS=%S CPU=%P RSS=%MKB" \
-              timeout 120s python anagram_generate.py IAMTESTINGANAGRAMS \
-                --min-word-len 2 --min-words "$minw" --max-words "$maxw" \
+              timeout 180s python anagram_generate.py IAMTESTINGANAGRAMS \
+                --min-word-len 2 --min-words 2 --max-words 6 \
                 --min-zipf 2.7 --short-word-policy common \
-                --max-results 20000 --top-per-group 1 \
+                --workers "$workers" --max-results "$cap" --top-per-group 1 \
                 --export "/tmp/${label}.txt" >/dev/null
-            code=$?
-            echo "EXIT=$code"
-            if [ -f "/tmp/${label}.txt" ]; then
-              wc -l "/tmp/${label}.txt"
-            fi
+            wc -l "/tmp/${label}.txt"
             echo
           }
-          measure w2 2 2
-          measure w3 3 3
-          measure w4 4 4
-          measure w5 5 5
-          measure w6 6 6
-          measure combined 2 6
-          exit 0
+
+          measure single20 1 20000
+          measure parallel20 4 20000
+          diff -q /tmp/single20.txt /tmp/parallel20.txt
+
+          measure single100 1 100000
+          measure parallel100 4 100000
+          diff -q /tmp/single100.txt /tmp/parallel100.txt
+
+          echo "=== hinted pruning smoke ==="
+          /usr/bin/time -f "WALL=%e USER=%U SYS=%S CPU=%P RSS=%MKB" \
+            timeout 120s python anagram_generate.py ODITIHNSLSHEEEPT \
+              --min-word-len 2 --min-words 2 --max-words 6 \
+              --min-zipf 3.0 --short-word-policy common \
+              --contains-any dont --workers 4 --max-results 20000 \
+              --top-per-group 1 --export /tmp/hinted.txt >/dev/null
+          grep -qi "dont" /tmp/hinted.txt
