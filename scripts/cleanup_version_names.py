@@ -94,6 +94,14 @@ def clean_benchmark(text: str) -> str:
                         'PRE_RE = re.compile(r"PRE rank:')
     text = text.replace('raise SystemExit(f"V8 generator not found: {args.generator}")',
                         'raise SystemExit(f"Generator not found: {args.generator}")')
+    text = text.replace(
+        '        "--reranker",\n        "--reranker",\n',
+        '        "--reranker",\n',
+    )
+    text = text.replace(
+        'help="Reranker module/script to benchmark (the --reranker alias is kept for old commands)"',
+        'help="Reranker module/script to benchmark"',
+    )
     return text
 
 
@@ -115,6 +123,14 @@ def clean_core(text: str) -> str:
     text = text.replace("V10", "earlier reranker")
     text = text.replace("V9", "earlier reranker")
     text = text.replace("V8", "generator")
+    text = text.replace(
+        'f"=== {wc}-WORD current reranker RANKING "',
+        'f"=== {wc}-WORD RERANKED CANDIDATES "',
+    )
+    text = text.replace(
+        'print("  current reranker FINAL: not deep-analyzed; increase --deep-per-group or use --deep-all")',
+        'print("  FINAL: not deep-analyzed; increase --deep-per-group or use --deep-all")',
+    )
     return text
 
 
@@ -185,8 +201,6 @@ def main() -> int:
             continue
         clean_file(path)
 
-    # Catch solver-lineage labels that survived explicit cleanup. External action
-    # comments such as '# v4'/'# v5' are intentionally outside this 8..13 range.
     leftover_re = re.compile(r"(?<![A-Za-z0-9])(?:V|v)(?:8|9|10|11|12|13)(?![0-9])")
     leftovers: list[str] = []
     for path in ROOT.rglob("*"):
