@@ -62,11 +62,11 @@ for _name in dir(impl):
 # processes import it independently, so repeatedly wrapping an already-wrapped
 # function would otherwise build a recursion matryoshka doll.
 if not hasattr(impl, "_AUX_BASE_PHRASE_STRUCTURE"):
-    setattr(impl, "_AUX_BASE_PHRASE_STRUCTURE", impl.phrase_structure)
+    setattr(impl, "_AUX_BASE_PHRASE_STRUCTURE", impl.phrase_structure)  # noqa: B010
 if not hasattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES"):
-    setattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES", impl._order_local_tables)
+    setattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES", impl._order_local_tables)  # noqa: B010
 if not hasattr(impl, "_AUX_BASE_WORKER_INIT"):
-    setattr(impl, "_AUX_BASE_WORKER_INIT", impl._worker_init)
+    setattr(impl, "_AUX_BASE_WORKER_INIT", impl._worker_init)  # noqa: B010
 
 _BASE_PHRASE_STRUCTURE = getattr(impl, "_AUX_BASE_PHRASE_STRUCTURE")
 _BASE_ORDER_LOCAL_TABLES = getattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES")
