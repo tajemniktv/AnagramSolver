@@ -10,12 +10,16 @@ import json
 import math
 import multiprocessing
 import sys
+import threading
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING
 
 import anagram_rerank_core as core
 from anagram_order_diversity import raw_pool_size, select_diverse_orders
+
+if TYPE_CHECKING:
+    from anagram_rerank_topk_impl import OrderCandidate
 
 # Explicit aliases keep the facade contract visible to Ruff/Pylance.
 Row = core.Row
@@ -56,6 +60,12 @@ _BASE_DEEP_ANALYZE = impl.deep_analyze
 ENGINE_LAYER = "diverse-top-k-order-reranking"
 PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
 DEFAULT_ORDER_CANDIDATES = 56
+
+# The legacy implementation still exposes its worker width through a module
+# global. Normal CLI use is one deep-analysis call per process, but serializing
+# facade calls makes that compatibility bridge safe for accidental same-process
+# concurrent callers until the legacy layer can accept the width explicitly.
+_DEEP_ANALYZE_LOCK = threading.RLock()
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
@@ -247,7 +257,7 @@ def rank_orders(
     beam_width: int = 128,
     exact_max_words: int = 5,
     top_k: int = DEFAULT_ORDER_CANDIDATES,
-) -> tuple[tuple[Any, ...], int]:
+) -> tuple[tuple[OrderCandidate, ...], int]:
     """Rank a wider raw pool, then retain a quality-preserving diverse subset."""
     raw_k = raw_pool_size(top_k)
     candidates, evaluated = _BASE_RANK_ORDERS(
@@ -286,32 +296,34 @@ def deep_analyze(
 ) -> dict[str, float]:
     """Collect a wider worker pool, then diversify it in the parent process.
 
-    Widening happens by temporarily increasing the implementation's worker
-    setting. That matters on Windows: spawned process workers receive the wider
-    count through their initializer, while the pure diversity pass stays in the
-    parent and requires no monkey-patching inside child interpreters.
+    The frozen implementation communicates worker width through a module global.
+    The compatibility lock makes that temporary mutation safe for concurrent
+    same-process facade callers; spawned workers still receive the widened value
+    through their normal initializer, and the original value is always restored.
     """
-    retained = int(getattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES))
-    raw_k = raw_pool_size(retained)
-    previous = retained
-    setattr(impl, "_ORDER_CANDIDATE_COUNT", raw_k)  # noqa: B010
-    try:
-        stats = _BASE_DEEP_ANALYZE(
-            rows,
-            selected,
-            lex,
-            wordnet_dir=wordnet_dir,
-            backend=backend,
-            workers=workers,
-            batch_size=batch_size,
-            order_mode=order_mode,
-            beam_width=beam_width,
-            exact_max_words=exact_max_words,
+    with _DEEP_ANALYZE_LOCK:
+        retained = int(
+            getattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)
         )
-        _diversify_order_side_tables(retained)
-        return stats
-    finally:
-        setattr(impl, "_ORDER_CANDIDATE_COUNT", previous)  # noqa: B010
+        raw_k = raw_pool_size(retained)
+        setattr(impl, "_ORDER_CANDIDATE_COUNT", raw_k)  # noqa: B010
+        try:
+            stats = _BASE_DEEP_ANALYZE(
+                rows,
+                selected,
+                lex,
+                wordnet_dir=wordnet_dir,
+                backend=backend,
+                workers=workers,
+                batch_size=batch_size,
+                order_mode=order_mode,
+                beam_width=beam_width,
+                exact_max_words=exact_max_words,
+            )
+            _diversify_order_side_tables(retained)
+            return stats
+        finally:
+            setattr(impl, "_ORDER_CANDIDATE_COUNT", retained)  # noqa: B010
 
 
 def _clear_order_side_tables() -> None:
@@ -352,6 +364,10 @@ def main() -> int:
     )
     if count < 1:
         raise SystemExit("--order-candidates must be >= 1")
+
+    previous_count = int(
+        getattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)
+    )
     # ``impl`` is intentionally loaded through importlib, so Pyright sees a
     # generic ModuleType. Keep the dynamic assignment explicit and scoped.
     setattr(impl, "_ORDER_CANDIDATE_COUNT", count)  # noqa: B010
@@ -376,6 +392,7 @@ def main() -> int:
         sys.argv = original_argv
         for name, value in originals.items():
             setattr(core, name, value)
+        setattr(impl, "_ORDER_CANDIDATE_COUNT", previous_count)  # noqa: B010
         _clear_order_side_tables()
 
 
