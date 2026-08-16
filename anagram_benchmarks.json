@@ -302,6 +302,44 @@
       "answer": "coffee tastes better hot",
       "category": "ordinary-predicative",
       "full": false
+    },
+    {
+      "id": "user_testing_anagrams",
+      "answer": "i am testing anagrams",
+      "category": "ordinary-progressive",
+      "full": true,
+      "min_zipf": 2.7,
+      "max_results": 100000
+    },
+    {
+      "id": "reading_books_progressive",
+      "answer": "she is reading books",
+      "category": "ordinary-progressive",
+      "full": false
+    },
+    {
+      "id": "testing_systems_modal_progressive",
+      "answer": "we will be testing systems",
+      "category": "ordinary-modal-progressive",
+      "full": false
+    },
+    {
+      "id": "testing_systems_perfect_progressive",
+      "answer": "we have been testing systems",
+      "category": "ordinary-perfect-progressive",
+      "full": false
+    },
+    {
+      "id": "anagrams_progressive_passive",
+      "answer": "anagrams are being tested",
+      "category": "ordinary-progressive-passive",
+      "full": false
+    },
+    {
+      "id": "package_passive",
+      "answer": "the package was delivered",
+      "category": "ordinary-passive",
+      "full": false
     }
   ]
 }
