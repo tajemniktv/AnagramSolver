@@ -24,6 +24,14 @@ class _FakeLexicon:
             # though "worker" superficially looks like an -er comparative.
             "silver": core.Features(adj=True, recognized=True),
             "work": core.Features(verb=True, verb_base=True, recognized=True),
+            # Synthetic collision for the surface-recognition guard: "builder"
+            # is already known as a noun while an apparent base happens to carry
+            # adjective evidence. It must not borrow that evidence as comparative.
+            "builder": core.Features(noun=True, recognized=True),
+            "build": core.Features(adj=True, recognized=True),
+            "elder": core.Features(adj=True, recognized=True),
+            "farther": core.Features(adj=True, adv=True, recognized=True),
+            "further": core.Features(adj=True, adv=True, recognized=True),
             "run": core.Features(verb=True, verb_base=True, recognized=True),
             "today": core.Features(adv=True, recognized=True),
             "united": core.Features(
@@ -102,6 +110,22 @@ class ComparativeParallelGrammarTests(unittest.TestCase):
             with self.subTest(comparative=comparative):
                 self.assertFalse(grammar._comparative_like(comparative, self.lex))
         self.assertFalse(grammar._comparative_like("worker", self.lex))
+
+    def test_recognized_non_adjective_er_surface_cannot_borrow_base(self) -> None:
+        self.assertFalse(grammar._comparative_like("builder", self.lex))
+        self.assertEqual(
+            grammar.construction_pair_bonus("builder", "than", self.lex),
+            0.0,
+        )
+
+    def test_curated_irregular_er_comparatives_remain_recognized(self) -> None:
+        for comparative in ("elder", "farther", "further"):
+            with self.subTest(comparative=comparative):
+                self.assertTrue(grammar._comparative_like(comparative, self.lex))
+                self.assertGreater(
+                    grammar.construction_pair_bonus(comparative, "than", self.lex),
+                    1.0,
+                )
 
     def test_shared_comparative_span_cases_stay_in_parity_with_core(self) -> None:
         for words in (
