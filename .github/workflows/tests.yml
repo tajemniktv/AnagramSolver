@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: "3.14"
       - name: Install Ruff and Pyright
-        run: python -m pip install --disable-pip-version-check ruff pyright
+        run: python -m pip install --disable-pip-version-check ruff==0.16.3 pyright==1.1.411
       - name: Enforce reported Ruff diagnostics
         run: >-
           ruff check
