@@ -9,7 +9,7 @@ learned model or language model is involved.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import anagram_rerank_core as core
 
@@ -45,6 +45,13 @@ _DETERMINER_AUX_PAIR_PENALTY = 1.75
 _ARTICLE_MISMATCH_PAIR_PENALTY = 1.60
 _ARTICLE_MISMATCH_SURFACE_PENALTY = 0.12
 _DETERMINER_AUX_SURFACE_PENALTY = 0.18
+
+# Shared regression objective. Keeping these weights in one place prevents the
+# real-WordNet CI gate and focused unit regression from silently drifting apart.
+_OBJECTIVE_GRAMMAR_WEIGHT = 0.38
+_OBJECTIVE_STRUCTURE_WEIGHT = 0.44
+_OBJECTIVE_VALENCY_WEIGHT = 0.12
+_OBJECTIVE_COVERAGE_WEIGHT = 0.06
 
 # Orthographic approximations only. They are used as bounded negative evidence,
 # never as hard rejection, because English pronunciation delights in exceptions.
@@ -332,4 +339,23 @@ def apply_surface_structure_penalties(
         result.agreement,
         result.kind,
         4.0 * norm,
+    )
+
+
+def grammar_structure_objective(
+    words: Sequence[str],
+    lex: core.WordNetLexicon,
+    local_grammar_raw: Callable[[Sequence[str], core.WordNetLexicon], float],
+    phrase_structure: Callable[
+        [Sequence[str], core.WordNetLexicon], core.StructureResult
+    ],
+) -> float:
+    """Return the shared grammar/structure objective used by regressions."""
+    grammar = core.grammar_normalize(local_grammar_raw(words, lex))
+    structure = phrase_structure(words, lex)
+    return (
+        _OBJECTIVE_GRAMMAR_WEIGHT * grammar
+        + _OBJECTIVE_STRUCTURE_WEIGHT * structure.norm
+        + _OBJECTIVE_VALENCY_WEIGHT * structure.valency
+        + _OBJECTIVE_COVERAGE_WEIGHT * structure.coverage
     )
