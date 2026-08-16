@@ -4,11 +4,10 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Sequence
 
 import anagram_benchmark as benchmark
+import anagram_clause_validity as validity
 import anagram_rerank as rerank
-import anagram_rerank_core as core
 
 MIN_RECALL_1 = 0.35
 MIN_RECALL_10 = 0.79
@@ -21,19 +20,6 @@ _CROSS_BAG_MALFORMED = (
     ("a", "am", "sitting", "managers"),
     ("an", "game", "starting", "aims"),
 )
-
-
-def _order_objective(words: Sequence[str], lex: rerank.WordNetLexicon) -> float:
-    """Return the grammar/structure objective for one already ordered phrase."""
-    grammar_raw = rerank.local_grammar_raw(words, lex)
-    grammar_norm = core.grammar_normalize(grammar_raw)
-    structure = rerank.phrase_structure(words, lex)
-    return (
-        0.38 * grammar_norm
-        + 0.44 * structure.norm
-        + 0.12 * structure.valency
-        + 0.06 * structure.coverage
-    )
 
 
 def main() -> int:
@@ -61,9 +47,23 @@ def main() -> int:
         if observed[name] + 1e-12 < minimum
     ]
 
-    intended_objective = _order_objective(_CROSS_BAG_INTENDED, lex)
+    intended_objective = validity.grammar_structure_objective(
+        _CROSS_BAG_INTENDED,
+        lex,
+        rerank.local_grammar_raw,
+        rerank.phrase_structure,
+    )
     malformed_objectives = [
-        (_order_objective(words, lex), words) for words in _CROSS_BAG_MALFORMED
+        (
+            validity.grammar_structure_objective(
+                words,
+                lex,
+                rerank.local_grammar_raw,
+                rerank.phrase_structure,
+            ),
+            words,
+        )
+        for words in _CROSS_BAG_MALFORMED
     ]
     strongest_bad_score, strongest_bad_words = max(malformed_objectives)
     cross_bag_margin = intended_objective - strongest_bad_score
