@@ -15,6 +15,7 @@ from anagram_paths import CI_BENCHMARK_RESULTS_DIR
 
 HERE = Path(__file__).resolve().parent
 RESULTS_DIR = CI_BENCHMARK_RESULTS_DIR
+ORDER_CANDIDATES = 56
 
 
 @dataclass(slots=True)
@@ -186,6 +187,7 @@ def append_summary(
             "compare the identical retained top-K orders. Exact <=6w R@1 is a separate "
             "exhaustive-permutation metric over only cases with at most six words.\n\n"
         )
+        f.write(f"Retained order candidates per bag: **{ORDER_CANDIDATES}**.\n\n")
 
         if include_full:
             f.write(
@@ -269,6 +271,8 @@ def main() -> int:
             "anagram_benchmark.py",
             "--mode",
             "order",
+            "--order-candidates",
+            str(ORDER_CANDIDATES),
             *phrase_args,
         ]
 
@@ -288,6 +292,8 @@ def main() -> int:
                 "full",
                 "--workers",
                 str(args.workers),
+                "--order-candidates",
+                str(ORDER_CANDIDATES),
                 *phrase_args,
             ]
             full_text = run_logged(

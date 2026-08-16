@@ -28,6 +28,7 @@ RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_RUN_ROOT = SOLVER_RUNS_DIR
 BALANCED_MAX_RESULTS = 100_000
 QUICK_MAX_RESULTS = 20_000
+DEFAULT_ORDER_CANDIDATES = 56
 GENERATION_CACHE_SCHEMA = 3
 
 _RESULT_RE = re.compile(
@@ -174,7 +175,7 @@ def build_reranker_command(
         "--deep-per-group", "2000" if args.quick else "5000",
         "--beam-width", "128",
         "--phrase-rescore-top", "300",
-        "--order-candidates", "16",
+        "--order-candidates", str(args.order_candidates),
         "--top-per-group", "1",
         "--export", str(output),
     ]
@@ -271,6 +272,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--top", type=int, default=10, metavar="N", help="Results shown per word-count bucket")
     parser.add_argument("--workers", type=int, default=0, metavar="N", help="Reranker workers; 0 chooses automatically")
+    parser.add_argument(
+        "--order-candidates",
+        type=int,
+        default=DEFAULT_ORDER_CANDIDATES,
+        metavar="N",
+        help="Retained word orders per candidate bag for late phrase/collocation scoring",
+    )
     parser.add_argument("--phrase-db", type=Path, metavar="FILE", help="Optional Wikimedia phrase SQLite index")
     search_mode = parser.add_mutually_exclusive_group()
     search_mode.add_argument(
@@ -315,6 +323,8 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--top must be >= 1")
     if args.workers < 0:
         raise SystemExit("--workers must be >= 0")
+    if args.order_candidates < 1:
+        raise SystemExit("--order-candidates must be >= 1")
     if args.json and args.verbose:
         raise SystemExit("--json cannot be combined with --verbose; verbose child output would corrupt JSON stdout")
     if args.phrase_db is not None and not args.phrase_db.expanduser().is_file():
