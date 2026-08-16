@@ -48,6 +48,7 @@ class _FakeLexicon:
                 verb_ing=True,
                 recognized=True,
             ),
+            "test": core.Features(verb=True, verb_base=True, recognized=True),
             "testing": core.Features(verb=True, verb_ing=True, recognized=True),
             "university": core.Features(noun=True, noun_singular=True, recognized=True),
         }
@@ -59,7 +60,7 @@ class _FakeLexicon:
         )
 
     def allows_object(self, word: str) -> bool | None:
-        if word in {"testing", "starting"}:
+        if word in {"test", "testing", "starting"}:
             return True
         if word == "sitting":
             return False
@@ -68,7 +69,7 @@ class _FakeLexicon:
     def allows_intransitive(self, word: str) -> bool | None:
         if word in {"runs", "aims"}:
             return True
-        if word in {"testing", "starting"}:
+        if word in {"test", "testing", "starting"}:
             return False
         return None
 
@@ -128,6 +129,30 @@ class ClauseValidityTests(unittest.TestCase):
         self.assertLess(adjusted.coverage, base.coverage)
         self.assertLess(adjusted.norm, base.norm)
 
+    def test_aux_with_invalid_subject_is_demoted_to_fragment(self) -> None:
+        base = core.StructureResult(0.90, 1.0, 1.0, 1.0, "clause", 3.6)
+        adjusted = validity.adjust_base_clause_structure(
+            ("a", "am", "testing", "anagrams"),
+            self.lex,
+            base,
+        )
+
+        self.assertEqual(adjusted.kind, "fragment")
+        self.assertLess(adjusted.coverage, base.coverage)
+        self.assertLess(adjusted.norm, base.norm)
+        self.assertLess(adjusted.valency, base.valency)
+        self.assertLess(adjusted.agreement, base.agreement)
+
+    def test_subjectless_do_imperative_clause_is_preserved(self) -> None:
+        base = core.StructureResult(0.80, 0.90, 1.0, 0.60, "clause", 3.2)
+        for words in (
+            ("do", "test", "anagrams"),
+            ("dont", "test", "anagrams"),
+        ):
+            with self.subTest(words=words):
+                adjusted = validity.adjust_base_clause_structure(words, self.lex, base)
+                self.assertEqual(adjusted, base)
+
     def test_normal_finite_clause_is_not_demoted(self) -> None:
         words = ("the", "dog", "runs")
         base = core.phrase_structure(words, self.lex)
@@ -147,10 +172,19 @@ class ClauseValidityTests(unittest.TestCase):
         self.assertLess(validity.pair_validity_adjustment("a", "am", self.lex), 0.0)
         self.assertLess(validity.pair_validity_adjustment("an", "game", self.lex), 0.0)
         self.assertEqual(validity.pair_validity_adjustment("a", "game", self.lex), 0.0)
+        self.assertEqual(validity.pair_validity_adjustment("one", "is", self.lex), 0.0)
         self.assertEqual(
             validity.pair_validity_adjustment("silver", "lining", self.lex),
             0.0,
         )
+
+    def test_search_and_realized_local_scores_apply_pair_validity_once(self) -> None:
+        words = ("a", "am")
+        pair, starts, ends = rerank._order_local_tables(words, self.lex)
+        realized = rerank.local_grammar_raw(words, self.lex)
+        expected = starts[0] + pair[0][1] + ends[1]
+
+        self.assertAlmostEqual(realized, expected)
 
     def test_surface_penalty_reduces_mismatched_article_structure(self) -> None:
         result = core.StructureResult(0.90, 1.0, 1.0, 1.0, "clause", 3.6)
@@ -163,16 +197,36 @@ class ClauseValidityTests(unittest.TestCase):
         self.assertLess(adjusted.norm, result.norm)
         self.assertEqual(adjusted.coverage, result.coverage)
 
+    def test_surface_penalty_reduces_determiner_aux_structure(self) -> None:
+        result = core.StructureResult(0.90, 1.0, 1.0, 1.0, "clause", 3.6)
+        adjusted = validity.apply_surface_structure_penalties(
+            ("a", "am", "sitting"),
+            self.lex,
+            result,
+        )
+
+        self.assertLess(adjusted.norm, result.norm)
+        self.assertEqual(adjusted.coverage, result.coverage)
+        self.assertEqual(adjusted.valency, result.valency)
+        self.assertEqual(adjusted.agreement, result.agreement)
+
+    def test_nominal_function_subject_avoids_determiner_aux_surface_penalty(self) -> None:
+        result = core.StructureResult(0.90, 1.0, 1.0, 1.0, "clause", 3.6)
+        adjusted = validity.apply_surface_structure_penalties(
+            ("one", "is", "enough"),
+            self.lex,
+            result,
+        )
+
+        self.assertEqual(adjusted, result)
+
     def test_user_failure_cross_bag_structural_objective_prefers_intended_phrase(self) -> None:
         def objective(words: tuple[str, ...]) -> float:
-            raw = rerank.local_grammar_raw(words, self.lex)
-            grammar = core.grammar_normalize(raw)
-            structure = rerank.phrase_structure(words, self.lex)
-            return (
-                0.38 * grammar
-                + 0.44 * structure.norm
-                + 0.12 * structure.valency
-                + 0.06 * structure.coverage
+            return validity.grammar_structure_objective(
+                words,
+                self.lex,
+                rerank.local_grammar_raw,
+                rerank.phrase_structure,
             )
 
         intended = objective(("i", "am", "testing", "anagrams"))
