@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from dataclasses import dataclass
+from pathlib import Path
 from unittest.mock import patch
 
 import anagram_order_diversity as diversity
 import anagram_rerank as rerank
+import anagram_solver as solver
 
 
 @dataclass(frozen=True)
@@ -106,6 +109,31 @@ class OrderDiversityTests(unittest.TestCase):
 
         self.assertEqual(len(table[123]), 32)
         self.assertEqual(table[123][:16], candidates[:16])
+
+    def test_user_solver_defaults_to_wider_retention_and_forwards_override(self) -> None:
+        default_args = solver.build_parser().parse_args(["abcdef"])
+        solver._validate_args(default_args)
+        self.assertEqual(default_args.order_candidates, 32)
+
+        override_args = solver.build_parser().parse_args(
+            ["abcdef", "--order-candidates", "48"]
+        )
+        solver._validate_args(override_args)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cmd = solver.build_reranker_command(
+                override_args,
+                root / "candidates.txt",
+                root / "reranked.txt",
+            )
+        self.assertEqual(cmd[cmd.index("--order-candidates") + 1], "48")
+
+    def test_user_solver_rejects_invalid_order_candidate_count(self) -> None:
+        args = solver.build_parser().parse_args(
+            ["abcdef", "--order-candidates", "0"]
+        )
+        with self.assertRaisesRegex(SystemExit, "--order-candidates"):
+            solver._validate_args(args)
 
 
 if __name__ == "__main__":
