@@ -1,0 +1,2 @@
+1
+# Bump when Wikimedia phrase-index contents/schema semantics change.

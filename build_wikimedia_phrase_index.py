@@ -50,6 +50,8 @@ import urllib.request
 from collections import Counter
 from pathlib import Path
 
+from anagram_paths import PHRASE_INDEX_DIR, WIKIMEDIA_TITLES_DIR
+
 
 SOURCES = {
     "enwiktionary": (
@@ -62,7 +64,7 @@ SOURCES = {
     ),
 }
 
-DEFAULT_CACHE = Path.home() / ".multi_anagram" / "wikimedia_titles"
+DEFAULT_CACHE = WIKIMEDIA_TITLES_DIR
 
 
 def norm_token(text: str) -> str:
@@ -238,7 +240,7 @@ def main() -> int:
         description="Build a lightweight Wikimedia phrase-title SQLite index.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    ap.add_argument("--output", type=Path, default=Path("wikimedia_phrases.db"))
+    ap.add_argument("--output", type=Path, default=PHRASE_INDEX_DIR / "wikimedia_phrases.db")
     ap.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE)
     ap.add_argument("--include-wikipedia", action="store_true")
     ap.add_argument("--refresh", action="store_true")

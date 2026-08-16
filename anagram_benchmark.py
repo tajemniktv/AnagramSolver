@@ -43,11 +43,13 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from anagram_paths import BENCHMARK_DIR
+
 HERE = Path(__file__).resolve().parent
 DEFAULT_CASES = HERE / "anagram_benchmarks.json"
 DEFAULT_RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_GENERATOR = HERE / "anagram_generate.py"
-DEFAULT_CACHE = HERE / ".anagram_bench_cache"
+DEFAULT_CACHE = BENCHMARK_DIR
 
 
 def norm_token(text: str) -> str:
