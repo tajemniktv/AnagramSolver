@@ -1,10 +1,9 @@
 """Deterministic structural diversification for retained word orders.
 
-The grammar/structure objective remains the authority for the best order.  This
-module only decides which runner-up orders survive for later positive corpus
-rescoring.  Keeping a fixed high-quality core makes diversification monotonic
-with respect to the historical retained set: widening from 16 to 32 cannot
-throw away anything that the old top-16 path would have kept.
+The grammar/structure objective remains the authority for the score-ranked head.
+This module only decides which lower-ranked runner-up orders survive for later
+positive corpus rescoring. A large fixed quality core keeps diversity from
+turning the retained set into a novelty contest with English as collateral.
 """
 
 from __future__ import annotations
@@ -13,8 +12,8 @@ from collections import Counter
 from collections.abc import Sequence
 from typing import Protocol, TypeVar
 
-DEFAULT_QUALITY_CORE = 16
-DEFAULT_POOL_FACTOR = 2
+DEFAULT_QUALITY_CORE = 32
+DEFAULT_POOL_EXTRA = 16
 DEFAULT_MAX_POOL = 128
 DEFAULT_DIVERSITY_STRENGTH = 0.12
 
@@ -32,7 +31,7 @@ def raw_pool_size(
     retained: int,
     *,
     quality_core: int = DEFAULT_QUALITY_CORE,
-    pool_factor: int = DEFAULT_POOL_FACTOR,
+    pool_extra: int = DEFAULT_POOL_EXTRA,
     max_pool: int = DEFAULT_MAX_POOL,
 ) -> int:
     """Return the score-ranked pool size needed before diversity selection."""
@@ -40,16 +39,19 @@ def raw_pool_size(
         raise ValueError("retained must be >= 1")
     if quality_core < 1:
         raise ValueError("quality_core must be >= 1")
-    if pool_factor < 1:
-        raise ValueError("pool_factor must be >= 1")
-    if max_pool < retained:
-        raise ValueError("max_pool must be >= retained")
+    if pool_extra < 0:
+        raise ValueError("pool_extra must be >= 0")
+    if max_pool < 1:
+        raise ValueError("max_pool must be >= 1")
 
-    # Explicit small K retains its historical score-only semantics and avoids
-    # paying for a wider search when there are no diversity slots to fill.
+    # Explicit K at or below the quality core remains score-only and avoids the
+    # cost of a wider search. Above it, spend a bounded fixed number of extra
+    # raw slots on structural alternatives rather than multiplying beam cost as
+    # K grows. If callers deliberately request more than max_pool, honor their K
+    # and simply stop widening beyond it.
     if retained <= quality_core:
         return retained
-    return min(max_pool, max(retained, retained * pool_factor))
+    return max(retained, min(max_pool, retained + pool_extra))
 
 
 def _adjacency_similarity(left: Sequence[str], right: Sequence[str]) -> float:
