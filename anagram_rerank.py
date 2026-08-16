@@ -55,7 +55,7 @@ _BASE_DEEP_ANALYZE = impl.deep_analyze
 
 ENGINE_LAYER = "diverse-top-k-order-reranking"
 PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
-DEFAULT_ORDER_CANDIDATES = 48
+DEFAULT_ORDER_CANDIDATES = 56
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
