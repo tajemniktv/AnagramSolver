@@ -22,7 +22,9 @@ _CROSS_BAG_MALFORMED = (
 )
 _TARGET_MAX_RANKS = {
     "actions_words": 10,
-    "united_stand": 1,
+    # Four structurally symmetric parallel variants tie at the same objective;
+    # do not turn their incidental permutation enumeration into a grammar rule.
+    "united_stand": 4,
 }
 
 
