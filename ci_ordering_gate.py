@@ -20,6 +20,44 @@ _CROSS_BAG_MALFORMED = (
     ("a", "am", "sitting", "managers"),
     ("an", "game", "starting", "aims"),
 )
+_CONSTRUCTION_DIAGNOSTICS = (
+    ("comparative", ("actions", "speak", "louder", "than", "words")),
+    ("parallel", ("united", "we", "stand", "divided", "we", "fall")),
+)
+
+
+def _print_construction_diagnostic(
+    name: str,
+    words: tuple[str, ...],
+    lex: rerank.WordNetLexicon,
+) -> None:
+    candidates, _evaluated = rerank.rank_orders(
+        words,
+        lex,
+        order_mode="exact",
+        top_k=720,
+    )
+    target = next(
+        (candidate for candidate in candidates if candidate.order == words),
+        None,
+    )
+    print(f"\n{name} construction diagnostic:")
+    if target is None:
+        print("  target was not retained")
+    else:
+        rank = candidates.index(target) + 1
+        print(
+            f"  target rank={rank}/{len(candidates)} "
+            f"objective={target.objective:.4f} grammar={target.grammar_norm:.4f} "
+            f"structure={target.structure_norm:.4f} valency={target.valency_norm:.4f} "
+            f"coverage={target.syntax_coverage:.4f} kind={target.phrase_kind}"
+        )
+    for index, candidate in enumerate(candidates[:5], start=1):
+        print(
+            f"  #{index:<2} {' '.join(candidate.order):<42} "
+            f"obj={candidate.objective:.4f} grammar={candidate.grammar_norm:.4f} "
+            f"structure={candidate.structure_norm:.4f} kind={candidate.phrase_kind}"
+        )
 
 
 def main() -> int:
@@ -82,6 +120,9 @@ def main() -> int:
         f"{cross_bag_margin:.3f}  minimum margin {MIN_CROSS_BAG_MARGIN:.3f}"
     )
     print(f"  wall time {time.perf_counter() - t0:.2f}s")
+
+    for name, words in _CONSTRUCTION_DIAGNOSTICS:
+        _print_construction_diagnostic(name, words, lex)
 
     if failures:
         print("\nOrdering regression gate FAILED:")
