@@ -11,7 +11,6 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-
 HERE = Path(__file__).resolve().parent
 RESULTS_DIR = HERE / ".ci_benchmark_results"
 
