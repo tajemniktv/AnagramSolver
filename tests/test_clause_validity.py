@@ -32,8 +32,10 @@ class _FakeLexicon:
                 recognized=True,
             ),
             "hour": core.Features(noun=True, noun_singular=True, recognized=True),
+            "lining": core.Features(noun=True, verb=True, verb_ing=True, recognized=True),
             "managers": core.Features(noun=True, noun_plural=True, recognized=True),
             "runs": core.Features(verb=True, verb_3sg=True, recognized=True),
+            "silver": core.Features(noun=True, adj=True, recognized=True),
             "sitting": core.Features(
                 noun=True,
                 verb=True,
@@ -141,14 +143,14 @@ class ClauseValidityTests(unittest.TestCase):
         self.assertFalse(validity.indefinite_article_mismatch("an", "hour"))
         self.assertFalse(validity.indefinite_article_mismatch("a", "university"))
 
-    def test_pair_adjustments_target_the_two_reported_malformed_patterns(self) -> None:
+    def test_pair_adjustments_stay_narrow_and_preserve_noun_compounds(self) -> None:
         self.assertLess(validity.pair_validity_adjustment("a", "am", self.lex), 0.0)
-        self.assertLess(
-            validity.pair_validity_adjustment("game", "starting", self.lex),
-            0.0,
-        )
         self.assertLess(validity.pair_validity_adjustment("an", "game", self.lex), 0.0)
         self.assertEqual(validity.pair_validity_adjustment("a", "game", self.lex), 0.0)
+        self.assertEqual(
+            validity.pair_validity_adjustment("silver", "lining", self.lex),
+            0.0,
+        )
 
     def test_surface_penalty_reduces_mismatched_article_structure(self) -> None:
         result = core.StructureResult(0.90, 1.0, 1.0, 1.0, "clause", 3.6)
