@@ -57,14 +57,16 @@ def _comparative_base_candidates(word: str) -> tuple[str, ...]:
 
 
 def _comparative_like(word: str, lex: LexiconLike) -> bool:
-    """Recognize lexical and regular surface comparative adjective/adverb forms."""
-    if core._comparative_like(word, lex):
+    """Recognize lexical comparatives and regular ``-er`` forms with base evidence."""
+    word = core.norm_token(word)
+    if word in core.COMPARATIVE_WORDS:
         return True
-    for base in _comparative_base_candidates(word):
-        features = lex.features(base)
-        if features.adj or features.adv:
-            return True
-    return False
+    if not word.endswith("er"):
+        return False
+    return any(
+        lex.features(base).adj or lex.features(base).adv
+        for base in _comparative_base_candidates(word)
+    )
 
 
 def _comparative_span_starting_at(
@@ -72,7 +74,12 @@ def _comparative_span_starting_at(
     start: int,
     lex: core.WordNetLexicon,
 ) -> tuple[int, float] | None:
-    """Parse a compact comparative span with regular ``-er`` morphology."""
+    """Parse a compact comparative span with stricter regular ``-er`` evidence.
+
+    This intentionally tracks the core span parser while substituting the
+    stricter surface-comparative predicate above. Shared lexical cases are kept
+    in parity by regression tests so the extension cannot silently drift.
+    """
     if start >= len(words):
         return None
 
@@ -86,12 +93,9 @@ def _comparative_span_starting_at(
         if not left or not right:
             continue
 
-        left_ok = (
-            _comparative_like(left[0], lex)
-            or any(_comparative_like(word, lex) for word in left)
-            or any(lex.features(word).adj or lex.features(word).adv for word in left)
-        )
-        if not left_ok:
+        # A comparative construction must contain actual comparative evidence;
+        # a plain adjective/adverb such as "old" is not enough before "than".
+        if not any(_comparative_like(word, lex) for word in left):
             continue
 
         right_consumed = 0
@@ -100,9 +104,14 @@ def _comparative_span_starting_at(
             right_consumed = np[0] + 1
         else:
             features = lex.features(right[0])
-            if features.noun or features.adj or features.adv or core.function_class(
-                right[0]
-            ) in {"PRON", "PRON_12", "PRON_PL", "PRON_SG3", "NEG", "NUM_DET"}:
+            right_class = core.function_class(right[0])
+            if (
+                features.noun
+                or features.adj
+                or features.adv
+                or right_class in _PRONOUN_CLASSES
+                or right_class in {"NEG", "NUM_DET"}
+            ):
                 right_consumed = 1
 
         if right_consumed <= 0:
@@ -681,31 +690,44 @@ def auxiliary_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
     return _auxiliary_pair_bonus_for_class(core.function_class(left), right, lex)
 
 
-def construction_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
-    """Return local evidence for comparative and fronted-participial edges."""
+def _construction_pair_bonus_for_classes(
+    left: str,
+    right: str,
+    lex: LexiconLike,
+    left_class: str | None,
+    right_class: str | None,
+) -> float:
+    """Return construction evidence using precomputed function-word classes."""
     score = 0.0
-    left_features = lex.features(left)
-    right_features = lex.features(right)
-    right_class = core.function_class(right)
 
-    if _comparative_like(left, lex) and right == "than":
+    if right == "than" and _comparative_like(left, lex):
         score += _COMPARATIVE_THAN_PAIR_BONUS
 
-    if left == "than" and (
-        right_features.noun
-        or right_class in _PRONOUN_CLASSES
-        or core._det_class(right) is not None
-    ):
-        score += _THAN_COMPLEMENT_PAIR_BONUS
+    if left == "than":
+        right_features = lex.features(right)
+        if (
+            right_features.noun
+            or right_class in _PRONOUN_CLASSES
+            or core._det_class(right) is not None
+        ):
+            score += _THAN_COMPLEMENT_PAIR_BONUS
 
-    if (
-        core.function_class(left) is None
-        and left_features.verb_past
-        and right_class in _PRONOUN_CLASSES
-    ):
-        score += _PARTICIPIAL_SUBJECT_PAIR_BONUS
+    if left_class is None and right_class in _PRONOUN_CLASSES:
+        if lex.features(left).verb_past:
+            score += _PARTICIPIAL_SUBJECT_PAIR_BONUS
 
     return score
+
+
+def construction_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
+    """Return local evidence for comparative and fronted-participial edges."""
+    return _construction_pair_bonus_for_classes(
+        left,
+        right,
+        lex,
+        core.function_class(left),
+        core.function_class(right),
+    )
 
 
 def order_local_tables_with_auxiliaries(
@@ -715,13 +737,20 @@ def order_local_tables_with_auxiliaries(
 ) -> tuple[tuple[tuple[float, ...], ...], tuple[float, ...], tuple[float, ...]]:
     pair, starts, ends = base_tables(words, lex)
     rows = [list(row) for row in pair]
+    classes = tuple(core.function_class(word) for word in words)
     for i, left in enumerate(words):
-        left_class = core.function_class(left)
+        left_class = classes[i]
         for j, right in enumerate(words):
             if i == j:
                 continue
             rows[i][j] += validity.pair_validity_adjustment(left, right, lex)
-            rows[i][j] += construction_pair_bonus(left, right, lex)
+            rows[i][j] += _construction_pair_bonus_for_classes(
+                left,
+                right,
+                lex,
+                left_class,
+                classes[j],
+            )
             if left_class in {"BE_AUX", "HAVE_AUX"}:
                 rows[i][j] += _auxiliary_pair_bonus_for_class(left_class, right, lex)
     return tuple(tuple(row) for row in rows), starts, ends
@@ -739,11 +768,18 @@ def local_grammar_raw_with_auxiliaries(
     pair, starts, ends = base_tables(words, lex)
     if len(words) == 1:
         return starts[0] + ends[0]
+    classes = tuple(core.function_class(word) for word in words)
     total = starts[0] + ends[-1]
     total += sum(
         pair[i][i + 1]
-        + auxiliary_pair_bonus(words[i], words[i + 1], lex)
-        + construction_pair_bonus(words[i], words[i + 1], lex)
+        + _auxiliary_pair_bonus_for_class(classes[i], words[i + 1], lex)
+        + _construction_pair_bonus_for_classes(
+            words[i],
+            words[i + 1],
+            lex,
+            classes[i],
+            classes[i + 1],
+        )
         + validity.pair_validity_adjustment(words[i], words[i + 1], lex)
         for i in range(len(words) - 1)
     )
