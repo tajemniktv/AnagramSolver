@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
+from itertools import pairwise
 from typing import Protocol, TypeVar
 
 DEFAULT_QUALITY_CORE = 48
@@ -58,8 +59,8 @@ def _adjacency_similarity(left: Sequence[str], right: Sequence[str]) -> float:
     if len(left) <= 1 or len(right) <= 1:
         return 1.0 if tuple(left) == tuple(right) else 0.0
 
-    left_pairs = Counter(zip(left, left[1:]))
-    right_pairs = Counter(zip(right, right[1:]))
+    left_pairs = Counter(pairwise(left))
+    right_pairs = Counter(pairwise(right))
     overlap = sum((left_pairs & right_pairs).values())
     return overlap / max(sum(left_pairs.values()), sum(right_pairs.values()), 1)
 
