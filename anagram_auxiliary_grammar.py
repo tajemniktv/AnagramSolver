@@ -36,6 +36,7 @@ _FINITE_BE = frozenset(
     {"am", "is", "are", "was", "were", "isnt", "arent", "wasnt", "werent"}
 )
 _PRONOUN_CLASSES = frozenset({"PRON", "PRON_12", "PRON_PL", "PRON_SG3"})
+_IRREGULAR_COMPARATIVE_WORDS = frozenset({"elder", "farther", "further"})
 _COMPARATIVE_THAN_PAIR_BONUS = 1.90
 _THAN_COMPLEMENT_PAIR_BONUS = 0.65
 _PARTICIPIAL_SUBJECT_PAIR_BONUS = 0.85
@@ -59,10 +60,19 @@ def _comparative_base_candidates(word: str) -> tuple[str, ...]:
 def _comparative_like(word: str, lex: LexiconLike) -> bool:
     """Recognize lexical comparatives and regular ``-er`` forms with base evidence."""
     word = core.norm_token(word)
-    if word in core.COMPARATIVE_WORDS:
+    if word in core.COMPARATIVE_WORDS or word in _IRREGULAR_COMPARATIVE_WORDS:
         return True
     if not word.endswith("er"):
         return False
+
+    # Unknown inflected surfaces may legitimately need base recovery (the real
+    # WordNet gap for ``louder``). A token already recognized only as a noun or
+    # verb, however, must not borrow unrelated adjective/adverb evidence from a
+    # coincidental base candidate.
+    surface = lex.features(word)
+    if surface.recognized and not (surface.adj or surface.adv):
+        return False
+
     return any(
         lex.features(base).adj or lex.features(base).adv
         for base in _comparative_base_candidates(word)
