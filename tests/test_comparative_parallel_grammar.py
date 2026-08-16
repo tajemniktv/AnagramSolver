@@ -19,6 +19,13 @@ class _FakeLexicon:
             "nice": core.Features(adj=True, recognized=True),
             "happy": core.Features(adj=True, recognized=True),
             "big": core.Features(adj=True, recognized=True),
+            # False-friend coverage: surface "silver" can be adjectival without
+            # making it a regular comparative, while "work" is verb-only even
+            # though "worker" superficially looks like an -er comparative.
+            "silver": core.Features(adj=True, recognized=True),
+            "work": core.Features(verb=True, verb_base=True, recognized=True),
+            "run": core.Features(verb=True, verb_base=True, recognized=True),
+            "today": core.Features(adv=True, recognized=True),
             "united": core.Features(
                 verb=True,
                 verb_past=True,
@@ -33,6 +40,8 @@ class _FakeLexicon:
             ),
             "stand": core.Features(verb=True, verb_base=True, recognized=True),
             "fall": core.Features(verb=True, verb_base=True, recognized=True),
+            "standing": core.Features(verb=True, verb_ing=True, recognized=True),
+            "falling": core.Features(verb=True, verb_ing=True, recognized=True),
             "old": core.Features(adj=True, recognized=True),
         }
 
@@ -83,6 +92,27 @@ class ComparativeParallelGrammarTests(unittest.TestCase):
             with self.subTest(comparative=comparative):
                 self.assertTrue(grammar._comparative_like(comparative, self.lex))
         self.assertFalse(grammar._comparative_like("silver", self.lex))
+        self.assertEqual(
+            grammar.construction_pair_bonus("silver", "than", self.lex),
+            0.0,
+        )
+
+    def test_short_er_and_non_adjectival_bases_are_not_comparatives(self) -> None:
+        for comparative in ("her", "far"):
+            with self.subTest(comparative=comparative):
+                self.assertFalse(grammar._comparative_like(comparative, self.lex))
+        self.assertFalse(grammar._comparative_like("worker", self.lex))
+
+    def test_shared_comparative_span_cases_stay_in_parity_with_core(self) -> None:
+        for words in (
+            ("better", "than", "words"),
+            ("more", "words", "than", "actions"),
+        ):
+            with self.subTest(words=words):
+                self.assertEqual(
+                    grammar._comparative_span_starting_at(words, 0, self.lex),
+                    core._comparative_span_starting_at(words, 0, self.lex),
+                )
 
     def test_comparative_clause_consumes_complete_tail(self) -> None:
         result = grammar.comparative_clause_structure(
@@ -100,6 +130,30 @@ class ComparativeParallelGrammarTests(unittest.TestCase):
         self.assertIsNone(
             grammar.comparative_clause_structure(
                 ("actions", "speak", "than", "words", "louder"),
+                self.lex,
+            )
+        )
+
+    def test_comparative_clause_rejects_plain_adjective_before_than(self) -> None:
+        self.assertIsNone(
+            grammar.comparative_clause_structure(
+                ("actions", "speak", "old", "than", "words"),
+                self.lex,
+            )
+        )
+
+    def test_comparative_clause_rejects_non_tail_comparative_span(self) -> None:
+        self.assertIsNone(
+            grammar.comparative_clause_structure(
+                ("actions", "speak", "louder", "than", "words", "today"),
+                self.lex,
+            )
+        )
+
+    def test_comparative_clause_rejects_non_nominal_than_complement(self) -> None:
+        self.assertIsNone(
+            grammar.comparative_clause_structure(
+                ("actions", "speak", "louder", "than", "run"),
                 self.lex,
             )
         )
@@ -135,6 +189,22 @@ class ComparativeParallelGrammarTests(unittest.TestCase):
         self.assertIsNone(
             grammar.parallel_clause_structure(
                 ("we", "fall", "divided", "united", "stand", "we"),
+                self.lex,
+            )
+        )
+
+    def test_parallel_clause_rejects_mismatched_subjects(self) -> None:
+        self.assertIsNone(
+            grammar.parallel_clause_structure(
+                ("united", "we", "stand", "divided", "they", "fall"),
+                self.lex,
+            )
+        )
+
+    def test_parallel_clause_rejects_non_finite_verbs(self) -> None:
+        self.assertIsNone(
+            grammar.parallel_clause_structure(
+                ("united", "we", "standing", "divided", "we", "falling"),
                 self.lex,
             )
         )
