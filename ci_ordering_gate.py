@@ -6,12 +6,20 @@ from __future__ import annotations
 import time
 
 import anagram_benchmark as benchmark
+import anagram_clause_validity as validity
 import anagram_rerank as rerank
 
 MIN_RECALL_1 = 0.35
 MIN_RECALL_10 = 0.79
 MIN_RECALL_50 = 0.95
 MIN_MRR = 0.47
+MIN_CROSS_BAG_MARGIN = 0.02
+
+_CROSS_BAG_INTENDED = ("i", "am", "testing", "anagrams")
+_CROSS_BAG_MALFORMED = (
+    ("a", "am", "sitting", "managers"),
+    ("an", "game", "starting", "aims"),
+)
 
 
 def main() -> int:
@@ -39,9 +47,40 @@ def main() -> int:
         if observed[name] + 1e-12 < minimum
     ]
 
+    intended_objective = validity.grammar_structure_objective(
+        _CROSS_BAG_INTENDED,
+        lex,
+        rerank.local_grammar_raw,
+        rerank.phrase_structure,
+    )
+    malformed_objectives = [
+        (
+            validity.grammar_structure_objective(
+                words,
+                lex,
+                rerank.local_grammar_raw,
+                rerank.phrase_structure,
+            ),
+            words,
+        )
+        for words in _CROSS_BAG_MALFORMED
+    ]
+    strongest_bad_score, strongest_bad_words = max(malformed_objectives)
+    cross_bag_margin = intended_objective - strongest_bad_score
+    if cross_bag_margin + 1e-12 < MIN_CROSS_BAG_MARGIN:
+        failures.append(
+            "cross-bag grammar margin "
+            f"{cross_bag_margin:.3f} < {MIN_CROSS_BAG_MARGIN:.3f} "
+            f"against {' '.join(strongest_bad_words)}"
+        )
+
     print("\n=== CI ORDERING GATE ===")
     for name in ("recall1", "recall10", "recall50", "mrr"):
         print(f"  {name:<9} {observed[name]:.3f}  minimum {thresholds[name]:.3f}")
+    print(
+        "  cross-bag "
+        f"{cross_bag_margin:.3f}  minimum margin {MIN_CROSS_BAG_MARGIN:.3f}"
+    )
     print(f"  wall time {time.perf_counter() - t0:.2f}s")
 
     if failures:

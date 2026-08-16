@@ -4,6 +4,8 @@ This module recognizes finite auxiliary chains that the original hand-written
 structure parser deliberately handled only in a few special cases. It stays
 symbolic and deterministic: morphology comes from WordNet, valency comes from
 the existing frame parser, and no language model or learned score is involved.
+It also wires the narrow clause-validity layer used to reject obvious POS-
+ambiguity failures before they can dominate final ranking.
 """
 
 from __future__ import annotations
@@ -13,6 +15,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
+import anagram_clause_validity as validity
 import anagram_rerank_core as core
 
 
@@ -324,11 +327,13 @@ def auxiliary_structure(
         if chain is None:
             continue
 
-        subject_span = core._np_span_ending_at(words, aux_idx - 1, lex)
+        subj_head_idx = aux_idx - 1
+        if not validity.valid_subject_head(words[subj_head_idx], lex):
+            continue
+        subject_span = core._np_span_ending_at(words, subj_head_idx, lex)
         if subject_span is None:
             continue
         subj_start, subj_coh = subject_span
-        subj_head_idx = aux_idx - 1
         subject = words[subj_head_idx]
         number = core._subject_number_from_span(words, subj_start, subj_head_idx, lex)
         agreement = auxiliary_agreement(subject, number, auxiliary, lex)
@@ -382,15 +387,19 @@ def phrase_structure_with_auxiliaries(
     lex: core.WordNetLexicon,
     base_structure: BaseStructureFn,
 ) -> core.StructureResult:
-    """Return whichever of the legacy parser or auxiliary parser is stronger."""
-    base = base_structure(words, lex)
+    """Combine legacy, auxiliary and narrow clause-validity structure evidence."""
+    words = tuple(words)
+    base = validity.adjust_base_clause_structure(words, lex, base_structure(words, lex))
     auxiliary = auxiliary_structure(words, lex)
-    if auxiliary is None:
-        return base
-    return max(
-        (base, auxiliary),
-        key=lambda result: (result.norm, result.coverage, result.valency),
+    winner = (
+        base
+        if auxiliary is None
+        else max(
+            (base, auxiliary),
+            key=lambda result: (result.norm, result.coverage, result.valency),
+        )
     )
+    return validity.apply_surface_structure_penalties(words, lex, winner)
 
 
 def _auxiliary_pair_bonus_for_class(
@@ -433,10 +442,11 @@ def order_local_tables_with_auxiliaries(
     rows = [list(row) for row in pair]
     for i, left in enumerate(words):
         left_class = core.function_class(left)
-        if left_class not in {"BE_AUX", "HAVE_AUX"}:
-            continue
         for j, right in enumerate(words):
-            if i != j:
+            if i == j:
+                continue
+            rows[i][j] += validity.pair_validity_adjustment(left, right, lex)
+            if left_class in {"BE_AUX", "HAVE_AUX"}:
                 rows[i][j] += _auxiliary_pair_bonus_for_class(left_class, right, lex)
     return tuple(tuple(row) for row in rows), starts, ends
 
@@ -455,7 +465,9 @@ def local_grammar_raw_with_auxiliaries(
         return starts[0] + ends[0]
     total = starts[0] + ends[-1]
     total += sum(
-        pair[i][i + 1] + auxiliary_pair_bonus(words[i], words[i + 1], lex)
+        pair[i][i + 1]
+        + auxiliary_pair_bonus(words[i], words[i + 1], lex)
+        + validity.pair_validity_adjustment(words[i], words[i + 1], lex)
         for i in range(len(words) - 1)
     )
     return total / (len(words) - 1)
