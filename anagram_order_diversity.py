@@ -12,8 +12,8 @@ from collections import Counter
 from collections.abc import Sequence
 from typing import Protocol, TypeVar
 
-DEFAULT_QUALITY_CORE = 32
-DEFAULT_POOL_EXTRA = 16
+DEFAULT_QUALITY_CORE = 48
+DEFAULT_POOL_EXTRA = 8
 DEFAULT_MAX_POOL = 128
 DEFAULT_DIVERSITY_STRENGTH = 0.12
 
