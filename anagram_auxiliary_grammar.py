@@ -1,7 +1,7 @@
 """Auxiliary-chain grammar support layered over the core structural scorer.
 
 This module recognizes finite auxiliary chains that the original hand-written
-structure parser deliberately handled only in a few special cases.  It stays
+structure parser deliberately handled only in a few special cases. It stays
 symbolic and deterministic: morphology comes from WordNet, valency comes from
 the existing frame parser, and no language model or learned score is involved.
 """
@@ -11,12 +11,14 @@ from __future__ import annotations
 import itertools
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import Protocol
 
 import anagram_rerank_core as core
 
 
 class LexiconLike(Protocol):
+    """Minimal lexicon contract needed by morphology-only helpers."""
+
     def features(self, raw_word: str) -> core.Features: ...
 
 
@@ -25,6 +27,10 @@ BaseTablesFn = Callable[
     [tuple[str, ...], core.WordNetLexicon],
     tuple[tuple[tuple[float, ...], ...], tuple[float, ...], tuple[float, ...]],
 ]
+
+_FINITE_BE = frozenset(
+    {"am", "is", "are", "was", "were", "isnt", "arent", "wasnt", "werent"}
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -127,7 +133,8 @@ def parse_auxiliary_chain(
 
     Supported families include progressive, passive, perfect, modal, do-support,
     and the common nested combinations built from modal + have/be and
-    have + been + progressive/passive.
+    have + been + progressive/passive. Non-finite BE forms are accepted only
+    when reached inside a finite modal/perfect chain, never as root auxiliaries.
     """
     if aux_idx >= len(words):
         return None
@@ -136,6 +143,8 @@ def parse_auxiliary_chain(
     cls = core.function_class(word)
 
     if cls == "BE_AUX":
+        if word not in _FINITE_BE:
+            return None
         return _parse_be_chain(words, aux_idx, lex)
 
     if cls == "HAVE_AUX":
@@ -220,8 +229,9 @@ def auxiliary_agreement(
     subject: str,
     number: str,
     auxiliary: str,
-    lex: LexiconLike,
+    lex: core.WordNetLexicon,
 ) -> float:
+    """Score agreement for a finite auxiliary against its subject."""
     cls = core.function_class(auxiliary)
     if cls == "MODAL":
         return 0.98
@@ -232,28 +242,19 @@ def auxiliary_agreement(
     return core._subject_agreement(
         subject,
         auxiliary,
-        cast(core.WordNetLexicon, lex),
+        lex,
         auxiliary=True,
         number_override=number,
     )
 
 
-def _passive_tail(
+def _consume_passive_adverbs(
     tail: Sequence[str],
-    lex: LexiconLike,
-) -> tuple[float, int]:
-    if not tail:
-        return 0.96, 0
-
-    core_lex = cast(core.WordNetLexicon, lex)
-    if tail[0] == "by" and len(tail) > 1:
-        np = core._np_span_starting_at(tail, 1, core_lex)
-        if np is not None:
-            return 0.99, np[0] + 2
-
-    # A passive clause is already valency-complete.  Consume ordinary trailing
-    # adverbs as adjuncts without pretending that WordNet requires them.
-    consumed = 0
+    start: int,
+    lex: core.WordNetLexicon,
+) -> int:
+    """Consume consecutive adverb/negative adjuncts beginning at ``start``."""
+    consumed = start
     while consumed < len(tail):
         feature = lex.features(tail[consumed])
         cls = core.function_class(tail[consumed])
@@ -261,6 +262,29 @@ def _passive_tail(
             consumed += 1
             continue
         break
+    return consumed
+
+
+def _passive_tail(
+    tail: Sequence[str],
+    lex: core.WordNetLexicon,
+) -> tuple[float, int]:
+    if not tail:
+        return 0.96, 0
+
+    if tail[0] == "by" and len(tail) > 1:
+        np = core._np_span_starting_at(tail, 1, lex)
+        if np is not None:
+            # _np_span_starting_at returns an inclusive end index. Therefore
+            # ``end + 1`` is the exact token count for ``by <NP>``. Continue
+            # through genuine adverbial adjuncts, but do not hide arbitrary
+            # trailing tokens under the coverage cap.
+            consumed = _consume_passive_adverbs(tail, np[0] + 1, lex)
+            return 0.99, consumed
+
+    # A passive clause is already valency-complete. Consume ordinary trailing
+    # adverbs as adjuncts without pretending that WordNet requires them.
+    consumed = _consume_passive_adverbs(tail, 0, lex)
     if consumed:
         return 0.92, consumed
 
@@ -269,7 +293,7 @@ def _passive_tail(
 
 def auxiliary_structure(
     words: Sequence[str],
-    lex: LexiconLike,
+    lex: core.WordNetLexicon,
 ) -> core.StructureResult | None:
     """Return the best full-clause auxiliary-chain interpretation, if any."""
     words = tuple(words)
@@ -277,7 +301,6 @@ def auxiliary_structure(
     if n < 3:
         return None
 
-    core_lex = cast(core.WordNetLexicon, lex)
     candidates: list[core.StructureResult] = []
 
     det_collisions = sum(
@@ -301,15 +324,13 @@ def auxiliary_structure(
         if chain is None:
             continue
 
-        subject_span = core._np_span_ending_at(words, aux_idx - 1, core_lex)
+        subject_span = core._np_span_ending_at(words, aux_idx - 1, lex)
         if subject_span is None:
             continue
         subj_start, subj_coh = subject_span
         subj_head_idx = aux_idx - 1
         subject = words[subj_head_idx]
-        number = core._subject_number_from_span(
-            words, subj_start, subj_head_idx, core_lex
-        )
+        number = core._subject_number_from_span(words, subj_start, subj_head_idx, lex)
         agreement = auxiliary_agreement(subject, number, auxiliary, lex)
 
         tail = words[chain.main_idx + 1 :]
@@ -317,7 +338,7 @@ def auxiliary_structure(
             valency, tail_consumed = _passive_tail(tail, lex)
         else:
             valency, tail_consumed = core._valency_for_tail(
-                words[chain.main_idx], tail, core_lex
+                words[chain.main_idx], tail, lex
             )
 
         subject_tokens = aux_idx - subj_start
@@ -372,13 +393,16 @@ def phrase_structure_with_auxiliaries(
     )
 
 
-def auxiliary_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
-    """Extra local evidence for morphologically valid auxiliary transitions."""
-    cls = core.function_class(left)
+def _auxiliary_pair_bonus_for_class(
+    left_class: str | None,
+    right: str,
+    lex: LexiconLike,
+) -> float:
+    """Return an auxiliary-transition bonus with the left class precomputed."""
     right_cls = core.function_class(right)
     features = lex.features(right)
 
-    if cls == "BE_AUX":
+    if left_class == "BE_AUX":
         if right == "being" and right_cls == "BE_AUX":
             return 1.10
         if right_cls is None and features.verb_ing:
@@ -386,13 +410,18 @@ def auxiliary_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
         if right_cls is None and features.verb_past:
             return 1.00
 
-    if cls == "HAVE_AUX":
+    if left_class == "HAVE_AUX":
         if right == "been" and right_cls == "BE_AUX":
             return 1.05
         if right_cls is None and features.verb_past:
             return 1.10
 
     return 0.0
+
+
+def auxiliary_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
+    """Extra local evidence for morphologically valid auxiliary transitions."""
+    return _auxiliary_pair_bonus_for_class(core.function_class(left), right, lex)
 
 
 def order_local_tables_with_auxiliaries(
@@ -403,9 +432,12 @@ def order_local_tables_with_auxiliaries(
     pair, starts, ends = base_tables(words, lex)
     rows = [list(row) for row in pair]
     for i, left in enumerate(words):
+        left_class = core.function_class(left)
+        if left_class not in {"BE_AUX", "HAVE_AUX"}:
+            continue
         for j, right in enumerate(words):
             if i != j:
-                rows[i][j] += auxiliary_pair_bonus(left, right, lex)
+                rows[i][j] += _auxiliary_pair_bonus_for_class(left_class, right, lex)
     return tuple(tuple(row) for row in rows), starts, ends
 
 
@@ -414,12 +446,16 @@ def local_grammar_raw_with_auxiliaries(
     lex: core.WordNetLexicon,
     base_tables: BaseTablesFn,
 ) -> float:
+    """Compute the local raw score while touching only realized adjacencies."""
     words = tuple(words)
     if not words:
         return 0.0
-    pair, starts, ends = order_local_tables_with_auxiliaries(words, lex, base_tables)
+    pair, starts, ends = base_tables(words, lex)
     if len(words) == 1:
         return starts[0] + ends[0]
     total = starts[0] + ends[-1]
-    total += sum(pair[i][i + 1] for i in range(len(words) - 1))
+    total += sum(
+        pair[i][i + 1] + auxiliary_pair_bonus(words[i], words[i + 1], lex)
+        for i in range(len(words) - 1)
+    )
     return total / (len(words) - 1)
