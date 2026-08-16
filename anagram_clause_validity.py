@@ -79,6 +79,24 @@ def valid_subject_head(word: str, lex: core.WordNetLexicon) -> bool:
     return lex.features(word).noun
 
 
+def _nominal_function_aux_compatible(subject: str, auxiliary: str) -> bool:
+    """Return whether a nominal function head can precede this finite auxiliary.
+
+    Most nominal exceptions are number-ambiguous (``more``, ``less``, ``most``,
+    ``least``), so they stay neutral. ``one`` is explicitly singular, which lets
+    us reject only high-confidence clashes without inventing broader agreement
+    rules here. ``were`` remains neutral because singular subjunctive uses such
+    as ``if one were`` are grammatical.
+    """
+    if subject not in _NOMINAL_FUNCTION_HEADS:
+        return False
+    if subject != "one":
+        return True
+    if auxiliary in {"am", "are", "arent", "have", "havent", "do", "dont"}:
+        return False
+    return True
+
+
 def lexical_finite_form(word: str, lex: core.WordNetLexicon) -> bool:
     """Return whether a lexical token has an ordinary finite-verb analysis.
 
@@ -149,7 +167,13 @@ def _explicit_aux_subject_state(
             continue
         found = True
         subj_head_idx = aux_idx - 1
-        if not valid_subject_head(words[subj_head_idx], lex):
+        subject_head = words[subj_head_idx]
+        if not valid_subject_head(subject_head, lex):
+            continue
+        if (
+            subject_head in _NOMINAL_FUNCTION_HEADS
+            and not _nominal_function_aux_compatible(subject_head, token)
+        ):
             continue
         if core._np_span_ending_at(words, subj_head_idx, lex) is not None:
             return True, True
@@ -248,12 +272,12 @@ def adjust_base_clause_structure(
     Valid explicit auxiliaries are left to the existing auxiliary/copular logic.
     The core's leading ``do``/``don't`` imperative form is also preserved: it is
     intentionally subjectless, so requiring an explicit NP there would create a
-    false negative. For lexical clauses, reported coverage is capped to what a
-    genuinely finite lexical predicate can cover.
+    false negative. Explicit auxiliary failures elsewhere in the same phrase are
+    checked first so that imperative preservation cannot mask a later bad clause.
+    For lexical clauses, reported coverage is capped to what a genuinely finite
+    lexical predicate can cover.
     """
     if result.kind not in {"clause", "copula"} or result.coverage <= 0.0:
-        return result
-    if result.kind == "clause" and _is_subjectless_do_imperative(words, lex):
         return result
 
     has_aux, valid_aux_subject = _explicit_aux_subject_state(words, lex)
@@ -261,6 +285,9 @@ def adjust_base_clause_structure(
         if valid_aux_subject:
             return result
         return _demote_structure(result, coverage=_HARD_COVERAGE_CAP, hard=True)
+
+    if result.kind == "clause" and _is_subjectless_do_imperative(words, lex):
+        return result
 
     if result.kind == "copula":
         return result
@@ -288,9 +315,14 @@ def pair_validity_adjustment(
     # A determiner cannot itself be the subject head immediately before a
     # finite auxiliary. Core pair_grammar may otherwise recover some positive
     # noun evidence from WordNet's alternate sense of tokens such as ``a``.
-    # Explicit nominal function heads such as ``one`` are the narrow exception.
+    # Explicit nominal function heads are exempt only when the auxiliary is
+    # compatible with the nominal use (e.g. ``one is``, but not ``one am``).
+    nominal_exempt = (
+        left in _NOMINAL_FUNCTION_HEADS
+        and _nominal_function_aux_compatible(left, right)
+    )
     if (
-        left not in _NOMINAL_FUNCTION_HEADS
+        not nominal_exempt
         and core._det_class(left) is not None
         and right_cls in _FINITE_AUX_CLASSES
     ):
@@ -320,7 +352,10 @@ def apply_surface_structure_penalties(
     determiner_aux = sum(
         1
         for left, right in zip(words, words[1:])
-        if left not in _NOMINAL_FUNCTION_HEADS
+        if not (
+            left in _NOMINAL_FUNCTION_HEADS
+            and _nominal_function_aux_compatible(left, right)
+        )
         and core._det_class(left) is not None
         and core.function_class(right) in _FINITE_AUX_CLASSES
     )
