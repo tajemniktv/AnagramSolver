@@ -16,9 +16,9 @@ import subprocess
 import sys
 import unicodedata
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Sequence
 
 HERE = Path(__file__).resolve().parent
 GENERATOR = HERE / "anagram_generate.py"
@@ -217,9 +217,9 @@ def _run(cmd: Sequence[str], *, verbose: bool) -> subprocess.CompletedProcess[st
     # an argument rather than executable shell syntax. In verbose mode inherit
     # the terminal streams so long searches show progress immediately.
     if verbose:
-        proc = subprocess.run(cmd, text=True)
+        proc = subprocess.run(cmd, text=True, check=False)
     else:
-        proc = subprocess.run(cmd, text=True, capture_output=True)
+        proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
 
     if proc.returncode != 0:
         if verbose:

@@ -15,10 +15,15 @@ import multiprocessing
 import sys
 import time
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
+from collections.abc import Iterable, Sequence
+from concurrent.futures import (
+    Executor,
+    ProcessPoolExecutor,
+    ThreadPoolExecutor,
+    as_completed,
+)
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
 
 import anagram_rerank_core as core
 
@@ -28,16 +33,32 @@ for _name in dir(core):
     if not _name.startswith("__"):
         globals()[_name] = getattr(core, _name)
 
+# Explicit aliases document the actual core contract for static analyzers.
+Row = core.Row
+WordNetLexicon = core.WordNetLexicon
+StructureResult = core.StructureResult
+PositiveBigramModel = core.PositiveBigramModel
+PhraseIndex = core.PhraseIndex
+phrase_structure = core.phrase_structure
+local_grammar_raw = core.local_grammar_raw
+grammar_normalize = core.grammar_normalize
+_order_local_tables = core._order_local_tables
+_exact_index_orders = core._exact_index_orders
+_kbest_local_orders = core._kbest_local_orders
+_local_raw_indices = core._local_raw_indices
+resolve_backend = core.resolve_backend
+chunked = core.chunked
+
 ENGINE_LAYER = "top-k-order-reranking"
 DEFAULT_ORDER_CANDIDATES = 16
 _ORDER_CANDIDATE_COUNT = DEFAULT_ORDER_CANDIDATES
 
 # Main-process side table. Row uses slots, so keeping the alternatives outside
 # Row lets us add the feature without invalidating prepared-cache pickles.
-_ORDER_CANDIDATES_BY_ROW_ID: dict[int, tuple["OrderCandidate", ...]] = {}
+_ORDER_CANDIDATES_BY_ROW_ID: dict[int, tuple[OrderCandidate, ...]] = {}
 
 # Worker-local settings.
-_WORKER_LEX = None
+_WORKER_LEX: WordNetLexicon | None = None
 _WORKER_ORDER_MODE = "auto"
 _WORKER_BEAM_WIDTH = 128
 _WORKER_EXACT_MAX_WORDS = 5
@@ -364,6 +385,7 @@ def deep_analyze(
             for batch in chunked(selected_sorted, batch_size)
         ]
 
+        pool: Executor
         if resolved_backend == "thread":
             global _WORKER_LEX, _WORKER_ORDER_MODE, _WORKER_BEAM_WIDTH
             global _WORKER_EXACT_MAX_WORDS, _WORKER_ORDER_CANDIDATES
@@ -372,25 +394,23 @@ def deep_analyze(
             _WORKER_BEAM_WIDTH = beam_width
             _WORKER_EXACT_MAX_WORDS = exact_max_words
             _WORKER_ORDER_CANDIDATES = _ORDER_CANDIDATE_COUNT
-            pool_type = ThreadPoolExecutor
-            pool_kwargs = {"max_workers": workers}
+            pool = ThreadPoolExecutor(max_workers=workers)
         elif resolved_backend == "process":
-            pool_type = ProcessPoolExecutor
-            pool_kwargs = {
-                "max_workers": workers,
-                "initializer": _worker_init,
-                "initargs": (
+            pool = ProcessPoolExecutor(
+                max_workers=workers,
+                initializer=_worker_init,
+                initargs=(
                     str(wordnet_dir),
                     order_mode,
                     beam_width,
                     exact_max_words,
                     _ORDER_CANDIDATE_COUNT,
                 ),
-            }
+            )
         else:
             raise ValueError(f"Unsupported backend: {resolved_backend}")
 
-        with pool_type(**pool_kwargs) as pool:
+        with pool:
             futures = [pool.submit(_worker_analyze_batch, payload) for payload in payloads]
             for fut in as_completed(futures):
                 results = fut.result()

@@ -20,25 +20,26 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import heapq
+import itertools
 import math
+import multiprocessing
 import os
 import pickle
-import sqlite3
 import re
 import shutil
+import sqlite3
 import sys
-import time
-import heapq
-import multiprocessing
 import tarfile
 import tempfile
+import time
 import unicodedata
 import urllib.request
 from collections import defaultdict
+from collections.abc import Iterable, Iterator, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Sequence
 
 WORDNET_URL = "https://wordnetcode.princeton.edu/wn3.1.dict.tar.gz"
 DEFAULT_WORDNET_DIR = Path.home() / ".multi_anagram" / "wordnet31"
@@ -285,7 +286,9 @@ def _gil_enabled() -> bool:
         return True
     try:
         return bool(fn())
-    except Exception:
+    except Exception:  # noqa: BLE001
+        # sys._is_gil_enabled is a non-standard interpreter hook. If a build
+        # exposes a broken/incompatible hook, conservatively assume the GIL.
         return True
 
 
@@ -435,7 +438,7 @@ class WordNetLexicon:
     _cache: dict[str, Features] = field(default_factory=dict)
 
     @classmethod
-    def load(cls, dictionary_dir: Path) -> "WordNetLexicon":
+    def load(cls, dictionary_dir: Path) -> WordNetLexicon:
         return cls(
             nouns=load_index(dictionary_dir / "index.noun"),
             verbs=load_index(dictionary_dir / "index.verb"),
@@ -726,7 +729,7 @@ class PositiveBigramModel:
 
         edge_scores: list[float] = []
         seen = 0
-        for left, right in zip(words, words[1:]):
+        for left, right in itertools.pairwise(words):
             pair_count = self.bigram_counts.get((left, right), 0)
             if pair_count <= 0:
                 edge_scores.append(0.0)
@@ -823,7 +826,7 @@ class PhraseIndex:
     max_n: int
 
     @classmethod
-    def open(cls, path: Path) -> "PhraseIndex":
+    def open(cls, path: Path) -> PhraseIndex:
         # Read-only URI prevents a scoring run from mutating its corpus.
         uri = f"{path.resolve().as_uri()}?mode=ro"
         conn = sqlite3.connect(uri, uri=True)
@@ -857,7 +860,7 @@ class PhraseIndex:
         grams_by_n: dict[int, list[str]] = defaultdict(list)
         max_n = min(self.max_n, len(words))
         for n in range(2, max_n + 1):
-            for i in range(0, len(words) - n + 1):
+            for i in range(len(words) - n + 1):
                 gram = " ".join(words[i : i + n])
                 grams_by_n[n].append(gram)
                 queries.append(gram)
@@ -921,10 +924,9 @@ def apply_phrase_rescore(
             by_wc[row.word_count].append(row)
 
     rescored = 0
-    for wc, bucket in by_wc.items():
+    for bucket in by_wc.values():
         bucket.sort(key=lambda r: (r.final, r.pre_score), reverse=True)
         chosen = bucket[:top_per_group]
-        vocabulary = None  # merely documents that order is already fixed
         for row in chosen:
             row.base_final = row.final
 
@@ -1096,9 +1098,10 @@ def pair_grammar(left: str, right: str, lex: WordNetLexicon) -> float:
             score += 1.0
 
     # Subject-ish material before finite/copular be.
-    if rc == "BE_AUX":
-        if lf.noun or lc in {"PRON_12", "PRON_PL", "PRON_SG3", "PRON"}:
-            score += 1.2
+    if rc == "BE_AUX" and (
+        lf.noun or lc in {"PRON_12", "PRON_PL", "PRON_SG3", "PRON"}
+    ):
+        score += 1.2
 
     # do-support/modal -> base verb.
     if lc == "DONT":
@@ -1133,9 +1136,7 @@ def pair_grammar(left: str, right: str, lex: WordNetLexicon) -> float:
 
     # Subject -> do-support agreement.
     if rc == "DONT":
-        if left in {"i", "you", "we", "they"}:
-            score += 2.5
-        elif lf.noun_plural:
+        if left in {"i", "you", "we", "they"} or lf.noun_plural:
             score += 2.5
         elif left in {"he", "she", "it"}:
             score -= 2.5
@@ -1254,16 +1255,17 @@ def morphology_family_word(word: str, lex: WordNetLexicon) -> str:
     Used only to expand deep-analysis families, never to change letters.
     """
     word = norm_token(word)
-    f = lex.features(word)
+    # Preserve the feature-cache warmup side effect without an unused local.
+    lex.features(word)
 
     noun_bases = lex._noun_plural_bases(word)
     if noun_bases:
-        return sorted(noun_bases)[0]
+        return min(noun_bases)
 
     v3, vpast, ving = lex._verb_bases(word)
     verb_bases = v3 | vpast | ving
     if verb_bases:
-        return sorted(verb_bases)[0]
+        return min(verb_bases)
 
     return word
 
@@ -1773,7 +1775,7 @@ def _valency_for_tail(
     # Direct nominal object, optionally followed by a resultative complement.
     np = _np_span_starting_at(tail, 0, lex)
     if np is not None:
-        np_end, np_coh = np
+        np_end, _np_coh = np
         consumed = np_end + 1
 
         if consumed < len(tail):
@@ -1842,7 +1844,7 @@ def phrase_structure(words: Sequence[str], lex: WordNetLexicon) -> StructureResu
         return StructureResult(0.0, 0.5, 0.0, 0.5, "empty", 0.0)
 
     det_collisions = 0
-    for a, b in zip(words, words[1:]):
+    for a, b in itertools.pairwise(words):
         if _det_class(a) is not None and _det_class(b) is not None:
             det_collisions += 1
 
@@ -2125,7 +2127,7 @@ def local_grammar_raw(words: Sequence[str], lex: WordNetLexicon) -> float:
     if len(words) == 1:
         return start_score(words[0], lex) + end_score(words[0], lex)
     total = start_score(words[0], lex) + end_score(words[-1], lex)
-    total += sum(pair_grammar(a, b, lex) for a, b in zip(words, words[1:]))
+    total += sum(pair_grammar(a, b, lex) for a, b in itertools.pairwise(words))
     return total / (len(words) - 1)
 
 
@@ -2166,7 +2168,7 @@ def _local_raw_indices(
         idx = order[0]
         return starts[idx] + ends[idx]
     total = starts[order[0]] + ends[order[-1]]
-    total += sum(pair[a][b] for a, b in zip(order, order[1:]))
+    total += sum(pair[a][b] for a, b in itertools.pairwise(order))
     return total / (n - 1)
 
 
@@ -2614,7 +2616,7 @@ def rank_buckets(rows: list[Row]) -> dict[int, list[Row]]:
     for row in rows:
         by_wc[row.word_count].append(row)
 
-    for wc, bucket in by_wc.items():
+    for bucket in by_wc.values():
         bucket.sort(
             key=lambda r: (
                 1 if r.deep else 0,
@@ -2840,11 +2842,12 @@ def main() -> int:
     rows: list[Row] | None = None
     if not args.no_prepared_cache:
         cache_key = _prepared_cache_key(args.input, wn_dir)
-        cache_path = args.prepared_cache_dir.expanduser() / f"{cache_key}.pickle"
-        if cache_path.exists() and not args.rebuild_prepared_cache:
-            print(f"Loading prepared candidate cache: {cache_path}")
+        prepared_cache_path = args.prepared_cache_dir.expanduser() / f"{cache_key}.pickle"
+        cache_path = prepared_cache_path
+        if prepared_cache_path.exists() and not args.rebuild_prepared_cache:
+            print(f"Loading prepared candidate cache: {prepared_cache_path}")
             _stage_t0 = time.perf_counter()
-            rows = load_prepared_cache(cache_path)
+            rows = load_prepared_cache(prepared_cache_path)
             stage_times["cache_load"] = time.perf_counter() - _stage_t0
             if rows is not None:
                 print(f"Loaded {len(rows):,} prepared candidate word set(s) from cache.")

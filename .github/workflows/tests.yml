@@ -13,6 +13,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  static-analysis:
+    name: static analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Install Ruff and Pyright
+        run: python -m pip install --disable-pip-version-check ruff==0.16.3 pyright==1.1.411
+      - name: Enforce reported Ruff diagnostics
+        run: >-
+          ruff check
+          --select F821,F401,F841,I001,UP035,UP037,RUF007,PIE808,PERF102,SIM102,SIM114,FURB192,RUF059,C408,C409,PLW1510,RUF010,FURB167,FURB105,RUF100,BLE001
+          anagram_benchmark.py anagram_generate.py anagram_rerank.py anagram_rerank_core.py
+          anagram_rerank_topk_impl.py anagram_solver.py build_wikimedia_phrase_index.py
+          ci_phrase_matrix.py ci_ordering_gate.py
+      - name: Enforce Pylance/Pyright diagnostics
+        run: >-
+          pyright anagram_rerank_core.py anagram_rerank.py
+          anagram_rerank_topk_impl.py ci_ordering_gate.py
+
   unit-tests:
     name: unit tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest

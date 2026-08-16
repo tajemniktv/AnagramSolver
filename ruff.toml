@@ -1,0 +1,6 @@
+[lint.per-file-ignores]
+# This script's source hash is part of the ~1 GB Wikimedia corpus cache key.
+# Keep its historical import block byte-stable so style-only edits do not
+# invalidate and rebuild the corpus snapshot. Behavior changes should still
+# edit the builder and intentionally produce a new cache key.
+"build_wikimedia_phrase_index.py" = ["F401", "I001"]

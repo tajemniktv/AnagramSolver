@@ -20,9 +20,9 @@ import time
 import unicodedata
 import urllib.request
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Sequence
 
 DEFAULT_DICT_URL = "https://phillipmfeldman.org/English/large.txt"
 DEFAULT_CACHE_DIR = Path.home() / ".multi_anagram"
@@ -145,7 +145,7 @@ def download_file(url: str, path: Path, refresh: bool = False) -> Path:
 
 
 def get_dictionary(source: str, refresh: bool = False) -> Path:
-    if not re.match(r"^https?://", source, re.I):
+    if not re.match(r"^https?://", source, re.IGNORECASE):
         path = Path(source).expanduser()
         if not path.is_file():
             raise FileNotFoundError(f"Dictionary not found: {path}")
@@ -707,7 +707,7 @@ def build_records(
     records: list[Record] = []
 
     for solution in solutions:
-        words = tuple([*required_words, *solution])
+        words = (*required_words, *solution)
         matched = tuple(sorted(contains_any.intersection(words)))
 
         if contains_any:
@@ -925,7 +925,7 @@ def report_benchmark(answer: str, records: Sequence[Record]) -> None:
     sig = answer_signature(answer)
     matches = [r for r in records if tuple(sorted(r.words)) == sig]
 
-    print("", file=sys.stderr)
+    print(file=sys.stderr)
     print(f"BENCHMARK ANSWER: {answer}", file=sys.stderr)
     if not matches:
         print("  NOT FOUND in generated candidates.", file=sys.stderr)
@@ -1148,7 +1148,7 @@ def main() -> int:
                     excluded_words.add(w)
 
     try:
-        exclude_regexes = [re.compile(x, re.I) for x in args.exclude_regex]
+        exclude_regexes = [re.compile(x, re.IGNORECASE) for x in args.exclude_regex]
     except re.error as exc:
         raise SystemExit(f"Bad --exclude-regex: {exc}")
 
@@ -1300,7 +1300,7 @@ def main() -> int:
             allow_repeat=not args.no_repeat,
         ):
             generated += 1
-            all_words = tuple([*required_words, *solution])
+            all_words = (*required_words, *solution)
             matched = contains_any.intersection(all_words)
 
             if contains_any:

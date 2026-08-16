@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import gzip
 import hashlib
+import importlib
 import json
 import math
 import multiprocessing
@@ -12,6 +13,14 @@ import sys
 from pathlib import Path
 
 import anagram_rerank_core as core
+
+# Explicit aliases keep the facade contract visible to Ruff/Pylance.
+Row = core.Row
+WordNetLexicon = core.WordNetLexicon
+PositiveBigramModel = core.PositiveBigramModel
+PhraseIndex = core.PhraseIndex
+ensure_wordnet = core.ensure_wordnet
+DEFAULT_WORDNET_DIR = core.DEFAULT_WORDNET_DIR
 
 # Capture the stable core functions that facade wrappers delegate to. These must
 # not be looked up dynamically after main() installs the facade overrides.
@@ -27,7 +36,7 @@ _CORE_HOOK_NAMES = (
     "DeepResult",
 )
 _core_before_impl = {name: getattr(core, name) for name in _CORE_HOOK_NAMES}
-import anagram_rerank_topk_impl as impl  # noqa: E402
+impl = importlib.import_module("anagram_rerank_topk_impl")
 for _name, _value in _core_before_impl.items():
     setattr(core, _name, _value)
 
@@ -147,9 +156,12 @@ def _row_from_cache_dict(item: object) -> Row | None:
     ):
         return None
 
-    numeric = {name: _bounded_number(item, name) for name in _CACHE_FLOAT_RANGES}
-    if any(value is None for value in numeric.values()):
-        return None
+    numeric: dict[str, float] = {}
+    for name in _CACHE_FLOAT_RANGES:
+        value = _bounded_number(item, name)
+        if value is None:
+            return None
+        numeric[name] = value
 
     return Row(
         words=words,
@@ -257,7 +269,7 @@ def main() -> int:
     )
     if count < 1:
         raise SystemExit("--order-candidates must be >= 1")
-    impl._ORDER_CANDIDATE_COUNT = count
+    setattr(impl, "_ORDER_CANDIDATE_COUNT", count)
 
     overrides = {
         "best_order": impl.best_order,

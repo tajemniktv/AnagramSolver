@@ -39,10 +39,9 @@ import subprocess
 import sys
 import time
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
-
 
 HERE = Path(__file__).resolve().parent
 DEFAULT_CASES = HERE / "anagram_benchmarks.json"
@@ -314,8 +313,8 @@ def run_phrase_order_case(
 
     grammar_rank = min(grammar_ranks) if grammar_ranks else None
     retained_rank = min(phrase_ranks) if phrase_ranks else None
-    grammar_best = grammar_scored[0][1] if grammar_scored else tuple()
-    best_order = phrase_scored[0][2] if phrase_scored else tuple()
+    grammar_best = grammar_scored[0][1] if grammar_scored else ()
+    best_order = phrase_scored[0][2] if phrase_scored else ()
     best_phrase_score = phrase_scored[0][1] if phrase_scored else 0.0
 
     return PhraseOrderResult(
@@ -583,7 +582,7 @@ def run_full_case(
         generated = True
         cmd = make_generator_command(case, generator, export)
         print(f"\n[{case_id}] generating exact candidate bags ...")
-        proc = subprocess.run(cmd, text=True, capture_output=True)
+        proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
         if proc.returncode != 0:
             return FullResult(
                 case_id, answer, True, None, None, None, None, False,
@@ -602,7 +601,7 @@ def run_full_case(
         phrase_bonus_max=phrase_bonus_max,
         order_candidates=order_candidates,
     )
-    proc = subprocess.run(cmd, text=True, capture_output=True)
+    proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
     elapsed = time.perf_counter() - t0
 
     if proc.returncode != 0:
@@ -670,7 +669,7 @@ def print_full_summary(results: list[FullResult]) -> None:
 
         print(
             f"{bag_status:6} {exact_mark:6} {r.case_id:<24} "
-            f"PRE={str(r.pre_rank):<7} BAG={rank_text:<14} "
+            f"PRE={r.pre_rank!s:<7} BAG={rank_text:<14} "
             f"{r.seconds:7.2f}s {cache_text}  selected={selected}"
             + (f"  {r.note}" if r.note else "")
         )
