@@ -143,6 +143,24 @@ class ClauseValidityTests(unittest.TestCase):
         self.assertLess(adjusted.valency, base.valency)
         self.assertLess(adjusted.agreement, base.agreement)
 
+    def test_nominal_function_subject_requires_compatible_auxiliary(self) -> None:
+        base = core.StructureResult(0.90, 1.0, 1.0, 1.0, "copula", 3.6)
+        valid = validity.adjust_base_clause_structure(
+            ("one", "is", "enough"),
+            self.lex,
+            base,
+        )
+        invalid = validity.adjust_base_clause_structure(
+            ("one", "am", "enough"),
+            self.lex,
+            base,
+        )
+
+        self.assertEqual(valid, base)
+        self.assertEqual(invalid.kind, "fragment")
+        self.assertLess(invalid.norm, base.norm)
+        self.assertLess(invalid.coverage, base.coverage)
+
     def test_subjectless_do_imperative_clause_is_preserved(self) -> None:
         base = core.StructureResult(0.80, 0.90, 1.0, 0.60, "clause", 3.2)
         for words in (
@@ -152,6 +170,18 @@ class ClauseValidityTests(unittest.TestCase):
             with self.subTest(words=words):
                 adjusted = validity.adjust_base_clause_structure(words, self.lex, base)
                 self.assertEqual(adjusted, base)
+
+    def test_subjectless_do_imperative_cannot_hide_later_bad_auxiliary(self) -> None:
+        base = core.StructureResult(0.80, 0.90, 1.0, 0.60, "clause", 3.2)
+        adjusted = validity.adjust_base_clause_structure(
+            ("do", "test", "am", "managers"),
+            self.lex,
+            base,
+        )
+
+        self.assertEqual(adjusted.kind, "fragment")
+        self.assertLess(adjusted.norm, base.norm)
+        self.assertLess(adjusted.coverage, base.coverage)
 
     def test_normal_finite_clause_is_not_demoted(self) -> None:
         words = ("the", "dog", "runs")
@@ -173,6 +203,7 @@ class ClauseValidityTests(unittest.TestCase):
         self.assertLess(validity.pair_validity_adjustment("an", "game", self.lex), 0.0)
         self.assertEqual(validity.pair_validity_adjustment("a", "game", self.lex), 0.0)
         self.assertEqual(validity.pair_validity_adjustment("one", "is", self.lex), 0.0)
+        self.assertLess(validity.pair_validity_adjustment("one", "am", self.lex), 0.0)
         self.assertEqual(
             validity.pair_validity_adjustment("silver", "lining", self.lex),
             0.0,
@@ -200,11 +231,12 @@ class ClauseValidityTests(unittest.TestCase):
     def test_surface_penalty_reduces_determiner_aux_structure(self) -> None:
         result = core.StructureResult(0.90, 1.0, 1.0, 1.0, "clause", 3.6)
         adjusted = validity.apply_surface_structure_penalties(
-            ("a", "am", "sitting"),
+            ("the", "am", "sitting"),
             self.lex,
             result,
         )
 
+        self.assertFalse(validity.indefinite_article_mismatch("the", "am"))
         self.assertLess(adjusted.norm, result.norm)
         self.assertEqual(adjusted.coverage, result.coverage)
         self.assertEqual(adjusted.valency, result.valency)
@@ -212,13 +244,19 @@ class ClauseValidityTests(unittest.TestCase):
 
     def test_nominal_function_subject_avoids_determiner_aux_surface_penalty(self) -> None:
         result = core.StructureResult(0.90, 1.0, 1.0, 1.0, "clause", 3.6)
-        adjusted = validity.apply_surface_structure_penalties(
+        valid = validity.apply_surface_structure_penalties(
             ("one", "is", "enough"),
             self.lex,
             result,
         )
+        invalid = validity.apply_surface_structure_penalties(
+            ("one", "am", "enough"),
+            self.lex,
+            result,
+        )
 
-        self.assertEqual(adjusted, result)
+        self.assertEqual(valid, result)
+        self.assertLess(invalid.norm, result.norm)
 
     def test_user_failure_cross_bag_structural_objective_prefers_intended_phrase(self) -> None:
         def objective(words: tuple[str, ...]) -> float:
