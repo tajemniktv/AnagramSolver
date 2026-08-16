@@ -41,6 +41,82 @@ _THAN_COMPLEMENT_PAIR_BONUS = 0.65
 _PARTICIPIAL_SUBJECT_PAIR_BONUS = 0.85
 
 
+def _comparative_base_candidates(word: str) -> tuple[str, ...]:
+    """Return conservative regular bases for a surface ``-er`` comparative."""
+    word = core.norm_token(word)
+    if len(word) <= 3 or not word.endswith("er"):
+        return ()
+
+    stem = word[:-2]
+    candidates = {stem, word[:-1]}
+    if stem.endswith("i") and len(stem) > 1:
+        candidates.add(stem[:-1] + "y")
+    if len(stem) >= 2 and stem[-1] == stem[-2]:
+        candidates.add(stem[:-1])
+    return tuple(sorted(candidate for candidate in candidates if candidate))
+
+
+def _comparative_like(word: str, lex: LexiconLike) -> bool:
+    """Recognize lexical and regular surface comparative adjective/adverb forms."""
+    if core._comparative_like(word, lex):
+        return True
+    for base in _comparative_base_candidates(word):
+        features = lex.features(base)
+        if features.adj or features.adv:
+            return True
+    return False
+
+
+def _comparative_span_starting_at(
+    words: Sequence[str],
+    start: int,
+    lex: core.WordNetLexicon,
+) -> tuple[int, float] | None:
+    """Parse a compact comparative span with regular ``-er`` morphology."""
+    if start >= len(words):
+        return None
+
+    max_end = min(len(words), start + 5)
+    for than_idx in range(start + 1, max_end):
+        if words[than_idx] != "than":
+            continue
+
+        left = words[start:than_idx]
+        right = words[than_idx + 1 :]
+        if not left or not right:
+            continue
+
+        left_ok = (
+            _comparative_like(left[0], lex)
+            or any(_comparative_like(word, lex) for word in left)
+            or any(lex.features(word).adj or lex.features(word).adv for word in left)
+        )
+        if not left_ok:
+            continue
+
+        right_consumed = 0
+        np = core._np_span_starting_at(right, 0, lex)
+        if np is not None:
+            right_consumed = np[0] + 1
+        else:
+            features = lex.features(right[0])
+            if features.noun or features.adj or features.adv or core.function_class(
+                right[0]
+            ) in {"PRON", "PRON_12", "PRON_PL", "PRON_SG3", "NEG", "NUM_DET"}:
+                right_consumed = 1
+
+        if right_consumed <= 0:
+            continue
+
+        end = than_idx + right_consumed
+        quality = 0.90
+        if _comparative_like(left[0], lex):
+            quality += 0.05
+        return end, min(1.0, quality)
+
+    return None
+
+
 @dataclass(slots=True, frozen=True)
 class AuxiliaryChain:
     main_idx: int
@@ -409,7 +485,7 @@ def comparative_clause_structure(
         subj_start, subj_coh = subject_span
         subject_head_idx = verb_idx - 1
 
-        comparative = core._comparative_span_starting_at(words, verb_idx + 1, lex)
+        comparative = _comparative_span_starting_at(words, verb_idx + 1, lex)
         if comparative is None or comparative[0] != n - 1:
             continue
         _comp_end, comparative_quality = comparative
@@ -427,12 +503,9 @@ def comparative_clause_structure(
         if agreement <= 0.15:
             continue
 
-        valency, tail_consumed = core._valency_for_tail(
-            verb, words[verb_idx + 1 :], lex
-        )
         tail_length = n - verb_idx - 1
-        if tail_consumed != tail_length:
-            continue
+        tail_consumed = tail_length
+        valency = 0.88 * comparative_quality
 
         consumed = (verb_idx - subj_start) + 1 + tail_consumed
         coverage = min(1.0, consumed / n)
@@ -615,7 +688,7 @@ def construction_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
     right_features = lex.features(right)
     right_class = core.function_class(right)
 
-    if core._comparative_like(left, lex) and right == "than":
+    if _comparative_like(left, lex) and right == "than":
         score += _COMPARATIVE_THAN_PAIR_BONUS
 
     if left == "than" and (
