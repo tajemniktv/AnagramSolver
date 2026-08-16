@@ -10,9 +10,12 @@ import json
 import math
 import multiprocessing
 import sys
+from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 import anagram_rerank_core as core
+from anagram_order_diversity import raw_pool_size, select_diverse_orders
 
 # Explicit aliases keep the facade contract visible to Ruff/Pylance.
 Row = core.Row
@@ -45,8 +48,14 @@ for _name in dir(impl):
     if not _name.startswith("__"):
         globals()[_name] = getattr(impl, _name)
 
-ENGINE_LAYER = "top-k-order-reranking-reviewed"
+# Keep direct references to the implementation functions before this facade
+# shadows their public names with diversity-aware wrappers.
+_BASE_RANK_ORDERS = impl.rank_orders
+_BASE_DEEP_ANALYZE = impl.deep_analyze
+
+ENGINE_LAYER = "diverse-top-k-order-reranking"
 PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
+DEFAULT_ORDER_CANDIDATES = 32
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
@@ -230,6 +239,81 @@ def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
     _CORE_PREPARE_ROWS(rows, lex)
 
 
+def rank_orders(
+    words: Sequence[str],
+    lex: WordNetLexicon,
+    *,
+    order_mode: str = "auto",
+    beam_width: int = 128,
+    exact_max_words: int = 5,
+    top_k: int = DEFAULT_ORDER_CANDIDATES,
+) -> tuple[tuple[Any, ...], int]:
+    """Rank a wider raw pool, then retain a quality-preserving diverse subset."""
+    raw_k = raw_pool_size(top_k)
+    candidates, evaluated = _BASE_RANK_ORDERS(
+        words,
+        lex,
+        order_mode=order_mode,
+        beam_width=beam_width,
+        exact_max_words=exact_max_words,
+        top_k=raw_k,
+    )
+    return select_diverse_orders(candidates, top_k), evaluated
+
+
+def _diversify_order_side_tables(retained: int) -> None:
+    """Replace worker-returned raw pools with the final diverse retained set."""
+    for name in ("_ORDER_CANDIDATES_BY_ROW_ID", "_ORDER_CANDIDATES_BY_INDEX"):
+        table = getattr(impl, name, None)
+        if not isinstance(table, dict):
+            continue
+        for key, candidates in list(table.items()):
+            table[key] = select_diverse_orders(candidates, retained)
+
+
+def deep_analyze(
+    rows: list[Row],
+    selected: set[int],
+    lex: WordNetLexicon,
+    *,
+    wordnet_dir: Path,
+    backend: str,
+    workers: int,
+    batch_size: int,
+    order_mode: str,
+    beam_width: int,
+    exact_max_words: int,
+) -> dict[str, float]:
+    """Collect a wider worker pool, then diversify it in the parent process.
+
+    Widening happens by temporarily increasing the implementation's worker
+    setting. That matters on Windows: spawned process workers receive the wider
+    count through their initializer, while the pure diversity pass stays in the
+    parent and requires no monkey-patching inside child interpreters.
+    """
+    retained = int(getattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES))
+    raw_k = raw_pool_size(retained)
+    previous = retained
+    setattr(impl, "_ORDER_CANDIDATE_COUNT", raw_k)  # noqa: B010
+    try:
+        stats = _BASE_DEEP_ANALYZE(
+            rows,
+            selected,
+            lex,
+            wordnet_dir=wordnet_dir,
+            backend=backend,
+            workers=workers,
+            batch_size=batch_size,
+            order_mode=order_mode,
+            beam_width=beam_width,
+            exact_max_words=exact_max_words,
+        )
+        _diversify_order_side_tables(retained)
+        return stats
+    finally:
+        setattr(impl, "_ORDER_CANDIDATE_COUNT", previous)  # noqa: B010
+
+
 def _clear_order_side_tables() -> None:
     for name in ("_ORDER_CANDIDATES_BY_ROW_ID", "_ORDER_CANDIDATES_BY_INDEX"):
         table = getattr(impl, name, None)
@@ -264,7 +348,7 @@ def main() -> int:
     """Run the legacy core with scoped top-K/safety hooks, restoring it afterward."""
     original_argv = sys.argv[:]
     cleaned, count = impl._consume_int_flag(
-        original_argv[1:], "--order-candidates", impl.DEFAULT_ORDER_CANDIDATES
+        original_argv[1:], "--order-candidates", DEFAULT_ORDER_CANDIDATES
     )
     if count < 1:
         raise SystemExit("--order-candidates must be >= 1")
@@ -274,7 +358,7 @@ def main() -> int:
 
     overrides = {
         "best_order": impl.best_order,
-        "deep_analyze": impl.deep_analyze,
+        "deep_analyze": deep_analyze,
         "apply_phrase_rescore": apply_phrase_rescore,
         "DeepResult": impl.DeepResult,
         "prepare_rows": prepare_rows,
