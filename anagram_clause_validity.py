@@ -170,10 +170,9 @@ def _explicit_aux_subject_state(
         subject_head = words[subj_head_idx]
         if not valid_subject_head(subject_head, lex):
             continue
-        if (
-            subject_head in _NOMINAL_FUNCTION_HEADS
-            and not _nominal_function_aux_compatible(subject_head, token)
-        ):
+        if subject_head in _NOMINAL_FUNCTION_HEADS:
+            if _nominal_function_aux_compatible(subject_head, token):
+                return True, True
             continue
         if core._np_span_ending_at(words, subj_head_idx, lex) is not None:
             return True, True
