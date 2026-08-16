@@ -15,7 +15,7 @@ from anagram_paths import CI_BENCHMARK_RESULTS_DIR
 
 HERE = Path(__file__).resolve().parent
 RESULTS_DIR = CI_BENCHMARK_RESULTS_DIR
-ORDER_CANDIDATES = 48
+ORDER_CANDIDATES = 56
 
 
 @dataclass(slots=True)
