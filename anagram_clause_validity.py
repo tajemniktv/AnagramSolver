@@ -232,10 +232,8 @@ def pair_validity_adjustment(
     lex: core.WordNetLexicon,
 ) -> float:
     """Return bounded local evidence against clearly malformed transitions."""
-    left_cls = core.function_class(left)
+    del lex
     right_cls = core.function_class(right)
-    left_features = lex.features(left)
-    right_features = lex.features(right)
     score = 0.0
 
     # A determiner cannot itself be the subject head immediately before a
@@ -244,22 +242,9 @@ def pair_validity_adjustment(
     if core._det_class(left) is not None and right_cls in _FINITE_AUX_CLASSES:
         score -= 1.75
 
-    # Subject-ish noun -> bare V-ing is a participial relation, not an ordinary
-    # finite predicate. Remove the small generic subject->verb bonus without
-    # forbidding legitimate participial phrases outright.
-    if (
-        left_cls is None
-        and left_features.noun
-        and right_cls is None
-        and right_features.verb_ing
-        and not (
-            right_features.verb_base
-            or right_features.verb_3sg
-            or right_features.verb_past
-        )
-    ):
-        score -= 1.00
-
+    # Do not penalize generic noun -> V-ing pairs locally: English noun phrases
+    # such as "silver lining" make that adjacency legitimately common. Bare
+    # V-ing pretending to be a finite predicate is handled at whole-clause level.
     if indefinite_article_mismatch(left, right):
         score -= 1.60
 
