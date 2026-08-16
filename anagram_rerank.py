@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import anagram_rerank_core as core
+from anagram_auxiliary_grammar import (
+    local_grammar_raw_with_auxiliaries,
+    order_local_tables_with_auxiliaries,
+    phrase_structure_with_auxiliaries,
+)
 from anagram_order_diversity import raw_pool_size, select_diverse_orders
 
 if TYPE_CHECKING:
@@ -52,6 +57,21 @@ for _name in dir(impl):
     if not _name.startswith("__"):
         globals()[_name] = getattr(impl, _name)
 
+# Keep the original implementation hooks stable across importlib.reload().
+# The ordering-layer tests intentionally reload this facade, and spawned worker
+# processes import it independently, so repeatedly wrapping an already-wrapped
+# function would otherwise build a recursion matryoshka doll.
+if not hasattr(impl, "_AUX_BASE_PHRASE_STRUCTURE"):
+    setattr(impl, "_AUX_BASE_PHRASE_STRUCTURE", impl.phrase_structure)  # noqa: B010
+if not hasattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES"):
+    setattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES", impl._order_local_tables)  # noqa: B010
+if not hasattr(impl, "_AUX_BASE_WORKER_INIT"):
+    setattr(impl, "_AUX_BASE_WORKER_INIT", impl._worker_init)  # noqa: B010
+
+_BASE_PHRASE_STRUCTURE = getattr(impl, "_AUX_BASE_PHRASE_STRUCTURE")
+_BASE_ORDER_LOCAL_TABLES = getattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES")
+_BASE_WORKER_INIT = getattr(impl, "_AUX_BASE_WORKER_INIT")
+
 # Keep direct references to the implementation functions before this facade
 # shadows their public names with diversity-aware wrappers.
 _BASE_RANK_ORDERS = impl.rank_orders
@@ -69,6 +89,55 @@ setattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)  # noqa: B010
 # facade calls makes that compatibility bridge safe for accidental same-process
 # concurrent callers until the legacy layer can accept the width explicitly.
 _DEEP_ANALYZE_LOCK = threading.RLock()
+
+
+def phrase_structure(
+    words: Sequence[str],
+    lex: WordNetLexicon,
+) -> core.StructureResult:
+    """Combine the legacy parser with explicit auxiliary-chain structures."""
+    return phrase_structure_with_auxiliaries(words, lex, _BASE_PHRASE_STRUCTURE)
+
+
+def _order_local_tables(
+    words: tuple[str, ...],
+    lex: WordNetLexicon,
+) -> tuple[tuple[tuple[float, ...], ...], tuple[float, ...], tuple[float, ...]]:
+    """Add bounded local evidence for BE/HAVE morphology transitions."""
+    return order_local_tables_with_auxiliaries(words, lex, _BASE_ORDER_LOCAL_TABLES)
+
+
+def local_grammar_raw(words: Sequence[str], lex: WordNetLexicon) -> float:
+    """Local grammar score using the same auxiliary-aware pair table as search."""
+    return local_grammar_raw_with_auxiliaries(words, lex, _BASE_ORDER_LOCAL_TABLES)
+
+
+def _install_auxiliary_scoring() -> None:
+    setattr(impl, "phrase_structure", phrase_structure)  # noqa: B010
+    setattr(impl, "_order_local_tables", _order_local_tables)  # noqa: B010
+    setattr(impl, "local_grammar_raw", local_grammar_raw)  # noqa: B010
+
+
+def _worker_init_with_auxiliary_scoring(
+    wordnet_dir: str,
+    order_mode: str,
+    beam_width: int,
+    exact_max_words: int,
+    order_candidates: int,
+) -> None:
+    """Initialize a spawned worker, then install the facade's grammar hooks."""
+    _BASE_WORKER_INIT(
+        wordnet_dir,
+        order_mode,
+        beam_width,
+        exact_max_words,
+        order_candidates,
+    )
+    _install_auxiliary_scoring()
+
+
+_install_auxiliary_scoring()
+setattr(impl, "_worker_init", _worker_init_with_auxiliary_scoring)  # noqa: B010
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
