@@ -269,7 +269,9 @@ def main() -> int:
     )
     if count < 1:
         raise SystemExit("--order-candidates must be >= 1")
-    setattr(impl, "_ORDER_CANDIDATE_COUNT", count)
+    # ``impl`` is intentionally loaded through importlib, so Pyright sees a
+    # generic ModuleType. Keep the dynamic assignment explicit and scoped.
+    setattr(impl, "_ORDER_CANDIDATE_COUNT", count)  # noqa: B010
 
     overrides = {
         "best_order": impl.best_order,
