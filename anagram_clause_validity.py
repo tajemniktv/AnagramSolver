@@ -25,6 +25,27 @@ _FINITE_BE = frozenset(
 # also contains a noun sense for the surface token.
 _NOMINAL_FUNCTION_HEADS = frozenset({"one", "more", "less", "most", "least"})
 
+# Structure demotion constants are intentionally bounded rather than hard
+# rejection. They encode the validity layer's contract: malformed analyses lose
+# enough confidence to stop masquerading as complete clauses, while downstream
+# lexical/phrase evidence can still distinguish imperfect but plausible text.
+_HARD_NORM_CAP = 0.25
+_HARD_COVERAGE_CAP = 0.25
+_HARD_VALENCY_CAP = 0.50
+_HARD_AGREEMENT_CAP = 0.50
+_SOFT_VALENCY_CAP = 0.65
+_SOFT_AGREEMENT_CAP = 0.65
+_FRAGMENT_COVERAGE_THRESHOLD = 0.60
+_SOFT_NORM_BASE_WEIGHT = 0.25
+_SOFT_NORM_COVERAGE_WEIGHT = 0.75
+_SOFT_NORM_COVERAGE_EXPONENT = 1.4
+
+# Local/surface penalties are likewise deliberately small and high-confidence.
+_DETERMINER_AUX_PAIR_PENALTY = 1.75
+_ARTICLE_MISMATCH_PAIR_PENALTY = 1.60
+_ARTICLE_MISMATCH_SURFACE_PENALTY = 0.12
+_DETERMINER_AUX_SURFACE_PENALTY = 0.18
+
 # Orthographic approximations only. They are used as bounded negative evidence,
 # never as hard rejection, because English pronunciation delights in exceptions.
 _VOWEL_SOUND_CONSONANT_PREFIXES = ("heir", "honest", "honor", "hour")
@@ -128,6 +149,16 @@ def _explicit_aux_subject_state(
     return found, False
 
 
+def _is_subjectless_do_imperative(
+    words: Sequence[str],
+    lex: core.WordNetLexicon,
+) -> bool:
+    """Preserve the core's valid leading ``do``/``don't`` imperative analysis."""
+    if len(words) < 2 or words[0] not in {"do", "dont"}:
+        return False
+    return lex.features(words[1]).verb_base
+
+
 def best_valid_lexical_clause_coverage(
     words: Sequence[str],
     lex: core.WordNetLexicon,
@@ -172,17 +203,24 @@ def _demote_structure(
     """Return a bounded demotion while preserving the scorer's result schema."""
     coverage = max(0.0, min(result.coverage, coverage))
     if hard or coverage <= 0.0:
-        norm = min(result.norm, 0.25)
-        coverage = min(result.coverage, 0.25)
-        valency = min(result.valency, 0.50)
-        agreement = min(result.agreement, 0.50)
+        norm = min(result.norm, _HARD_NORM_CAP)
+        coverage = min(result.coverage, _HARD_COVERAGE_CAP)
+        valency = min(result.valency, _HARD_VALENCY_CAP)
+        agreement = min(result.agreement, _HARD_AGREEMENT_CAP)
         kind = "fragment"
     else:
         ratio = max(0.0, min(1.0, coverage / result.coverage))
-        norm = min(result.norm, result.norm * (0.25 + 0.75 * (ratio**1.4)))
-        valency = min(result.valency, 0.65)
-        agreement = min(result.agreement, 0.65)
-        kind = "fragment" if coverage < 0.60 else result.kind
+        scale = _SOFT_NORM_BASE_WEIGHT + _SOFT_NORM_COVERAGE_WEIGHT * (
+            ratio**_SOFT_NORM_COVERAGE_EXPONENT
+        )
+        norm = min(result.norm, result.norm * scale)
+        valency = min(result.valency, _SOFT_VALENCY_CAP)
+        agreement = min(result.agreement, _SOFT_AGREEMENT_CAP)
+        kind = (
+            "fragment"
+            if coverage < _FRAGMENT_COVERAGE_THRESHOLD
+            else result.kind
+        )
 
     norm = max(0.0, norm)
     return core.StructureResult(norm, valency, coverage, agreement, kind, 4.0 * norm)
@@ -201,17 +239,21 @@ def adjust_base_clause_structure(
     * ``an game starting aims`` can treat bare ``starting`` as a finite verb.
 
     Valid explicit auxiliaries are left to the existing auxiliary/copular logic.
-    For lexical clauses, reported coverage is capped to what a genuinely finite
-    lexical predicate can cover.
+    The core's leading ``do``/``don't`` imperative form is also preserved: it is
+    intentionally subjectless, so requiring an explicit NP there would create a
+    false negative. For lexical clauses, reported coverage is capped to what a
+    genuinely finite lexical predicate can cover.
     """
     if result.kind not in {"clause", "copula"} or result.coverage <= 0.0:
+        return result
+    if result.kind == "clause" and _is_subjectless_do_imperative(words, lex):
         return result
 
     has_aux, valid_aux_subject = _explicit_aux_subject_state(words, lex)
     if has_aux:
         if valid_aux_subject:
             return result
-        return _demote_structure(result, coverage=0.25, hard=True)
+        return _demote_structure(result, coverage=_HARD_COVERAGE_CAP, hard=True)
 
     if result.kind == "copula":
         return result
@@ -239,14 +281,19 @@ def pair_validity_adjustment(
     # A determiner cannot itself be the subject head immediately before a
     # finite auxiliary. Core pair_grammar may otherwise recover some positive
     # noun evidence from WordNet's alternate sense of tokens such as ``a``.
-    if core._det_class(left) is not None and right_cls in _FINITE_AUX_CLASSES:
-        score -= 1.75
+    # Explicit nominal function heads such as ``one`` are the narrow exception.
+    if (
+        left not in _NOMINAL_FUNCTION_HEADS
+        and core._det_class(left) is not None
+        and right_cls in _FINITE_AUX_CLASSES
+    ):
+        score -= _DETERMINER_AUX_PAIR_PENALTY
 
     # Do not penalize generic noun -> V-ing pairs locally: English noun phrases
     # such as "silver lining" make that adjacency legitimately common. Bare
     # V-ing pretending to be a finite predicate is handled at whole-clause level.
     if indefinite_article_mismatch(left, right):
-        score -= 1.60
+        score -= _ARTICLE_MISMATCH_PAIR_PENALTY
 
     return score
 
@@ -266,10 +313,14 @@ def apply_surface_structure_penalties(
     determiner_aux = sum(
         1
         for left, right in zip(words, words[1:])
-        if core._det_class(left) is not None
+        if left not in _NOMINAL_FUNCTION_HEADS
+        and core._det_class(left) is not None
         and core.function_class(right) in _FINITE_AUX_CLASSES
     )
-    penalty = 0.12 * article_mismatches + 0.18 * determiner_aux
+    penalty = (
+        _ARTICLE_MISMATCH_SURFACE_PENALTY * article_mismatches
+        + _DETERMINER_AUX_SURFACE_PENALTY * determiner_aux
+    )
     if penalty <= 0.0:
         return result
 
