@@ -26,26 +26,27 @@ class OrderDiversityTests(unittest.TestCase):
         self.assertEqual(diversity.raw_pool_size(8), 8)
         self.assertEqual(diversity.raw_pool_size(16), 16)
         self.assertEqual(diversity.raw_pool_size(32), 32)
-        self.assertEqual(diversity.raw_pool_size(48), 64)
-        self.assertEqual(diversity.raw_pool_size(64), 80)
+        self.assertEqual(diversity.raw_pool_size(48), 48)
+        self.assertEqual(diversity.raw_pool_size(56), 64)
+        self.assertEqual(diversity.raw_pool_size(64), 72)
         self.assertEqual(diversity.raw_pool_size(256), 256)
 
     def test_small_k_preserves_historical_score_prefix_exactly(self) -> None:
         candidates = tuple(
             _Candidate((str(i),), 1.0 - i * 0.01)
-            for i in range(40)
+            for i in range(56)
         )
-        retained = diversity.select_diverse_orders(candidates, 32)
-        self.assertEqual(retained, candidates[:32])
+        retained = diversity.select_diverse_orders(candidates, 48)
+        self.assertEqual(retained, candidates[:48])
 
-    def test_wider_retention_never_drops_score_top32(self) -> None:
+    def test_wider_retention_never_drops_score_top48(self) -> None:
         candidates = tuple(
             _Candidate((str(i), "x", "y"), 1.0 - i * 0.01)
             for i in range(64)
         )
-        retained = diversity.select_diverse_orders(candidates, 48)
-        self.assertEqual(len(retained), 48)
-        for candidate in candidates[:32]:
+        retained = diversity.select_diverse_orders(candidates, 56)
+        self.assertEqual(len(retained), 56)
+        for candidate in candidates[:48]:
             self.assertIn(candidate, retained)
         self.assertEqual(retained[0], candidates[0])
 
@@ -66,7 +67,7 @@ class OrderDiversityTests(unittest.TestCase):
             diversity.order_similarity(best, diverse),
         )
 
-    def test_facade_requests_top64_raw_pool_for_default_top48(self) -> None:
+    def test_facade_requests_top64_raw_pool_for_default_top56(self) -> None:
         candidates = tuple(
             rerank.OrderCandidate(
                 order=(f"w{i}", "a", "b"),
@@ -82,11 +83,11 @@ class OrderDiversityTests(unittest.TestCase):
         )
 
         with patch.object(rerank, "_BASE_RANK_ORDERS", return_value=(candidates, 99)) as base:
-            retained, evaluated = rerank.rank_orders(("a", "b", "c"), object(), top_k=48)
+            retained, evaluated = rerank.rank_orders(("a", "b", "c"), object(), top_k=56)
 
         self.assertEqual(evaluated, 99)
-        self.assertEqual(len(retained), 48)
-        self.assertEqual(retained[:32], candidates[:32])
+        self.assertEqual(len(retained), 56)
+        self.assertEqual(retained[:48], candidates[:48])
         self.assertEqual(base.call_args.kwargs["top_k"], 64)
 
     def test_parent_side_table_is_diversified_after_worker_collection(self) -> None:
@@ -106,15 +107,15 @@ class OrderDiversityTests(unittest.TestCase):
         table = rerank.impl._ORDER_CANDIDATES_BY_ROW_ID
         table[123] = candidates
 
-        rerank._diversify_order_side_tables(48)
+        rerank._diversify_order_side_tables(56)
 
-        self.assertEqual(len(table[123]), 48)
-        self.assertEqual(table[123][:32], candidates[:32])
+        self.assertEqual(len(table[123]), 56)
+        self.assertEqual(table[123][:48], candidates[:48])
 
     def test_user_solver_defaults_to_wider_retention_and_forwards_override(self) -> None:
         default_args = solver.build_parser().parse_args(["abcdef"])
         solver._validate_args(default_args)
-        self.assertEqual(default_args.order_candidates, 48)
+        self.assertEqual(default_args.order_candidates, 56)
 
         override_args = solver.build_parser().parse_args(
             ["abcdef", "--order-candidates", "64"]
