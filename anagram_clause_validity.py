@@ -10,6 +10,7 @@ learned model or language model is involved.
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from itertools import pairwise
 
 import anagram_rerank_core as core
 
@@ -92,9 +93,7 @@ def _nominal_function_aux_compatible(subject: str, auxiliary: str) -> bool:
         return False
     if subject != "one":
         return True
-    if auxiliary in {"am", "are", "arent", "have", "havent", "do", "dont"}:
-        return False
-    return True
+    return auxiliary not in {"am", "are", "arent", "have", "havent", "do", "dont"}
 
 
 def lexical_finite_form(word: str, lex: core.WordNetLexicon) -> bool:
@@ -345,12 +344,12 @@ def apply_surface_structure_penalties(
     words = tuple(words)
     article_mismatches = sum(
         1
-        for left, right in zip(words, words[1:])
+        for left, right in pairwise(words)
         if indefinite_article_mismatch(left, right)
     )
     determiner_aux = sum(
         1
-        for left, right in zip(words, words[1:])
+        for left, right in pairwise(words)
         if not (
             left in _NOMINAL_FUNCTION_HEADS
             and _nominal_function_aux_compatible(left, right)
