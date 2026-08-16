@@ -12,8 +12,8 @@ Sparse corpus evidence is positive-only: missing n-grams are treated as unknown,
 not as negative evidence. A benchmark answer, when supplied, is used only after
 ranking and never contributes to scoring.
 
-Python standard library only. WordNet is downloaded on first use and cached
-under ~/.multi_anagram/wordnet31.
+Python standard library only. WordNet and other runtime data are downloaded
+on first use under the project-local .anagram_data directory.
 """
 
 from __future__ import annotations
@@ -41,11 +41,13 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from dataclasses import dataclass, field
 from pathlib import Path
 
-WORDNET_URL = "https://wordnetcode.princeton.edu/wn3.1.dict.tar.gz"
-DEFAULT_WORDNET_DIR = Path.home() / ".multi_anagram" / "wordnet31"
+from anagram_paths import NGRAM_DIR, PREPARED_CACHE_DIR, WORDNET_DIR
 
-DEFAULT_PREPARED_CACHE_DIR = Path.home() / ".multi_anagram" / "prepared_cache"
-DEFAULT_NGRAM_DIR = Path.home() / ".multi_anagram" / "ngrams"
+WORDNET_URL = "https://wordnetcode.princeton.edu/wn3.1.dict.tar.gz"
+DEFAULT_WORDNET_DIR = WORDNET_DIR
+
+DEFAULT_PREPARED_CACHE_DIR = PREPARED_CACHE_DIR
+DEFAULT_NGRAM_DIR = NGRAM_DIR
 NORVIG_1W_URL = "https://norvig.com/ngrams/count_1w.txt"
 NORVIG_2W_URL = "https://norvig.com/ngrams/count_2w.txt"
 PREPARED_CACHE_SCHEMA = "core-prepared-1"

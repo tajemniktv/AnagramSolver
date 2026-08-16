@@ -10,9 +10,16 @@ import json
 import math
 import multiprocessing
 import sys
+import threading
+from collections.abc import Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import anagram_rerank_core as core
+from anagram_order_diversity import raw_pool_size, select_diverse_orders
+
+if TYPE_CHECKING:
+    from anagram_rerank_topk_impl import OrderCandidate
 
 # Explicit aliases keep the facade contract visible to Ruff/Pylance.
 Row = core.Row
@@ -45,15 +52,29 @@ for _name in dir(impl):
     if not _name.startswith("__"):
         globals()[_name] = getattr(impl, _name)
 
-ENGINE_LAYER = "top-k-order-reranking-reviewed"
+# Keep direct references to the implementation functions before this facade
+# shadows their public names with diversity-aware wrappers.
+_BASE_RANK_ORDERS = impl.rank_orders
+_BASE_DEEP_ANALYZE = impl.deep_analyze
+
+ENGINE_LAYER = "diverse-top-k-order-reranking"
 PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
+DEFAULT_ORDER_CANDIDATES = 56
+# Direct facade callers should see the facade default too; ``main`` may still
+# override this for an explicit --order-candidates value and restores it after.
+setattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)  # noqa: B010
+
+# The legacy implementation still exposes its worker width through a module
+# global. Normal CLI use is one deep-analysis call per process, but serializing
+# facade calls makes that compatibility bridge safe for accidental same-process
+# concurrent callers until the legacy layer can accept the width explicitly.
+_DEEP_ANALYZE_LOCK = threading.RLock()
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
-    """Fingerprint prepared caches independently of the legacy pickle schema."""
+    """Fingerprint prepared caches by content, independent of project location."""
     h = hashlib.sha256()
     h.update(PREPARED_CACHE_SCHEMA.encode("ascii"))
-    h.update(str(input_path.resolve()).encode("utf-8", "replace"))
     h.update(core._hash_file(input_path).encode("ascii"))
     for name in (
         "index.noun", "index.verb", "index.adj", "index.adv",
@@ -231,6 +252,83 @@ def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
     _CORE_PREPARE_ROWS(rows, lex)
 
 
+def rank_orders(
+    words: Sequence[str],
+    lex: WordNetLexicon,
+    *,
+    order_mode: str = "auto",
+    beam_width: int = 128,
+    exact_max_words: int = 5,
+    top_k: int = DEFAULT_ORDER_CANDIDATES,
+) -> tuple[tuple[OrderCandidate, ...], int]:
+    """Rank a wider raw pool, then retain a quality-preserving diverse subset."""
+    raw_k = raw_pool_size(top_k)
+    candidates, evaluated = _BASE_RANK_ORDERS(
+        words,
+        lex,
+        order_mode=order_mode,
+        beam_width=beam_width,
+        exact_max_words=exact_max_words,
+        top_k=raw_k,
+    )
+    return select_diverse_orders(candidates, top_k), evaluated
+
+
+def _diversify_order_side_tables(retained: int) -> None:
+    """Replace worker-returned raw pools with the final diverse retained set."""
+    for name in ("_ORDER_CANDIDATES_BY_ROW_ID", "_ORDER_CANDIDATES_BY_INDEX"):
+        table = getattr(impl, name, None)
+        if not isinstance(table, dict):
+            continue
+        for key, candidates in list(table.items()):
+            table[key] = select_diverse_orders(candidates, retained)
+
+
+def deep_analyze(
+    rows: list[Row],
+    selected: set[int],
+    lex: WordNetLexicon,
+    *,
+    wordnet_dir: Path,
+    backend: str,
+    workers: int,
+    batch_size: int,
+    order_mode: str,
+    beam_width: int,
+    exact_max_words: int,
+) -> dict[str, float]:
+    """Collect a wider worker pool, then diversify it in the parent process.
+
+    The frozen implementation communicates worker width through a module global.
+    The compatibility lock makes that temporary mutation safe for concurrent
+    same-process facade callers; spawned workers still receive the widened value
+    through their normal initializer, and the original value is always restored.
+    """
+    with _DEEP_ANALYZE_LOCK:
+        retained = int(
+            getattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)
+        )
+        raw_k = raw_pool_size(retained)
+        setattr(impl, "_ORDER_CANDIDATE_COUNT", raw_k)  # noqa: B010
+        try:
+            stats = _BASE_DEEP_ANALYZE(
+                rows,
+                selected,
+                lex,
+                wordnet_dir=wordnet_dir,
+                backend=backend,
+                workers=workers,
+                batch_size=batch_size,
+                order_mode=order_mode,
+                beam_width=beam_width,
+                exact_max_words=exact_max_words,
+            )
+            _diversify_order_side_tables(retained)
+            return stats
+        finally:
+            setattr(impl, "_ORDER_CANDIDATE_COUNT", retained)  # noqa: B010
+
+
 def _clear_order_side_tables() -> None:
     for name in ("_ORDER_CANDIDATES_BY_ROW_ID", "_ORDER_CANDIDATES_BY_INDEX"):
         table = getattr(impl, name, None)
@@ -265,17 +363,21 @@ def main() -> int:
     """Run the legacy core with scoped top-K/safety hooks, restoring it afterward."""
     original_argv = sys.argv[:]
     cleaned, count = impl._consume_int_flag(
-        original_argv[1:], "--order-candidates", impl.DEFAULT_ORDER_CANDIDATES
+        original_argv[1:], "--order-candidates", DEFAULT_ORDER_CANDIDATES
     )
     if count < 1:
         raise SystemExit("--order-candidates must be >= 1")
+
+    previous_count = int(
+        getattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)
+    )
     # ``impl`` is intentionally loaded through importlib, so Pyright sees a
     # generic ModuleType. Keep the dynamic assignment explicit and scoped.
     setattr(impl, "_ORDER_CANDIDATE_COUNT", count)  # noqa: B010
 
     overrides = {
         "best_order": impl.best_order,
-        "deep_analyze": impl.deep_analyze,
+        "deep_analyze": deep_analyze,
         "apply_phrase_rescore": apply_phrase_rescore,
         "DeepResult": impl.DeepResult,
         "prepare_rows": prepare_rows,
@@ -293,6 +395,7 @@ def main() -> int:
         sys.argv = original_argv
         for name, value in originals.items():
             setattr(core, name, value)
+        setattr(impl, "_ORDER_CANDIDATE_COUNT", previous_count)  # noqa: B010
         _clear_order_side_tables()
 
 

@@ -33,14 +33,44 @@ jobs:
         shell: bash
         run: echo "month=$(date -u +'%Y-%m')" >> "$GITHUB_OUTPUT"
 
-      - name: Restore language data and phrase indexes
+      - name: Restore project-local language data and phrase indexes
         id: corpus-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .anagram_data
+            .ci_phrase_cache
+          key: phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-${{ hashFiles('phrase_index_schema.txt') }}
+          restore-keys: |
+            phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-
+
+      # Cache versions include their path list. During the migration away from
+      # ~/.multi_anagram, a new-layout restore cannot see the existing ~1 GB
+      # default-branch corpus cache even when the key prefix matches. On a new-
+      # layout miss, restore that legacy cache with its historical path list,
+      # copy its reusable data into .anagram_data, then remove the temporary
+      # home-directory copy. The save step below publishes the new layout.
+      - name: Restore legacy corpus cache for path migration
+        id: legacy-corpus-cache
+        if: steps.corpus-cache.outputs.cache-matched-key == ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
             ~/.multi_anagram
             .ci_phrase_cache
-          key: phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-${{ hashFiles('build_wikimedia_phrase_index.py') }}
+          key: legacy-phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}
+          restore-keys: |
+            phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-
+
+      - name: Migrate legacy language-data path
+        if: steps.legacy-corpus-cache.outputs.cache-matched-key != ''
+        shell: bash
+        run: |
+          if [ -d "$HOME/.multi_anagram" ]; then
+            mkdir -p .anagram_data
+            cp -a "$HOME/.multi_anagram/." .anagram_data/
+            rm -rf "$HOME/.multi_anagram"
+          fi
 
       # Prepared rows depend on reranker feature code, while their on-disk key
       # intentionally uses an explicit schema rather than hashing source files.
@@ -49,7 +79,7 @@ jobs:
       # same job can still reuse the freshly prepared rows.
       - name: Drop code-sensitive prepared-feature cache
         shell: bash
-        run: rm -rf ~/.multi_anagram/prepared_cache
+        run: rm -rf .anagram_data/prepared_cache
 
       - name: Build Wiktionary phrase index
         shell: bash
@@ -103,7 +133,16 @@ jobs:
         if: github.event_name == 'schedule'
         run: |
           if [ "${{ steps.corpus-cache.outputs.cache-hit }}" = "true" ]; then
-            echo "Monthly corpus cache is already warm; no benchmark requested."
+            echo "Monthly project-local corpus cache is already warm; no benchmark requested."
           else
-            echo "Monthly corpus cache was rebuilt and will be saved after this job; no benchmark requested."
+            echo "Monthly project-local corpus cache was populated/rebuilt and will be saved; no benchmark requested."
           fi
+
+      - name: Save project-local language data and phrase indexes
+        if: success() && steps.corpus-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .anagram_data
+            .ci_phrase_cache
+          key: ${{ steps.corpus-cache.outputs.cache-primary-key }}
