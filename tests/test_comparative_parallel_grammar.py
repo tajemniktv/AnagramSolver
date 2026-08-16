@@ -12,7 +12,13 @@ class _FakeLexicon:
             "actions": core.Features(noun=True, noun_plural=True, recognized=True),
             "words": core.Features(noun=True, noun_plural=True, recognized=True),
             "speak": core.Features(verb=True, verb_base=True, recognized=True),
-            "louder": core.Features(adj=True, adv=True, recognized=True),
+            # Match the real WordNet gap that motivated the active comparative
+            # morphology layer: the base is lexical, while the inflected surface
+            # form itself need not appear in index.adj/index.adv.
+            "loud": core.Features(adj=True, adv=True, recognized=True),
+            "nice": core.Features(adj=True, recognized=True),
+            "happy": core.Features(adj=True, recognized=True),
+            "big": core.Features(adj=True, recognized=True),
             "united": core.Features(
                 verb=True,
                 verb_past=True,
@@ -71,6 +77,12 @@ class _FakeLexicon:
 class ComparativeParallelGrammarTests(unittest.TestCase):
     def setUp(self) -> None:
         self.lex = _FakeLexicon()
+
+    def test_regular_comparative_morphology_recovers_lexical_bases(self) -> None:
+        for comparative in ("louder", "nicer", "happier", "bigger"):
+            with self.subTest(comparative=comparative):
+                self.assertTrue(grammar._comparative_like(comparative, self.lex))
+        self.assertFalse(grammar._comparative_like("silver", self.lex))
 
     def test_comparative_clause_consumes_complete_tail(self) -> None:
         result = grammar.comparative_clause_structure(
