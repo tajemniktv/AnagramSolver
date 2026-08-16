@@ -50,10 +50,9 @@ PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
-    """Fingerprint prepared caches independently of the legacy pickle schema."""
+    """Fingerprint prepared caches by content, independent of project location."""
     h = hashlib.sha256()
     h.update(PREPARED_CACHE_SCHEMA.encode("ascii"))
-    h.update(str(input_path.resolve()).encode("utf-8", "replace"))
     h.update(core._hash_file(input_path).encode("ascii"))
     for name in (
         "index.noun", "index.verb", "index.adj", "index.adv",

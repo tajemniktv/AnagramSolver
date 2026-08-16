@@ -11,8 +11,10 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from anagram_paths import CI_BENCHMARK_RESULTS_DIR
+
 HERE = Path(__file__).resolve().parent
-RESULTS_DIR = HERE / ".ci_benchmark_results"
+RESULTS_DIR = CI_BENCHMARK_RESULTS_DIR
 
 
 @dataclass(slots=True)

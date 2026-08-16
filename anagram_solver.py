@@ -20,10 +20,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from anagram_paths import SOLVER_RUNS_DIR
+
 HERE = Path(__file__).resolve().parent
 GENERATOR = HERE / "anagram_generate.py"
 RERANKER = HERE / "anagram_rerank.py"
-DEFAULT_RUN_ROOT = Path.home() / ".multi_anagram" / "solver_runs"
+DEFAULT_RUN_ROOT = SOLVER_RUNS_DIR
 BALANCED_MAX_RESULTS = 100_000
 QUICK_MAX_RESULTS = 20_000
 GENERATION_CACHE_SCHEMA = 3

@@ -4,8 +4,8 @@ Exact multi-word anagram candidate generator and lexical pre-ranker.
 
 The generator searches exact letter decompositions, applies lexical/clue filters,
 groups morphology variants, and emits a stable candidate export consumed by the
-linguistic reranker. Optional Norvig unigram/bigram data is cached under
-~/.multi_anagram/ngrams.
+linguistic reranker. Optional dictionaries and Norvig unigram/bigram data
+are cached under the project-local .anagram_data directory.
 
 Python standard library only.
 """
@@ -24,13 +24,15 @@ from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from anagram_paths import DICTIONARY_DIR, NGRAM_DIR
+
 DEFAULT_DICT_URL = "https://phillipmfeldman.org/English/large.txt"
-DEFAULT_CACHE_DIR = Path.home() / ".multi_anagram"
-DEFAULT_DICT_CACHE = DEFAULT_CACHE_DIR / "large.txt"
+DEFAULT_CACHE_DIR = DICTIONARY_DIR
+DEFAULT_DICT_CACHE = DICTIONARY_DIR / "large.txt"
 
 NORVIG_1W_URL = "https://norvig.com/ngrams/count_1w.txt"
 NORVIG_2W_URL = "https://norvig.com/ngrams/count_2w.txt"
-DEFAULT_NGRAM_DIR = DEFAULT_CACHE_DIR / "ngrams"
+DEFAULT_NGRAM_DIR = NGRAM_DIR
 
 A_ORD = ord("a")
 

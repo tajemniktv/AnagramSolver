@@ -1,3 +1,4 @@
+.anagram_data/
 __pycache__/
 *.py[cod]
 .anagram_bench_cache/

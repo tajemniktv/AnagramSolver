@@ -12,7 +12,7 @@ Python 3.13 or newer is recommended.
 python anagram_solver.py "ODITIHNSLSHEEEPT"
 ```
 
-On the first run the solver may download/cache its dictionary, WordNet data, and word-frequency data. Later runs reuse those caches.
+On the first run the solver may download/cache its dictionary, WordNet data, and word-frequency data. Runtime data lives under `.anagram_data/` next to the scripts, so copying the project directory also carries its caches. The directory is git-ignored. Later runs reuse those caches.
 
 Normal use runs a **balanced** search capped at 100,000 generated word bags. It is much more responsive than unlimited 2–6-word enumeration, but the cap means it **can miss the answer** if the correct bag occurs later in generation order.
 
@@ -87,19 +87,19 @@ The solver works without a phrase database and still uses positive-only observed
 Build a Wiktionary index:
 
 ```powershell
-python build_wikimedia_phrase_index.py --output wikimedia_phrases.db --rebuild
+python build_wikimedia_phrase_index.py --rebuild
 ```
 
 Or include Wikipedia titles as well:
 
 ```powershell
-python build_wikimedia_phrase_index.py --include-wikipedia --output wikimedia_phrases.db --rebuild
+python build_wikimedia_phrase_index.py --include-wikipedia --rebuild
 ```
 
 Then use it while solving:
 
 ```powershell
-python anagram_solver.py "ODITIHNSLSHEEEPT" --phrase-db wikimedia_phrases.db
+python anagram_solver.py "ODITIHNSLSHEEEPT" --phrase-db .anagram_data/phrase_indexes/wikimedia_phrases.db
 ```
 
 The combined Wikipedia build is large and intentionally not performed automatically by the normal solver.
@@ -109,10 +109,10 @@ The combined Wikipedia build is large and intentionally not performed automatica
 The user-facing frontend stores intermediate candidate/reranked exports under:
 
 ```text
-~/.multi_anagram/solver_runs/
+.anagram_data/solver_runs/
 ```
 
-The cache key includes the generation constraints, generation mode/cap, and generator source hash, so repeating the same search can skip candidate generation while changed constraints/source code create a new cache entry. Use `--rebuild` to force regeneration or `--work-root` to choose a different location.
+All default generated/cache directories are children of `.anagram_data/`: solver runs, dictionaries, n-grams, WordNet, prepared rows, Wikimedia title downloads, phrase indexes, and benchmark artifacts. The cache key includes the generation constraints, generation mode/cap, and generator source hash, so repeating the same search can skip candidate generation while changed constraints/source code create a new cache entry. Use `--rebuild` to force regeneration or `--work-root` to choose a different location.
 
 ## Research / low-level tools
 
