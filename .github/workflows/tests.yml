@@ -28,7 +28,7 @@ jobs:
       - name: Enforce reported Ruff diagnostics
         run: >-
           ruff check
-          --select F821,F401,F841,I001,UP035,UP037,RUF007,PIE808,PERF102,SIM102,SIM114,FURB192,RUF059,C408,C409,PLW1510,RUF010,FURB167,FURB105,RUF100,BLE001
+          --select F821,F401,F841,I001,UP035,UP037,RUF007,PIE808,PERF102,SIM102,SIM114,FURB192,RUF059,C408,C409,PLW1510,RUF010,FURB167,FURB105,RUF100,BLE001,B010
           anagram_benchmark.py anagram_generate.py anagram_rerank.py anagram_rerank_core.py
           anagram_rerank_topk_impl.py anagram_solver.py build_wikimedia_phrase_index.py
           ci_phrase_matrix.py ci_ordering_gate.py
