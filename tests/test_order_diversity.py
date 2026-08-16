@@ -22,6 +22,12 @@ class OrderDiversityTests(unittest.TestCase):
     def tearDown(self) -> None:
         rerank._clear_order_side_tables()
 
+    def test_direct_facade_default_initializes_worker_retention(self) -> None:
+        self.assertEqual(
+            rerank.impl._ORDER_CANDIDATE_COUNT,
+            rerank.DEFAULT_ORDER_CANDIDATES,
+        )
+
     def test_raw_pool_widens_only_after_quality_core(self) -> None:
         self.assertEqual(diversity.raw_pool_size(8), 8)
         self.assertEqual(diversity.raw_pool_size(16), 16)
