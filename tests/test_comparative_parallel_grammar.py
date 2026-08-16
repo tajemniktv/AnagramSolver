@@ -1,0 +1,185 @@
+from __future__ import annotations
+
+import unittest
+
+import anagram_auxiliary_grammar as grammar
+import anagram_rerank_core as core
+
+
+class _FakeLexicon:
+    def __init__(self) -> None:
+        self._features = {
+            "actions": core.Features(noun=True, noun_plural=True, recognized=True),
+            "words": core.Features(noun=True, noun_plural=True, recognized=True),
+            "speak": core.Features(verb=True, verb_base=True, recognized=True),
+            "louder": core.Features(adj=True, adv=True, recognized=True),
+            "united": core.Features(
+                verb=True,
+                verb_past=True,
+                adj=True,
+                recognized=True,
+            ),
+            "divided": core.Features(
+                verb=True,
+                verb_past=True,
+                adj=True,
+                recognized=True,
+            ),
+            "stand": core.Features(verb=True, verb_base=True, recognized=True),
+            "fall": core.Features(verb=True, verb_base=True, recognized=True),
+            "old": core.Features(adj=True, recognized=True),
+        }
+
+    def features(self, word: str) -> core.Features:
+        return self._features.get(
+            word,
+            core.Features(recognized=core.function_class(word) is not None),
+        )
+
+    def allows_intransitive(self, word: str) -> bool | None:
+        if word in {"stand", "fall"}:
+            return True
+        if word == "speak":
+            return False
+        return None
+
+    def allows_object(self, word: str) -> bool | None:
+        del word
+        return None
+
+    def allows_pp(self, word: str) -> bool | None:
+        del word
+        return None
+
+    def allows_predicative(self, word: str) -> bool | None:
+        del word
+        return None
+
+    def allows_object_predicative(self, word: str) -> bool | None:
+        del word
+        return None
+
+    def allows_infinitive_or_gerund(self, word: str) -> bool | None:
+        del word
+        return None
+
+    def allows_clausal(self, word: str) -> bool | None:
+        del word
+        return None
+
+
+class ComparativeParallelGrammarTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.lex = _FakeLexicon()
+
+    def test_comparative_clause_consumes_complete_tail(self) -> None:
+        result = grammar.comparative_clause_structure(
+            ("actions", "speak", "louder", "than", "words"),
+            self.lex,
+        )
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result.kind, "comparative-clause")
+        self.assertEqual(result.coverage, 1.0)
+        self.assertGreater(result.agreement, 0.90)
+        self.assertGreater(result.norm, 0.90)
+
+    def test_comparative_clause_rejects_scrambled_tail(self) -> None:
+        self.assertIsNone(
+            grammar.comparative_clause_structure(
+                ("actions", "speak", "than", "words", "louder"),
+                self.lex,
+            )
+        )
+
+    def test_comparative_pair_evidence_is_directional(self) -> None:
+        self.assertGreater(
+            grammar.construction_pair_bonus("louder", "than", self.lex),
+            1.0,
+        )
+        self.assertGreater(
+            grammar.construction_pair_bonus("than", "words", self.lex),
+            0.0,
+        )
+        self.assertEqual(
+            grammar.construction_pair_bonus("than", "louder", self.lex),
+            0.0,
+        )
+
+    def test_parallel_clause_recognizes_repeated_subject_symmetry(self) -> None:
+        result = grammar.parallel_clause_structure(
+            ("united", "we", "stand", "divided", "we", "fall"),
+            self.lex,
+        )
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result.kind, "parallel-clause")
+        self.assertEqual(result.coverage, 1.0)
+        self.assertGreater(result.agreement, 0.90)
+        self.assertGreater(result.valency, 0.90)
+        self.assertGreater(result.norm, 0.95)
+
+    def test_parallel_clause_rejects_scrambled_topology(self) -> None:
+        self.assertIsNone(
+            grammar.parallel_clause_structure(
+                ("we", "fall", "divided", "united", "stand", "we"),
+                self.lex,
+            )
+        )
+
+    def test_participial_subject_bonus_stays_narrow(self) -> None:
+        self.assertGreater(
+            grammar.construction_pair_bonus("united", "we", self.lex),
+            0.0,
+        )
+        self.assertEqual(
+            grammar.construction_pair_bonus("old", "we", self.lex),
+            0.0,
+        )
+
+    def test_structure_wrapper_prefers_new_full_constructions(self) -> None:
+        weak = core.StructureResult(0.20, 0.50, 0.25, 0.50, "fragment", 0.80)
+
+        def base_structure(_words, _lex):
+            return weak
+
+        comparative = grammar.phrase_structure_with_auxiliaries(
+            ("actions", "speak", "louder", "than", "words"),
+            self.lex,
+            base_structure,
+        )
+        parallel = grammar.phrase_structure_with_auxiliaries(
+            ("united", "we", "stand", "divided", "we", "fall"),
+            self.lex,
+            base_structure,
+        )
+        self.assertEqual(comparative.kind, "comparative-clause")
+        self.assertEqual(parallel.kind, "parallel-clause")
+
+    def test_search_and_realized_scores_share_construction_bonuses(self) -> None:
+        words = ("actions", "speak", "louder", "than", "words")
+
+        def base_tables(_words, _lex):
+            size = len(_words)
+            pair = tuple(tuple(0.0 for _ in range(size)) for _ in range(size))
+            zeros = tuple(0.0 for _ in range(size))
+            return pair, zeros, zeros
+
+        pair, _starts, _ends = grammar.order_local_tables_with_auxiliaries(
+            words,
+            self.lex,
+            base_tables,
+        )
+        realized = grammar.local_grammar_raw_with_auxiliaries(
+            words,
+            self.lex,
+            base_tables,
+        )
+        expected = sum(pair[i][i + 1] for i in range(len(words) - 1)) / (
+            len(words) - 1
+        )
+        self.assertAlmostEqual(realized, expected)
+
+
+if __name__ == "__main__":
+    unittest.main()
