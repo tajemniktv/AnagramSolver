@@ -1,9 +1,9 @@
 """Deterministic clause and noun-phrase validity checks for ranking.
 
-The core grammar scorer is intentionally permissive around POS ambiguity.  This
+The core grammar scorer is intentionally permissive around POS ambiguity. This
 module adds a narrow validity layer for cases where WordNet's overlapping noun,
 verb and function-word labels can otherwise make malformed clauses look fully
-formed.  The checks are symbolic and conservative: no corpus-negative evidence,
+formed. The checks are symbolic and conservative: no corpus-negative evidence,
 learned model or language model is involved.
 """
 
@@ -17,12 +17,15 @@ _PRONOUN_CLASSES = frozenset({"PRON", "PRON_12", "PRON_PL", "PRON_SG3"})
 _FINITE_AUX_CLASSES = frozenset(
     {"BE_AUX", "HAVE_AUX", "MODAL", "DONT", "DOESNT", "DO_AUX"}
 )
-# A few function-word-like forms genuinely work as nominal heads.  Keep this
+_FINITE_BE = frozenset(
+    {"am", "is", "are", "was", "were", "isnt", "arent", "wasnt", "werent"}
+)
+# A few function-word-like forms genuinely work as nominal heads. Keep this
 # deliberately narrow so a/the/my cannot become subjects merely because WordNet
 # also contains a noun sense for the surface token.
 _NOMINAL_FUNCTION_HEADS = frozenset({"one", "more", "less", "most", "least"})
 
-# Orthographic approximations only.  They are used as bounded negative evidence,
+# Orthographic approximations only. They are used as bounded negative evidence,
 # never as hard rejection, because English pronunciation delights in exceptions.
 _VOWEL_SOUND_CONSONANT_PREFIXES = ("heir", "honest", "honor", "hour")
 _CONSONANT_SOUND_VOWEL_PREFIXES = (
@@ -51,7 +54,7 @@ def valid_subject_head(word: str, lex: core.WordNetLexicon) -> bool:
 def lexical_finite_form(word: str, lex: core.WordNetLexicon) -> bool:
     """Return whether a lexical token has an ordinary finite-verb analysis.
 
-    Bare present participles are deliberately excluded.  A token may still be
+    Bare present participles are deliberately excluded. A token may still be
     ambiguous between a participle and a finite form; in that case the explicit
     finite morphology wins and the existing agreement scorer decides whether it
     fits the subject.
@@ -104,6 +107,27 @@ def _subject_span_before(
     return subj_start, subj_head_idx, subj_coh
 
 
+def _explicit_aux_subject_state(
+    words: Sequence[str],
+    lex: core.WordNetLexicon,
+) -> tuple[bool, bool]:
+    """Return (has finite explicit auxiliary, has one with a valid subject)."""
+    found = False
+    for aux_idx, token in enumerate(words):
+        cls = core.function_class(token)
+        if aux_idx == 0 or cls not in _FINITE_AUX_CLASSES:
+            continue
+        if cls == "BE_AUX" and token not in _FINITE_BE:
+            continue
+        found = True
+        subj_head_idx = aux_idx - 1
+        if not valid_subject_head(words[subj_head_idx], lex):
+            continue
+        if core._np_span_ending_at(words, subj_head_idx, lex) is not None:
+            return True, True
+    return found, False
+
+
 def best_valid_lexical_clause_coverage(
     words: Sequence[str],
     lex: core.WordNetLexicon,
@@ -124,10 +148,9 @@ def best_valid_lexical_clause_coverage(
             continue
         subj_start, subj_head_idx, _subj_coh = subject
 
-        valency, tail_consumed = core._valency_for_tail(
+        _valency, tail_consumed = core._valency_for_tail(
             token, words[verb_idx + 1 :], lex
         )
-        del valency
 
         subject_tokens = subj_head_idx - subj_start + 1
         intervening = verb_idx - subj_head_idx - 1
@@ -140,47 +163,66 @@ def best_valid_lexical_clause_coverage(
     return best
 
 
-def adjust_base_clause_structure(
-    words: Sequence[str],
-    lex: core.WordNetLexicon,
+def _demote_structure(
     result: core.StructureResult,
+    *,
+    coverage: float,
+    hard: bool,
 ) -> core.StructureResult:
-    """Demote a base ``clause`` score that depends on non-finite morphology.
-
-    The legacy scorer deliberately treats any WordNet verb sense as a possible
-    finite predicate.  That makes ``an game starting aims`` look fully covered
-    because ``starting`` is verb-like.  We preserve valid finite analyses, but
-    if the reported coverage can only be obtained by a non-finite token, the
-    structure score is capped to what an actual finite lexical parse can cover.
-    """
-    if result.kind != "clause" or result.coverage <= 0.0:
-        return result
-
-    valid_coverage = best_valid_lexical_clause_coverage(words, lex)
-    if valid_coverage + 0.05 >= result.coverage:
-        return result
-
-    ratio = max(0.0, min(1.0, valid_coverage / result.coverage))
-    if valid_coverage <= 0.0:
+    """Return a bounded demotion while preserving the scorer's result schema."""
+    coverage = max(0.0, min(result.coverage, coverage))
+    if hard or coverage <= 0.0:
         norm = min(result.norm, 0.25)
         coverage = min(result.coverage, 0.25)
         valency = min(result.valency, 0.50)
         agreement = min(result.agreement, 0.50)
         kind = "fragment"
     else:
+        ratio = max(0.0, min(1.0, coverage / result.coverage))
         norm = min(result.norm, result.norm * (0.25 + 0.75 * (ratio**1.4)))
-        coverage = min(result.coverage, valid_coverage)
         valency = min(result.valency, 0.65)
         agreement = min(result.agreement, 0.65)
-        kind = "fragment" if valid_coverage < 0.60 else result.kind
+        kind = "fragment" if coverage < 0.60 else result.kind
 
-    return core.StructureResult(
-        max(0.0, norm),
-        valency,
-        coverage,
-        agreement,
-        kind,
-        4.0 * max(0.0, norm),
+    norm = max(0.0, norm)
+    return core.StructureResult(norm, valency, coverage, agreement, kind, 4.0 * norm)
+
+
+def adjust_base_clause_structure(
+    words: Sequence[str],
+    lex: core.WordNetLexicon,
+    result: core.StructureResult,
+) -> core.StructureResult:
+    """Demote finite-clause scores that depend on invalid subject/morphology.
+
+    Two concrete WordNet ambiguity failures motivate this layer:
+
+    * ``a am sitting managers`` can treat the article ``a`` as a noun subject.
+    * ``an game starting aims`` can treat bare ``starting`` as a finite verb.
+
+    Valid explicit auxiliaries are left to the existing auxiliary/copular logic.
+    For lexical clauses, reported coverage is capped to what a genuinely finite
+    lexical predicate can cover.
+    """
+    if result.kind not in {"clause", "copula"} or result.coverage <= 0.0:
+        return result
+
+    has_aux, valid_aux_subject = _explicit_aux_subject_state(words, lex)
+    if has_aux:
+        if valid_aux_subject:
+            return result
+        return _demote_structure(result, coverage=0.25, hard=True)
+
+    if result.kind == "copula":
+        return result
+
+    valid_coverage = best_valid_lexical_clause_coverage(words, lex)
+    if valid_coverage + 0.05 >= result.coverage:
+        return result
+    return _demote_structure(
+        result,
+        coverage=valid_coverage,
+        hard=valid_coverage <= 0.0,
     )
 
 
@@ -197,13 +239,13 @@ def pair_validity_adjustment(
     score = 0.0
 
     # A determiner cannot itself be the subject head immediately before a
-    # finite auxiliary.  Core pair_grammar may otherwise recover some positive
+    # finite auxiliary. Core pair_grammar may otherwise recover some positive
     # noun evidence from WordNet's alternate sense of tokens such as ``a``.
     if core._det_class(left) is not None and right_cls in _FINITE_AUX_CLASSES:
         score -= 1.75
 
     # Subject-ish noun -> bare V-ing is a participial relation, not an ordinary
-    # finite predicate.  Remove the small generic subject->verb bonus without
+    # finite predicate. Remove the small generic subject->verb bonus without
     # forbidding legitimate participial phrases outright.
     if (
         left_cls is None
