@@ -34,26 +34,14 @@ class _FakeLexicon:
 
     def allows_object(self, word: str) -> bool | None:
         if word in {
-            "testing",
-            "reading",
-            "playing",
-            "making",
-            "tested",
-            "read",
-            "test",
+            "testing", "reading", "playing", "making", "tested", "read", "test",
         }:
             return True
         return None
 
     def allows_intransitive(self, word: str) -> bool | None:
         if word in {
-            "testing",
-            "reading",
-            "playing",
-            "making",
-            "tested",
-            "read",
-            "test",
+            "testing", "reading", "playing", "making", "tested", "read", "test",
         }:
             return False
         return None
@@ -91,7 +79,6 @@ class AuxiliaryGrammarTests(unittest.TestCase):
 
     def test_progressive_clause_consumes_subject_aux_verb_and_object(self) -> None:
         result = self._structure(("i", "am", "testing", "anagrams"))
-
         self.assertEqual(result.kind, "aux-progressive")
         self.assertEqual(result.coverage, 1.0)
         self.assertEqual(result.agreement, 1.0)
@@ -99,11 +86,8 @@ class AuxiliaryGrammarTests(unittest.TestCase):
         self.assertGreater(result.norm, 0.95)
 
     def test_negative_progressive_variants_keep_full_coverage(self) -> None:
-        explicit_not = self._structure(
-            ("i", "am", "not", "testing", "anagrams")
-        )
+        explicit_not = self._structure(("i", "am", "not", "testing", "anagrams"))
         contracted = self._structure(("they", "arent", "testing", "anagrams"))
-
         self.assertEqual(explicit_not.kind, "aux-progressive")
         self.assertEqual(explicit_not.coverage, 1.0)
         self.assertEqual(explicit_not.agreement, 1.0)
@@ -117,7 +101,6 @@ class AuxiliaryGrammarTests(unittest.TestCase):
         she_has = self._structure(("she", "has", "tested", "anagrams"))
         they_have = self._structure(("they", "have", "tested", "anagrams"))
         she_hasnt = self._structure(("she", "hasnt", "tested", "anagrams"))
-
         for result in (she_has, they_have, she_hasnt):
             self.assertEqual(result.kind, "aux-perfect")
             self.assertEqual(result.coverage, 1.0)
@@ -131,16 +114,11 @@ class AuxiliaryGrammarTests(unittest.TestCase):
             ("she", "3sg", "is"),
             ("we", "non3sg", "were"),
         )
-        mixed = (
-            ("they", "non3sg", "was"),
-            ("she", "3sg", "were"),
-        )
-
+        mixed = (("they", "non3sg", "was"), ("she", "3sg", "were"))
         for subject, number, verb in good:
             with self.subTest(subject=subject, verb=verb):
                 self.assertGreater(
-                    auxiliary.auxiliary_agreement(subject, number, verb, self.lex),
-                    0.90,
+                    auxiliary.auxiliary_agreement(subject, number, verb, self.lex), 0.90
                 )
         for subject, number, verb in mixed:
             with self.subTest(subject=subject, verb=verb):
@@ -150,30 +128,25 @@ class AuxiliaryGrammarTests(unittest.TestCase):
 
     def test_bad_be_agreement_is_strongly_capped(self) -> None:
         result = self._structure(("they", "is", "testing", "anagrams"))
-
         self.assertLessEqual(result.agreement, 0.10)
         self.assertLessEqual(result.norm, 0.42)
 
     def test_progressive_passive_chain_is_recognized(self) -> None:
         result = self._structure(("anagrams", "are", "being", "tested"))
-
         self.assertEqual(result.kind, "aux-progressive-passive")
         self.assertEqual(result.coverage, 1.0)
         self.assertEqual(result.agreement, 1.0)
         self.assertGreater(result.norm, 0.90)
 
     def test_passive_by_phrase_and_adverb_tail_are_consumed_exactly(self) -> None:
-        by_agent = self._structure(
-            ("anagrams", "were", "tested", "by", "researchers")
-        )
+        by_agent = self._structure(("anagrams", "were", "tested", "by", "researchers"))
         adverb = self._structure(("anagrams", "were", "tested", "recently"))
         by_agent_adverb = self._structure(
             ("anagrams", "were", "tested", "by", "researchers", "recently")
         )
         trailing_junk = self._structure(
-            ("anagrams", "were", "tested", "by", "researchers", "systems")
+            ("anagrams", "were", "tested", "by", "researchers", "will")
         )
-
         for result in (by_agent, adverb, by_agent_adverb):
             self.assertEqual(result.kind, "aux-passive")
             self.assertEqual(result.coverage, 1.0)
@@ -183,14 +156,12 @@ class AuxiliaryGrammarTests(unittest.TestCase):
 
     def test_perfect_progressive_chain_is_recognized(self) -> None:
         result = self._structure(("we", "have", "been", "testing", "systems"))
-
         self.assertEqual(result.kind, "aux-perfect-progressive")
         self.assertEqual(result.coverage, 1.0)
         self.assertGreater(result.norm, 0.90)
 
     def test_modal_progressive_chain_is_recognized(self) -> None:
         result = self._structure(("we", "will", "be", "testing", "systems"))
-
         self.assertEqual(result.kind, "aux-modal-progressive")
         self.assertEqual(result.coverage, 1.0)
         self.assertGreater(result.norm, 0.90)
@@ -200,10 +171,7 @@ class AuxiliaryGrammarTests(unittest.TestCase):
         perfect_progressive = self._structure(
             ("we", "could", "have", "been", "testing", "systems")
         )
-        perfect_passive = self._structure(
-            ("systems", "could", "have", "been", "tested")
-        )
-
+        perfect_passive = self._structure(("systems", "could", "have", "been", "tested"))
         self.assertEqual(perfect.kind, "aux-modal-perfect")
         self.assertEqual(perfect_progressive.kind, "aux-modal-perfect-progressive")
         self.assertEqual(perfect_passive.kind, "aux-modal-perfect-passive")
@@ -236,33 +204,18 @@ class AuxiliaryGrammarTests(unittest.TestCase):
 
     def test_simple_passive_is_complete_without_object(self) -> None:
         result = self._structure(("the", "ball", "was", "tested"))
-
         self.assertEqual(result.kind, "aux-passive")
         self.assertEqual(result.coverage, 1.0)
         self.assertGreaterEqual(result.valency, 0.95)
 
     def test_auxiliary_pair_bonus_is_morphology_specific(self) -> None:
-        self.assertGreater(
-            auxiliary.auxiliary_pair_bonus("am", "testing", self.lex), 0.0
-        )
-        self.assertGreater(
-            auxiliary.auxiliary_pair_bonus("have", "tested", self.lex), 0.0
-        )
-        self.assertGreater(
-            auxiliary.auxiliary_pair_bonus("have", "been", self.lex), 0.0
-        )
-        self.assertEqual(
-            auxiliary.auxiliary_pair_bonus("have", "testing", self.lex), 0.0
-        )
-        self.assertGreater(
-            auxiliary.auxiliary_pair_bonus("is", "tested", self.lex), 0.0
-        )
-        self.assertEqual(
-            auxiliary.auxiliary_pair_bonus("testing", "anagrams", self.lex), 0.0
-        )
-        self.assertEqual(
-            auxiliary.auxiliary_pair_bonus("am", "anagrams", self.lex), 0.0
-        )
+        self.assertGreater(auxiliary.auxiliary_pair_bonus("am", "testing", self.lex), 0.0)
+        self.assertGreater(auxiliary.auxiliary_pair_bonus("have", "tested", self.lex), 0.0)
+        self.assertGreater(auxiliary.auxiliary_pair_bonus("have", "been", self.lex), 0.0)
+        self.assertEqual(auxiliary.auxiliary_pair_bonus("have", "testing", self.lex), 0.0)
+        self.assertGreater(auxiliary.auxiliary_pair_bonus("is", "tested", self.lex), 0.0)
+        self.assertEqual(auxiliary.auxiliary_pair_bonus("testing", "anagrams", self.lex), 0.0)
+        self.assertEqual(auxiliary.auxiliary_pair_bonus("am", "anagrams", self.lex), 0.0)
 
     def test_table_wrapper_adds_bonus_without_changing_endpoints(self) -> None:
         words = ("i", "am", "testing", "anagrams")
@@ -275,7 +228,6 @@ class AuxiliaryGrammarTests(unittest.TestCase):
         pair, starts, ends = auxiliary.order_local_tables_with_auxiliaries(
             words, self.lex, base_tables
         )
-
         self.assertGreater(pair[1][2], 0.0)
         self.assertEqual(pair[0][1], 0.0)
         self.assertEqual(starts, (0.1, 0.1, 0.1, 0.1))
@@ -293,7 +245,6 @@ class AuxiliaryGrammarTests(unittest.TestCase):
         score_without_aux = auxiliary.local_grammar_raw_with_auxiliaries(
             ("i", "test", "anagrams"), self.lex, base_tables
         )
-
         self.assertGreater(score_with_aux, 0.0)
         self.assertEqual(score_without_aux, 0.0)
 
@@ -305,7 +256,6 @@ class AuxiliaryGrammarTests(unittest.TestCase):
             rerank.impl.local_grammar_raw,
         )
         rerank._install_auxiliary_scoring()
-
         self.assertEqual(
             first,
             (
@@ -317,9 +267,7 @@ class AuxiliaryGrammarTests(unittest.TestCase):
         self.assertIs(rerank.impl.phrase_structure, rerank.phrase_structure)
         self.assertIs(rerank.impl._order_local_tables, rerank._order_local_tables)
         self.assertIs(rerank.impl.local_grammar_raw, rerank.local_grammar_raw)
-        self.assertIs(
-            rerank.impl._worker_init, rerank._worker_init_with_auxiliary_scoring
-        )
+        self.assertIs(rerank.impl._worker_init, rerank._worker_init_with_auxiliary_scoring)
 
     def test_worker_init_reinstalls_auxiliary_hooks(self) -> None:
         def reset_hooks(*_args) -> None:
