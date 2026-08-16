@@ -68,9 +68,9 @@ if not hasattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES"):
 if not hasattr(impl, "_AUX_BASE_WORKER_INIT"):
     setattr(impl, "_AUX_BASE_WORKER_INIT", impl._worker_init)  # noqa: B010
 
-_BASE_PHRASE_STRUCTURE = getattr(impl, "_AUX_BASE_PHRASE_STRUCTURE")
-_BASE_ORDER_LOCAL_TABLES = getattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES")
-_BASE_WORKER_INIT = getattr(impl, "_AUX_BASE_WORKER_INIT")
+_BASE_PHRASE_STRUCTURE = impl._AUX_BASE_PHRASE_STRUCTURE
+_BASE_ORDER_LOCAL_TABLES = impl._AUX_BASE_ORDER_LOCAL_TABLES
+_BASE_WORKER_INIT = impl._AUX_BASE_WORKER_INIT
 
 # Keep direct references to the implementation functions before this facade
 # shadows their public names with diversity-aware wrappers.
