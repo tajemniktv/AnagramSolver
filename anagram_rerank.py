@@ -60,6 +60,9 @@ _BASE_DEEP_ANALYZE = impl.deep_analyze
 ENGINE_LAYER = "diverse-top-k-order-reranking"
 PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
 DEFAULT_ORDER_CANDIDATES = 56
+# Direct facade callers should see the facade default too; ``main`` may still
+# override this for an explicit --order-candidates value and restores it after.
+setattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)  # noqa: B010
 
 # The legacy implementation still exposes its worker width through a module
 # global. Normal CLI use is one deep-analysis call per process, but serializing
