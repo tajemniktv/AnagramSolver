@@ -38,6 +38,7 @@ class _FakeLexicon:
             "further": core.Features(adj=True, adv=True, recognized=True),
             "run": core.Features(verb=True, verb_base=True, recognized=True),
             "today": core.Features(adv=True, recognized=True),
+            "ever": core.Features(adv=True, recognized=True),
             "united": core.Features(
                 verb=True,
                 verb_past=True,
@@ -50,11 +51,17 @@ class _FakeLexicon:
                 adj=True,
                 recognized=True,
             ),
+            "called": core.Features(
+                verb=True,
+                verb_past=True,
+                recognized=True,
+            ),
             "stand": core.Features(verb=True, verb_base=True, recognized=True),
             "fall": core.Features(verb=True, verb_base=True, recognized=True),
             "standing": core.Features(verb=True, verb_ing=True, recognized=True),
             "falling": core.Features(verb=True, verb_ing=True, recognized=True),
             "old": core.Features(adj=True, recognized=True),
+            "young": core.Features(adj=True, recognized=True),
         }
 
     def features(self, word: str) -> core.Features:
@@ -172,6 +179,21 @@ class ComparativeParallelGrammarTests(unittest.TestCase):
                     comparatives.comparative_span_starting_at(words, 0, self.lex)
                 )
 
+    def test_elliptical_adjective_and_adverb_complements_remain_supported(self) -> None:
+        for complement in ("old", "today", "ever"):
+            with self.subTest(complement=complement):
+                self.assertIsNotNone(
+                    comparatives.comparative_span_starting_at(
+                        ("better", "than", complement),
+                        0,
+                        self.lex,
+                    )
+                )
+                self.assertGreater(
+                    grammar.construction_pair_bonus("than", complement, self.lex),
+                    0.0,
+                )
+
     def test_comparative_clause_consumes_complete_tail(self) -> None:
         result = grammar.comparative_clause_structure(
             ("actions", "speak", "louder", "than", "words"),
@@ -243,6 +265,19 @@ class ComparativeParallelGrammarTests(unittest.TestCase):
         self.assertGreater(result.valency, 0.90)
         self.assertGreater(result.norm, 0.95)
 
+    def test_parallel_clause_accepts_adjective_fronted_predicates(self) -> None:
+        result = grammar.parallel_clause_structure(
+            ("old", "we", "stand", "young", "we", "fall"),
+            self.lex,
+        )
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result.kind, "parallel-clause")
+        self.assertEqual(result.coverage, 1.0)
+        self.assertGreater(result.agreement, 0.90)
+        self.assertGreater(result.valency, 0.90)
+        self.assertGreater(result.norm, 0.94)
+
     def test_parallel_clause_rejects_scrambled_topology(self) -> None:
         self.assertIsNone(
             grammar.parallel_clause_structure(
@@ -274,6 +309,10 @@ class ComparativeParallelGrammarTests(unittest.TestCase):
         )
         self.assertEqual(
             grammar.construction_pair_bonus("old", "we", self.lex),
+            0.0,
+        )
+        self.assertEqual(
+            grammar.construction_pair_bonus("called", "we", self.lex),
             0.0,
         )
 
