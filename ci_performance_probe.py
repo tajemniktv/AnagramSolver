@@ -17,7 +17,6 @@ from pathlib import Path
 import anagram_rerank as rerank
 import anagram_rerank_core as core
 
-
 FRAME_WORDS = (
     "chased", "needs", "arrived", "speak", "stand", "fall", "testing",
     "tasting", "reads", "boils", "favors", "helps", "stopped", "runs",
