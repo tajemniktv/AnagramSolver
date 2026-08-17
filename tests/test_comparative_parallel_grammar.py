@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 import anagram_auxiliary_grammar as grammar
+import anagram_comparative_grammar as comparatives
 import anagram_rerank_core as core
 
 
@@ -19,15 +20,19 @@ class _FakeLexicon:
             "nice": core.Features(adj=True, recognized=True),
             "happy": core.Features(adj=True, recognized=True),
             "big": core.Features(adj=True, recognized=True),
-            # False-friend coverage: surface "silver" can be adjectival without
-            # making it a regular comparative, while "work" is verb-only even
-            # though "worker" superficially looks like an -er comparative.
+            # True negatives: a surface adjective with no recovered adj/adv base,
+            # and an -er form whose apparent base is verb-only.
             "silver": core.Features(adj=True, recognized=True),
             "work": core.Features(verb=True, verb_base=True, recognized=True),
-            # A homonymous inflected surface may be indexed under another POS
-            # while still having a valid comparative reading: closer -> close.
+            # Homographic surfaces. Each has a legitimate regular comparative
+            # analysis, but the surface is independently indexed under another
+            # POS, so local evidence must stay weak rather than binary.
             "closer": core.Features(noun=True, recognized=True),
             "close": core.Features(adj=True, adv=True, verb=True, recognized=True),
+            "number": core.Features(noun=True, recognized=True),
+            "numb": core.Features(adj=True, recognized=True),
+            "buffer": core.Features(noun=True, verb=True, recognized=True),
+            "buff": core.Features(adj=True, noun=True, verb=True, recognized=True),
             "elder": core.Features(adj=True, recognized=True),
             "farther": core.Features(adj=True, adv=True, recognized=True),
             "further": core.Features(adj=True, adv=True, recognized=True),
@@ -94,47 +99,77 @@ class ComparativeParallelGrammarTests(unittest.TestCase):
     def setUp(self) -> None:
         self.lex = _FakeLexicon()
 
-    def test_regular_comparative_morphology_recovers_lexical_bases(self) -> None:
-        for comparative in ("louder", "nicer", "happier", "bigger"):
-            with self.subTest(comparative=comparative):
-                self.assertTrue(grammar._comparative_like(comparative, self.lex))
-        self.assertFalse(grammar._comparative_like("silver", self.lex))
-        self.assertEqual(
-            grammar.construction_pair_bonus("silver", "than", self.lex),
-            0.0,
-        )
+    def test_regular_comparative_evidence_recovers_lexical_bases(self) -> None:
+        for word, base in (
+            ("louder", "loud"),
+            ("nicer", "nice"),
+            ("happier", "happy"),
+            ("bigger", "big"),
+        ):
+            with self.subTest(word=word):
+                evidence = comparatives.comparative_evidence(word, self.lex)
+                self.assertTrue(evidence.present)
+                self.assertEqual(evidence.base, base)
+                self.assertGreaterEqual(evidence.confidence, 0.85)
 
-    def test_short_er_and_non_adjectival_bases_are_not_comparatives(self) -> None:
-        for comparative in ("her", "far"):
-            with self.subTest(comparative=comparative):
-                self.assertFalse(grammar._comparative_like(comparative, self.lex))
-        self.assertFalse(grammar._comparative_like("worker", self.lex))
+    def test_false_er_friends_have_no_comparative_evidence(self) -> None:
+        for word in ("silver", "worker", "her", "far"):
+            with self.subTest(word=word):
+                evidence = comparatives.comparative_evidence(word, self.lex)
+                self.assertFalse(evidence.present)
+                self.assertEqual(
+                    grammar.construction_pair_bonus(word, "than", self.lex),
+                    0.0,
+                )
 
-    def test_recognized_non_adjective_surface_can_recover_comparative_base(self) -> None:
-        self.assertTrue(grammar._comparative_like("closer", self.lex))
-        self.assertGreater(
-            grammar.construction_pair_bonus("closer", "than", self.lex),
-            1.0,
-        )
+    def test_homographic_er_surfaces_keep_weak_comparative_evidence(self) -> None:
+        strong_bonus = grammar.construction_pair_bonus("louder", "than", self.lex)
+        for word, base in (
+            ("closer", "close"),
+            ("number", "numb"),
+            ("buffer", "buff"),
+        ):
+            with self.subTest(word=word):
+                evidence = comparatives.comparative_evidence(word, self.lex)
+                self.assertTrue(evidence.present)
+                self.assertEqual(evidence.base, base)
+                self.assertEqual(evidence.source, "regular-ambiguous")
+                self.assertLess(evidence.confidence, 0.50)
+                local_bonus = grammar.construction_pair_bonus(word, "than", self.lex)
+                self.assertGreater(local_bonus, 0.0)
+                self.assertLess(local_bonus, 1.0)
+                self.assertLess(local_bonus, strong_bonus)
 
-    def test_curated_irregular_er_comparatives_remain_recognized(self) -> None:
-        for comparative in ("elder", "farther", "further"):
-            with self.subTest(comparative=comparative):
-                self.assertTrue(grammar._comparative_like(comparative, self.lex))
+    def test_curated_irregular_er_comparatives_remain_strong(self) -> None:
+        for word in ("elder", "farther", "further"):
+            with self.subTest(word=word):
+                evidence = comparatives.comparative_evidence(word, self.lex)
+                self.assertTrue(evidence.present)
+                self.assertGreater(evidence.confidence, 0.90)
                 self.assertGreater(
-                    grammar.construction_pair_bonus(comparative, "than", self.lex),
+                    grammar.construction_pair_bonus(word, "than", self.lex),
                     1.0,
                 )
 
-    def test_shared_comparative_span_cases_stay_in_parity_with_core(self) -> None:
+    def test_complete_span_can_contextualize_ambiguous_comparative(self) -> None:
+        result = comparatives.comparative_span_starting_at(
+            ("closer", "than", "words"),
+            0,
+            self.lex,
+        )
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result[0], 2)
+        self.assertGreater(result[1], 0.85)
+
+    def test_lexical_comparative_spans_remain_supported(self) -> None:
         for words in (
             ("better", "than", "words"),
             ("more", "words", "than", "actions"),
         ):
             with self.subTest(words=words):
-                self.assertEqual(
-                    grammar._comparative_span_starting_at(words, 0, self.lex),
-                    core._comparative_span_starting_at(words, 0, self.lex),
+                self.assertIsNotNone(
+                    comparatives.comparative_span_starting_at(words, 0, self.lex)
                 )
 
     def test_comparative_clause_consumes_complete_tail(self) -> None:
