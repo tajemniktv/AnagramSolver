@@ -7,6 +7,7 @@ legacy parser's behavior or prepared-cache format.
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -54,16 +55,35 @@ class FastWordNetLexicon(core.WordNetLexicon):
 
 @dataclass(slots=True)
 class FastPhraseIndex(core.PhraseIndex):
-    """Read-through cache for immutable phrase-index counts, including misses."""
+    """Bounded read-through cache for immutable phrase-index counts and misses."""
 
-    _count_cache: dict[str, int] = field(default_factory=dict)
+    _count_cache: OrderedDict[str, int] = field(default_factory=OrderedDict)
+    _count_cache_limit: int = field(default=32768, repr=False)
+
+    def _remember_count(self, phrase: str, count: int) -> None:
+        if self._count_cache_limit <= 0:
+            return
+        self._count_cache[phrase] = count
+        self._count_cache.move_to_end(phrase)
+        while len(self._count_cache) > self._count_cache_limit:
+            self._count_cache.popitem(last=False)
 
     def counts(self, phrases: Sequence[str]) -> dict[str, int]:
         unique = tuple(dict.fromkeys(phrase for phrase in phrases if phrase))
         if not unique:
             return {}
 
-        missing = tuple(phrase for phrase in unique if phrase not in self._count_cache)
+        out: dict[str, int] = {}
+        missing: list[str] = []
+        for phrase in unique:
+            if phrase in self._count_cache:
+                count = self._count_cache[phrase]
+                self._count_cache.move_to_end(phrase)
+                if count > 0:
+                    out[phrase] = count
+            else:
+                missing.append(phrase)
+
         for i in range(0, len(missing), 200):
             batch = missing[i : i + 200]
             placeholders = ",".join("?" for _ in batch)
@@ -75,13 +95,12 @@ class FastPhraseIndex(core.PhraseIndex):
                 )
             }
             for phrase in batch:
-                self._count_cache[phrase] = found.get(phrase, 0)
+                count = found.get(phrase, 0)
+                if count > 0:
+                    out[phrase] = count
+                self._remember_count(phrase, count)
 
-        return {
-            phrase: count
-            for phrase in unique
-            if (count := self._count_cache[phrase]) > 0
-        }
+        return out
 
 
 def install_performance_hooks() -> None:
