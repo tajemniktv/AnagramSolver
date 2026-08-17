@@ -142,8 +142,10 @@ def performance_hooks() -> Iterator[None]:
 
     The depth counter keeps adapters active across nested or overlapping facade
     calls without holding the lock while user work executes. Importing the
-    reranker therefore remains side-effect free, while active facade operations
-    still share the optimized core functions they depend on.
+    reranker therefore remains side-effect free. During an active facade call,
+    unrelated same-process core consumers may temporarily observe the fast
+    semantics-equivalent bindings; the last overlapping facade context restores
+    the exact bindings that were present before the first one entered.
     """
     global _HOOK_DEPTH, _HOOK_RESTORE
 
