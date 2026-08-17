@@ -13,6 +13,8 @@ from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import lru_cache
+from pathlib import Path
+from typing import cast
 
 import anagram_rerank_core as core
 
@@ -51,6 +53,12 @@ class FastWordNetLexicon(core.WordNetLexicon):
         default_factory=OrderedDict
     )
     _frames_cache_limit: int = field(default=4096, repr=False)
+
+    @classmethod
+    def load(cls, dictionary_dir: Path) -> FastWordNetLexicon:
+        # The core classmethod constructs ``cls`` already; narrow its historical
+        # base-class return annotation for callers of the optimized subclass.
+        return cast(FastWordNetLexicon, super().load(dictionary_dir))
 
     def frames_for(self, raw_word: str) -> frozenset[int]:
         word = fast_norm_token(raw_word)
