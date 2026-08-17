@@ -23,12 +23,17 @@ def _phrase_connection() -> sqlite3.Connection:
             ("actions speak louder", 3, 30),
             ("speak louder than", 3, 25),
             ("louder than words", 3, 35),
+            ("zero gram", 2, 0),
+            ("negative gram", 2, -3),
         ),
     )
     return connection
 
 
 class PerformanceHotPathTests(unittest.TestCase):
+    def tearDown(self) -> None:
+        perf.clear_performance_caches()
+
     def test_fast_norm_token_preserves_core_behavior(self) -> None:
         for text in (
             "hello",
@@ -75,6 +80,24 @@ class PerformanceHotPathTests(unittest.TestCase):
             },
         )
 
+    def test_fast_wordnet_frame_cache_is_bounded_lru(self) -> None:
+        lex = perf.FastWordNetLexicon(
+            nouns=set(),
+            verbs={"run", "walk", "jump"},
+            adjs=set(),
+            advs=set(),
+            noun_exc={},
+            verb_exc={},
+            verb_frames={"run": frozenset({1})},
+            _frames_cache_limit=2,
+        )
+        lex.frames_for("run")
+        lex.frames_for("walk")
+        lex.frames_for("run")
+        lex.frames_for("jump")
+        self.assertEqual(tuple(lex._frames_cache), ("run", "jump"))
+        self.assertLessEqual(len(lex._frames_cache), lex._frames_cache_limit)
+
     def test_fast_phrase_index_matches_original_and_reuses_counts(self) -> None:
         baseline_connection = _phrase_connection()
         fast_connection = _phrase_connection()
@@ -106,6 +129,24 @@ class PerformanceHotPathTests(unittest.TestCase):
             baseline_connection.close()
             fast_connection.close()
 
+    def test_fast_phrase_index_preserves_nonpositive_rows_and_misses(self) -> None:
+        baseline_connection = _phrase_connection()
+        fast_connection = _phrase_connection()
+        try:
+            baseline = perf._ORIGINAL_PHRASE_INDEX(baseline_connection, 5)
+            fast = perf.FastPhraseIndex(fast_connection, 5)
+            phrases = ("zero gram", "negative gram", "missing gram")
+            expected = baseline.counts(phrases)
+            actual = fast.counts(phrases)
+
+            self.assertEqual(actual, expected)
+            self.assertEqual(actual, {"zero gram": 0, "negative gram": -3})
+            self.assertIsNone(fast._count_cache["missing gram"])
+            self.assertEqual(fast.counts(phrases), expected)
+        finally:
+            baseline_connection.close()
+            fast_connection.close()
+
     def test_fast_phrase_index_count_cache_is_bounded(self) -> None:
         connection = _phrase_connection()
         try:
@@ -129,24 +170,32 @@ class PerformanceHotPathTests(unittest.TestCase):
         finally:
             connection.close()
 
-    def test_install_installs_fast_adapters(self) -> None:
-        perf.install_performance_hooks()
-        self.assertIs(core.norm_token, perf.fast_norm_token)
-        self.assertIs(core.function_class, perf.cached_function_class)
-        self.assertIs(core.WordNetLexicon, perf.FastWordNetLexicon)
-        self.assertIs(core.PhraseIndex, perf.FastPhraseIndex)
+    def test_performance_hooks_install_nest_and_restore(self) -> None:
+        before = (
+            core.norm_token,
+            core.function_class,
+            core.WordNetLexicon,
+            core.PhraseIndex,
+        )
 
-    def test_install_is_idempotent(self) -> None:
-        perf.install_performance_hooks()
-        first_class = core.WordNetLexicon
-        first_phrase_index = core.PhraseIndex
-        first_norm = core.norm_token
-        first_function_class = core.function_class
-        perf.install_performance_hooks()
-        self.assertIs(core.WordNetLexicon, first_class)
-        self.assertIs(core.PhraseIndex, first_phrase_index)
-        self.assertIs(core.norm_token, first_norm)
-        self.assertIs(core.function_class, first_function_class)
+        with perf.performance_hooks():
+            self.assertIs(core.norm_token, perf.fast_norm_token)
+            self.assertIs(core.function_class, perf.cached_function_class)
+            self.assertIs(core.WordNetLexicon, perf.FastWordNetLexicon)
+            self.assertIs(core.PhraseIndex, perf.FastPhraseIndex)
+            with perf.performance_hooks():
+                self.assertIs(core.norm_token, perf.fast_norm_token)
+                self.assertIs(core.WordNetLexicon, perf.FastWordNetLexicon)
+
+        self.assertEqual(
+            (
+                core.norm_token,
+                core.function_class,
+                core.WordNetLexicon,
+                core.PhraseIndex,
+            ),
+            before,
+        )
 
 
 if __name__ == "__main__":
