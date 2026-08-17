@@ -5,7 +5,8 @@ structure parser deliberately handled only in a few special cases. It stays
 symbolic and deterministic: morphology comes from WordNet, valency comes from
 the existing frame parser, and no language model or learned score is involved.
 It also wires the narrow clause-validity layer used to reject obvious POS-
-ambiguity failures before they can dominate final ranking.
+ambiguity failures before they can dominate final ranking, plus a few compact
+high-confidence clause constructions that need non-local structure evidence.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import anagram_clause_validity as validity
+import anagram_comparative_grammar as comparatives
 import anagram_rerank_core as core
 
 
@@ -34,6 +36,10 @@ BaseTablesFn = Callable[
 _FINITE_BE = frozenset(
     {"am", "is", "are", "was", "were", "isnt", "arent", "wasnt", "werent"}
 )
+_PRONOUN_CLASSES = frozenset({"PRON", "PRON_12", "PRON_PL", "PRON_SG3"})
+_COMPARATIVE_THAN_PAIR_BONUS = 1.90
+_THAN_COMPLEMENT_PAIR_BONUS = 0.65
+_PARTICIPIAL_SUBJECT_PAIR_BONUS = 0.85
 
 
 @dataclass(slots=True, frozen=True)
@@ -382,22 +388,191 @@ def auxiliary_structure(
     return max(candidates, key=lambda result: (result.norm, result.coverage, result.valency))
 
 
+def comparative_clause_structure(
+    words: Sequence[str],
+    lex: core.WordNetLexicon,
+) -> core.StructureResult | None:
+    """Recognize a finite clause whose complete tail is a comparative phrase."""
+    words = tuple(words)
+    n = len(words)
+    if n < 4:
+        return None
+
+    candidates: list[core.StructureResult] = []
+    for verb_idx in range(1, n - 2):
+        verb = words[verb_idx]
+        if not validity.lexical_finite_form(verb, lex):
+            continue
+
+        subject_span = core._np_span_ending_at(words, verb_idx - 1, lex)
+        if subject_span is None:
+            continue
+        subj_start, subj_coh = subject_span
+        subject_head_idx = verb_idx - 1
+
+        comparative = comparatives.comparative_span_starting_at(
+            words, verb_idx + 1, lex
+        )
+        if comparative is None or comparative[0] != n - 1:
+            continue
+        _comp_end, comparative_quality = comparative
+
+        number = core._subject_number_from_span(
+            words, subj_start, subject_head_idx, lex
+        )
+        agreement = core._subject_agreement(
+            words[subject_head_idx],
+            verb,
+            lex,
+            auxiliary=False,
+            number_override=number,
+        )
+        if agreement <= 0.15:
+            continue
+
+        tail_length = n - verb_idx - 1
+        tail_consumed = tail_length
+        valency = 0.88 * comparative_quality
+
+        consumed = (verb_idx - subj_start) + 1 + tail_consumed
+        coverage = min(1.0, consumed / n)
+        if subj_start > 0:
+            coverage *= 0.90
+
+        norm = (
+            0.22
+            + 0.14 * subj_coh
+            + 0.20 * agreement
+            + 0.18 * valency
+            + 0.16 * comparative_quality
+            + 0.10 * coverage
+        )
+        norm *= 0.55 + 0.45 * (coverage**1.25)
+        norm = max(0.0, min(0.98, norm))
+        candidates.append(
+            core.StructureResult(
+                norm,
+                valency,
+                coverage,
+                agreement,
+                "comparative-clause",
+                4.0 * norm,
+            )
+        )
+
+    if not candidates:
+        return None
+    return max(candidates, key=lambda result: (result.norm, result.coverage, result.valency))
+
+
+def _fronted_predicate_quality(word: str, lex: core.WordNetLexicon) -> float:
+    """Score a compact fronted participial/adjectival clause modifier."""
+    if core.function_class(word) is not None:
+        return 0.0
+    features = lex.features(word)
+    if features.verb_past:
+        return 0.98
+    if features.adj and not features.noun:
+        return 0.82
+    return 0.0
+
+
+def _parallel_half_quality(
+    modifier: str,
+    subject: str,
+    verb: str,
+    lex: core.WordNetLexicon,
+) -> tuple[float, float, float] | None:
+    """Return modifier/agreement/valency for ``modifier subject verb``."""
+    modifier_quality = _fronted_predicate_quality(modifier, lex)
+    if modifier_quality <= 0.0:
+        return None
+    if core.function_class(subject) not in _PRONOUN_CLASSES:
+        return None
+    if not validity.lexical_finite_form(verb, lex):
+        return None
+
+    number = core._subject_number(subject, lex)
+    agreement = core._subject_agreement(
+        subject,
+        verb,
+        lex,
+        auxiliary=False,
+        number_override=number,
+    )
+    if agreement <= 0.15:
+        return None
+
+    intransitive = lex.allows_intransitive(verb)
+    if intransitive is True:
+        valency = 0.98
+    elif intransitive is False:
+        valency = 0.35
+    else:
+        valency = 0.65
+    return modifier_quality, agreement, valency
+
+
+def parallel_clause_structure(
+    words: Sequence[str],
+    lex: core.WordNetLexicon,
+) -> core.StructureResult | None:
+    """Recognize balanced ``modifier S V / modifier S V`` parallel clauses.
+
+    The first slice is deliberately strict: exactly two three-token halves with
+    the same pronominal subject. This captures constructions such as
+    ``united we stand, divided we fall`` without giving generic six-word text a
+    free symmetry bonus merely because it can be split in half.
+    """
+    words = tuple(words)
+    if len(words) != 6 or words[1] != words[4]:
+        return None
+
+    left = _parallel_half_quality(words[0], words[1], words[2], lex)
+    right = _parallel_half_quality(words[3], words[4], words[5], lex)
+    if left is None or right is None:
+        return None
+
+    modifier_quality = 0.5 * (left[0] + right[0])
+    agreement = 0.5 * (left[1] + right[1])
+    valency = 0.5 * (left[2] + right[2])
+    norm = (
+        0.32
+        + 0.20 * modifier_quality
+        + 0.20 * agreement
+        + 0.16 * valency
+        + 0.12
+    )
+    norm = max(0.0, min(0.98, norm))
+    return core.StructureResult(
+        norm,
+        valency,
+        1.0,
+        agreement,
+        "parallel-clause",
+        4.0 * norm,
+    )
+
+
 def phrase_structure_with_auxiliaries(
     words: Sequence[str],
     lex: core.WordNetLexicon,
     base_structure: BaseStructureFn,
 ) -> core.StructureResult:
-    """Combine legacy, auxiliary and narrow clause-validity structure evidence."""
+    """Combine legacy, auxiliary, construction and validity structure evidence."""
     words = tuple(words)
     base = validity.adjust_base_clause_structure(words, lex, base_structure(words, lex))
-    auxiliary = auxiliary_structure(words, lex)
-    winner = (
-        base
-        if auxiliary is None
-        else max(
-            (base, auxiliary),
-            key=lambda result: (result.norm, result.coverage, result.valency),
-        )
+    candidates = [base]
+    for candidate in (
+        auxiliary_structure(words, lex),
+        comparative_clause_structure(words, lex),
+        parallel_clause_structure(words, lex),
+    ):
+        if candidate is not None:
+            candidates.append(candidate)
+    winner = max(
+        candidates,
+        key=lambda result: (result.norm, result.coverage, result.valency),
     )
     return validity.apply_surface_structure_penalties(words, lex, winner)
 
@@ -433,6 +608,51 @@ def auxiliary_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
     return _auxiliary_pair_bonus_for_class(core.function_class(left), right, lex)
 
 
+def _construction_pair_bonus_for_classes(
+    left: str,
+    right: str,
+    lex: LexiconLike,
+    left_class: str | None,
+    right_class: str | None,
+) -> float:
+    """Return construction evidence using precomputed function-word classes."""
+    score = 0.0
+
+    if right == "than":
+        evidence = comparatives.comparative_evidence(left, lex)
+        score += _COMPARATIVE_THAN_PAIR_BONUS * evidence.confidence
+
+    if left == "than":
+        right_features = lex.features(right)
+        if (
+            right_features.noun
+            or right_features.adj
+            or right_features.adv
+            or right_class in _PRONOUN_CLASSES
+            or right_class in {"NEG", "NUM_DET"}
+            or core._det_class(right) is not None
+        ):
+            score += _THAN_COMPLEMENT_PAIR_BONUS
+
+    if left_class is None and right_class in _PRONOUN_CLASSES:
+        left_features = lex.features(left)
+        if left_features.verb_past and left_features.adj:
+            score += _PARTICIPIAL_SUBJECT_PAIR_BONUS
+
+    return score
+
+
+def construction_pair_bonus(left: str, right: str, lex: LexiconLike) -> float:
+    """Return local evidence for comparative and fronted-participial edges."""
+    return _construction_pair_bonus_for_classes(
+        left,
+        right,
+        lex,
+        core.function_class(left),
+        core.function_class(right),
+    )
+
+
 def order_local_tables_with_auxiliaries(
     words: tuple[str, ...],
     lex: core.WordNetLexicon,
@@ -440,12 +660,20 @@ def order_local_tables_with_auxiliaries(
 ) -> tuple[tuple[tuple[float, ...], ...], tuple[float, ...], tuple[float, ...]]:
     pair, starts, ends = base_tables(words, lex)
     rows = [list(row) for row in pair]
+    classes = tuple(core.function_class(word) for word in words)
     for i, left in enumerate(words):
-        left_class = core.function_class(left)
+        left_class = classes[i]
         for j, right in enumerate(words):
             if i == j:
                 continue
             rows[i][j] += validity.pair_validity_adjustment(left, right, lex)
+            rows[i][j] += _construction_pair_bonus_for_classes(
+                left,
+                right,
+                lex,
+                left_class,
+                classes[j],
+            )
             if left_class in {"BE_AUX", "HAVE_AUX"}:
                 rows[i][j] += _auxiliary_pair_bonus_for_class(left_class, right, lex)
     return tuple(tuple(row) for row in rows), starts, ends
@@ -463,10 +691,18 @@ def local_grammar_raw_with_auxiliaries(
     pair, starts, ends = base_tables(words, lex)
     if len(words) == 1:
         return starts[0] + ends[0]
+    classes = tuple(core.function_class(word) for word in words)
     total = starts[0] + ends[-1]
     total += sum(
         pair[i][i + 1]
-        + auxiliary_pair_bonus(words[i], words[i + 1], lex)
+        + _auxiliary_pair_bonus_for_class(classes[i], words[i + 1], lex)
+        + _construction_pair_bonus_for_classes(
+            words[i],
+            words[i + 1],
+            lex,
+            classes[i],
+            classes[i + 1],
+        )
         + validity.pair_validity_adjustment(words[i], words[i + 1], lex)
         for i in range(len(words) - 1)
     )
