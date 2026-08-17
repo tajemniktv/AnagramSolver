@@ -13,7 +13,6 @@ import json
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypeAlias
 
 import anagram_rerank as rerank
 import anagram_rerank_core as core
@@ -38,10 +37,8 @@ ORDER_BAGS = (
     ("a", "quiet", "room", "helps", "focus"),
 )
 
-Canonical: TypeAlias = object
 
-
-def _digest(value: Canonical) -> str:
+def _digest(value: object) -> str:
     payload = json.dumps(
         value,
         sort_keys=True,
@@ -54,7 +51,7 @@ def _digest(value: Canonical) -> str:
 
 def _measure(
     label: str,
-    workload: Callable[[], Canonical],
+    workload: Callable[[], object],
     *,
     samples: int = 3,
 ) -> tuple[float, str]:
@@ -105,7 +102,7 @@ def _deep_work(
     *,
     workers: int,
     batch_size: int,
-) -> tuple[float, Canonical]:
+) -> tuple[float, object]:
     rows = [
         _probe_row(ORDER_BAGS[i % len(ORDER_BAGS)], i + 1)
         for i in range(384)
@@ -154,7 +151,7 @@ def main() -> int:
     for word in set(FRAME_WORDS) | set(FUNCTION_WORDS):
         lex.features(word)
 
-    def frame_work() -> Canonical:
+    def frame_work() -> object:
         observed: list[tuple[str, tuple[int, ...]]] = []
         for _ in range(2_000):
             observed = [
@@ -163,7 +160,7 @@ def main() -> int:
             ]
         return observed
 
-    def function_work() -> Canonical:
+    def function_work() -> object:
         observed: list[tuple[str, str | None]] = []
         for _ in range(25_000):
             observed = [
@@ -172,7 +169,7 @@ def main() -> int:
             ]
         return observed
 
-    def ordering_work() -> Canonical:
+    def ordering_work() -> object:
         observed: list[dict[str, object]] = []
         for _ in range(3):
             for words in ORDER_BAGS:
