@@ -3,7 +3,7 @@ name: performance probe
 on:
   pull_request:
     paths:
-      - "*.py"
+      - "**/*.py"
       - ".github/workflows/performance-probe.yml"
 
 permissions:
