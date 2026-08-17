@@ -626,13 +626,17 @@ def _construction_pair_bonus_for_classes(
         right_features = lex.features(right)
         if (
             right_features.noun
+            or right_features.adj
+            or right_features.adv
             or right_class in _PRONOUN_CLASSES
+            or right_class in {"NEG", "NUM_DET"}
             or core._det_class(right) is not None
         ):
             score += _THAN_COMPLEMENT_PAIR_BONUS
 
     if left_class is None and right_class in _PRONOUN_CLASSES:
-        if lex.features(left).verb_past:
+        left_features = lex.features(left)
+        if left_features.verb_past and left_features.adj:
             score += _PARTICIPIAL_SUBJECT_PAIR_BONUS
 
     return score
