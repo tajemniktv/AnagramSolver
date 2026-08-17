@@ -13,9 +13,9 @@ construction can use the surrounding syntax to disambiguate the same form.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal, Protocol
-from collections.abc import Sequence
 
 import anagram_rerank_core as core
 
