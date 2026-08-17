@@ -15,6 +15,7 @@ import anagram_rerank_core as core
 
 _ORIGINAL_NORM_TOKEN = core.norm_token
 _ORIGINAL_FUNCTION_CLASS = core.function_class
+_ORIGINAL_PHRASE_INDEX = core.PhraseIndex
 _INSTALLED = False
 
 
