@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 import sqlite3
 import unittest
 
@@ -194,6 +195,24 @@ class PerformanceHotPathTests(unittest.TestCase):
                 core.WordNetLexicon,
                 core.PhraseIndex,
             ),
+            before,
+        )
+
+    def test_reranker_import_and_reload_preserve_core_bindings(self) -> None:
+        before = (
+            core.norm_token,
+            core.function_class,
+            core.WordNetLexicon,
+            core.PhraseIndex,
+        )
+        rerank = importlib.import_module("anagram_rerank")
+        self.assertEqual(
+            (core.norm_token, core.function_class, core.WordNetLexicon, core.PhraseIndex),
+            before,
+        )
+        importlib.reload(rerank)
+        self.assertEqual(
+            (core.norm_token, core.function_class, core.WordNetLexicon, core.PhraseIndex),
             before,
         )
 
