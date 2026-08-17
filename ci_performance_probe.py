@@ -14,6 +14,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+import anagram_performance as perf
 import anagram_rerank as rerank
 import anagram_rerank_core as core
 
@@ -97,11 +98,15 @@ def _probe_row(words: tuple[str, ...], rank: int) -> core.Row:
 
 def _deep_work(
     wn_dir: Path,
-    lex: core.WordNetLexicon,
     *,
     workers: int,
     batch_size: int,
 ) -> tuple[float, object]:
+    # Give every backend/configuration the same cold per-lexicon and memoized
+    # helper state. Lexicon file loading stays outside the timer; process startup
+    # and worker-local loading remain real backend costs once timing begins.
+    perf.clear_performance_caches()
+    lex = rerank.WordNetLexicon.load(wn_dir)
     rows = [
         _probe_row(ORDER_BAGS[i % len(ORDER_BAGS)], i + 1)
         for i in range(384)
@@ -143,7 +148,7 @@ def _deep_work(
 
 def main() -> int:
     wn_dir = core.ensure_wordnet(core.DEFAULT_WORDNET_DIR)
-    lex = core.WordNetLexicon.load(wn_dir)
+    lex = rerank.WordNetLexicon.load(wn_dir)
 
     # Warm ordinary feature lookup so the frame probe isolates repeated verb
     # lemma/frame derivation rather than first-use POS feature construction.
@@ -163,7 +168,7 @@ def main() -> int:
         observed: list[tuple[str, str | None]] = []
         for _ in range(25_000):
             observed = [
-                (word, core.function_class(word))
+                (word, perf.cached_function_class(word))
                 for word in FUNCTION_WORDS
             ]
         return observed
@@ -210,7 +215,7 @@ def main() -> int:
     # machine matrix justifies changing it.
     deep_digests: dict[str, str] = {}
     serial_seconds, serial_output = _deep_work(
-        wn_dir, lex, workers=1, batch_size=32
+        wn_dir, workers=1, batch_size=32
     )
     deep_digests["serial"] = _digest(serial_output)
     print(
@@ -219,7 +224,7 @@ def main() -> int:
     )
     for batch_size in (8, 32, 96):
         seconds, output = _deep_work(
-            wn_dir, lex, workers=2, batch_size=batch_size
+            wn_dir, workers=2, batch_size=batch_size
         )
         digest = _digest(output)
         deep_digests[f"p2-b{batch_size}"] = digest
