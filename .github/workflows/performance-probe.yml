@@ -1,0 +1,33 @@
+name: performance probe
+
+on:
+  pull_request:
+    paths:
+      - "*.py"
+      - ".github/workflows/performance-probe.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hot-path-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .anagram_data/wordnet31
+          key: wordnet31-${{ runner.os }}
+      - name: Provision WordNet
+        run: python -c "import anagram_rerank_core as c; print(c.ensure_wordnet(c.DEFAULT_WORDNET_DIR))"
+      - name: Run repeatable hot-path probe
+        run: python ci_performance_probe.py
