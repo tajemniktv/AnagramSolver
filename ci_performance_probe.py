@@ -14,8 +14,8 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-import anagram_rerank as rerank
 import anagram_rerank_core as core
+import anagram_rerank as rerank
 
 
 FRAME_WORDS = (
