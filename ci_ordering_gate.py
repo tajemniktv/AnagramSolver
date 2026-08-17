@@ -4,10 +4,13 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable, Sequence
+from typing import cast
 
 import anagram_benchmark as benchmark
 import anagram_clause_validity as validity
 import anagram_rerank as rerank
+import anagram_rerank_core as core
 
 MIN_RECALL_1 = 0.35
 MIN_RECALL_10 = 0.79
@@ -27,12 +30,23 @@ _TARGET_MAX_RANKS = {
     "united_stand": 4,
 }
 
+_GrammarFn = Callable[[Sequence[str], core.WordNetLexicon], float]
+_StructureFn = Callable[
+    [Sequence[str], core.WordNetLexicon], core.StructureResult
+]
+
 
 def main() -> int:
     cases = benchmark.load_cases(benchmark.DEFAULT_CASES, set())
     wn_dir = rerank.ensure_wordnet(rerank.DEFAULT_WORDNET_DIR)
     print(f"Loading WordNet from {wn_dir} ...")
     lex = rerank.WordNetLexicon.load(wn_dir)
+
+    # The facade annotations expose the optimized subclass, but both callbacks
+    # implement the base WordNetLexicon protocol used by the shared objective.
+    # Widen only the static callable view here; no runtime conversion occurs.
+    local_grammar_raw = cast(_GrammarFn, rerank.local_grammar_raw)
+    phrase_structure = cast(_StructureFn, rerank.phrase_structure)
 
     t0 = time.perf_counter()
     results = [benchmark.run_order_case(rerank, lex, case) for case in cases]
@@ -56,16 +70,16 @@ def main() -> int:
     intended_objective = validity.grammar_structure_objective(
         _CROSS_BAG_INTENDED,
         lex,
-        rerank.local_grammar_raw,
-        rerank.phrase_structure,
+        local_grammar_raw,
+        phrase_structure,
     )
     malformed_objectives = [
         (
             validity.grammar_structure_objective(
                 words,
                 lex,
-                rerank.local_grammar_raw,
-                rerank.phrase_structure,
+                local_grammar_raw,
+                phrase_structure,
             ),
             words,
         )
