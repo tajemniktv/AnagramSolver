@@ -65,14 +65,11 @@ def _comparative_like(word: str, lex: LexiconLike) -> bool:
     if not word.endswith("er"):
         return False
 
-    # Unknown inflected surfaces may legitimately need base recovery (the real
-    # WordNet gap for ``louder``). A token already recognized only as a noun or
-    # verb, however, must not borrow unrelated adjective/adverb evidence from a
-    # coincidental base candidate.
-    surface = lex.features(word)
-    if surface.recognized and not (surface.adj or surface.adv):
-        return False
-
+    # Surface POS is not decisive here: an inflected spelling can have a
+    # homonymous noun/verb entry while still being a valid comparative (for
+    # example, ``closer`` -> ``close``). Require adjective/adverb evidence on a
+    # recovered base instead. False friends such as ``silver`` and ``worker``
+    # still fail because none of their regular base candidates has that evidence.
     return any(
         lex.features(base).adj or lex.features(base).adv
         for base in _comparative_base_candidates(word)
