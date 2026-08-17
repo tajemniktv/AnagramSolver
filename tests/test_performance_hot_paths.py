@@ -30,8 +30,19 @@ def _phrase_connection() -> sqlite3.Connection:
 
 class PerformanceHotPathTests(unittest.TestCase):
     def test_fast_norm_token_preserves_core_behavior(self) -> None:
-        for text in ("hello", "HELLO", "café", "don't", "", "two words"):
-            with self.subTest(text=text):
+        for text in (
+            "hello",
+            "HELLO",
+            "café",
+            "don't",
+            "",
+            "two words",
+            "hello123",
+            "snake_case",
+            "!!!",
+            "a" * 10_000,
+        ):
+            with self.subTest(text=text[:80]):
                 self.assertEqual(perf.fast_norm_token(text), perf._ORIGINAL_NORM_TOKEN(text))
 
     def test_cached_function_class_matches_original(self) -> None:
@@ -45,7 +56,7 @@ class PerformanceHotPathTests(unittest.TestCase):
     def test_fast_wordnet_frames_are_cached_per_surface_form(self) -> None:
         lex = perf.FastWordNetLexicon(
             nouns=set(),
-            verbs={"run"},
+            verbs={"run", "walk"},
             adjs=set(),
             advs=set(),
             noun_exc={},
@@ -54,7 +65,15 @@ class PerformanceHotPathTests(unittest.TestCase):
         )
         self.assertEqual(lex.frames_for("run"), frozenset({1, 8}))
         self.assertEqual(lex.frames_for("RUN"), frozenset({1, 8}))
-        self.assertEqual(lex._frames_cache, {"run": frozenset({1, 8})})
+        self.assertEqual(lex.frames_for("walk"), frozenset())
+        self.assertEqual(lex.frames_for("WALK"), frozenset())
+        self.assertEqual(
+            lex._frames_cache,
+            {
+                "run": frozenset({1, 8}),
+                "walk": frozenset(),
+            },
+        )
 
     def test_fast_phrase_index_matches_original_and_reuses_counts(self) -> None:
         baseline_connection = _phrase_connection()
@@ -86,6 +105,36 @@ class PerformanceHotPathTests(unittest.TestCase):
         finally:
             baseline_connection.close()
             fast_connection.close()
+
+    def test_fast_phrase_index_count_cache_is_bounded(self) -> None:
+        connection = _phrase_connection()
+        try:
+            fast = perf.FastPhraseIndex(connection, 5, _count_cache_limit=3)
+            self.assertEqual(
+                fast.counts(("missing one", "missing two", "missing three", "missing four")),
+                {},
+            )
+            self.assertEqual(
+                tuple(fast._count_cache),
+                ("missing two", "missing three", "missing four"),
+            )
+
+            self.assertEqual(fast.counts(("missing two",)), {})
+            fast.counts(("missing five",))
+            self.assertEqual(
+                tuple(fast._count_cache),
+                ("missing four", "missing two", "missing five"),
+            )
+            self.assertLessEqual(len(fast._count_cache), fast._count_cache_limit)
+        finally:
+            connection.close()
+
+    def test_install_installs_fast_adapters(self) -> None:
+        perf.install_performance_hooks()
+        self.assertIs(core.norm_token, perf.fast_norm_token)
+        self.assertIs(core.function_class, perf.cached_function_class)
+        self.assertIs(core.WordNetLexicon, perf.FastWordNetLexicon)
+        self.assertIs(core.PhraseIndex, perf.FastPhraseIndex)
 
     def test_install_is_idempotent(self) -> None:
         perf.install_performance_hooks()
