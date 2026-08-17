@@ -2,14 +2,18 @@
 """Small repeatable hot-path probe for ranking-performance changes.
 
 This is deliberately not a hard timing gate: hosted-runner noise is too large for
-that. It prints stable workloads and checksums so PRs can compare before/after
-wall time without changing ranking semantics.
+that. It prints stable workloads and output-sensitive digests so PRs can compare
+before/after wall time without silently accepting ranking drift.
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import time
 from collections.abc import Callable
+from pathlib import Path
+from typing import TypeAlias
 
 import anagram_rerank as rerank
 import anagram_rerank_core as core
@@ -34,21 +38,45 @@ ORDER_BAGS = (
     ("a", "quiet", "room", "helps", "focus"),
 )
 
+Canonical: TypeAlias = object
 
-def _measure(label: str, workload: Callable[[], float], *, samples: int = 3) -> tuple[float, float]:
+
+def _digest(value: Canonical) -> str:
+    payload = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("ascii")
+    return hashlib.sha256(payload).hexdigest()[:16]
+
+
+def _measure(
+    label: str,
+    workload: Callable[[], Canonical],
+    *,
+    samples: int = 3,
+) -> tuple[float, str]:
     durations: list[float] = []
-    checksum = 0.0
+    digests: list[str] = []
     for _ in range(samples):
         start = time.perf_counter()
-        checksum = workload()
+        result = workload()
         durations.append(time.perf_counter() - start)
+        digests.append(_digest(result))
+
+    if len(set(digests)) != 1:
+        raise RuntimeError(f"{label} produced inconsistent sample digests: {digests}")
+
     best = min(durations)
     median = sorted(durations)[len(durations) // 2]
+    digest = digests[0]
     print(
         f"PERF {label:<18} best={best:.6f}s median={median:.6f}s "
-        f"checksum={checksum:.6f}"
+        f"digest={digest}"
     )
-    return best, checksum
+    return best, digest
 
 
 def _probe_row(words: tuple[str, ...], rank: int) -> core.Row:
@@ -72,12 +100,12 @@ def _probe_row(words: tuple[str, ...], rank: int) -> core.Row:
 
 
 def _deep_work(
-    wn_dir,
+    wn_dir: Path,
     lex: core.WordNetLexicon,
     *,
     workers: int,
     batch_size: int,
-) -> tuple[float, float]:
+) -> tuple[float, Canonical]:
     rows = [
         _probe_row(ORDER_BAGS[i % len(ORDER_BAGS)], i + 1)
         for i in range(384)
@@ -97,12 +125,24 @@ def _deep_work(
         exact_max_words=5,
     )
     elapsed = time.perf_counter() - start
-    checksum = sum(
-        row.final + row.grammar_raw + row.structure_norm + row.valency_norm
-        for row in rows
-    ) + stats["orders"]
+    canonical = {
+        "orders": int(stats["orders"]),
+        "rows": [
+            {
+                "order": row.best_order,
+                "final": row.final,
+                "grammar_raw": row.grammar_raw,
+                "grammar_norm": row.grammar_norm,
+                "structure": row.structure_norm,
+                "valency": row.valency_norm,
+                "coverage": row.syntax_coverage,
+                "kind": row.phrase_kind,
+            }
+            for row in rows
+        ],
+    }
     rerank._clear_order_side_tables()
-    return elapsed, checksum
+    return elapsed, canonical
 
 
 def main() -> int:
@@ -114,22 +154,26 @@ def main() -> int:
     for word in set(FRAME_WORDS) | set(FUNCTION_WORDS):
         lex.features(word)
 
-    def frame_work() -> float:
-        total = 0
+    def frame_work() -> Canonical:
+        observed: list[tuple[str, tuple[int, ...]]] = []
         for _ in range(2_000):
-            for word in FRAME_WORDS:
-                total += len(lex.frames_for(word))
-        return float(total)
+            observed = [
+                (word, tuple(sorted(lex.frames_for(word))))
+                for word in FRAME_WORDS
+            ]
+        return observed
 
-    def function_work() -> float:
-        total = 0
+    def function_work() -> Canonical:
+        observed: list[tuple[str, str | None]] = []
         for _ in range(25_000):
-            for word in FUNCTION_WORDS:
-                total += len(core.function_class(word) or "")
-        return float(total)
+            observed = [
+                (word, core.function_class(word))
+                for word in FUNCTION_WORDS
+            ]
+        return observed
 
-    def ordering_work() -> float:
-        total = 0.0
+    def ordering_work() -> Canonical:
+        observed: list[dict[str, object]] = []
         for _ in range(3):
             for words in ORDER_BAGS:
                 candidates, evaluated = rerank.rank_orders(
@@ -139,10 +183,26 @@ def main() -> int:
                     exact_max_words=5,
                     top_k=8,
                 )
-                total += evaluated
-                if candidates:
-                    total += candidates[0].objective
-        return total
+                observed.append(
+                    {
+                        "bag": words,
+                        "evaluated": evaluated,
+                        "candidates": [
+                            {
+                                "order": candidate.order,
+                                "grammar_raw": candidate.grammar_raw,
+                                "grammar_norm": candidate.grammar_norm,
+                                "structure": candidate.structure_norm,
+                                "valency": candidate.valency_norm,
+                                "coverage": candidate.syntax_coverage,
+                                "kind": candidate.phrase_kind,
+                                "objective": candidate.objective,
+                            }
+                            for candidate in candidates
+                        ],
+                    }
+                )
+        return observed
 
     _measure("verb-frames", frame_work)
     _measure("function-class", function_work)
@@ -152,21 +212,28 @@ def main() -> int:
     # a batch-overhead probe, not a claim about the best worker count on a user's
     # desktop. Keep the production worker default unchanged unless a broader
     # machine matrix justifies changing it.
-    serial_seconds, serial_checksum = _deep_work(
+    deep_digests: dict[str, str] = {}
+    serial_seconds, serial_output = _deep_work(
         wn_dir, lex, workers=1, batch_size=32
     )
+    deep_digests["serial"] = _digest(serial_output)
     print(
         f"PERF {'deep-serial':<18} best={serial_seconds:.6f}s "
-        f"median={serial_seconds:.6f}s checksum={serial_checksum:.6f}"
+        f"median={serial_seconds:.6f}s digest={deep_digests['serial']}"
     )
     for batch_size in (8, 32, 96):
-        seconds, checksum = _deep_work(
+        seconds, output = _deep_work(
             wn_dir, lex, workers=2, batch_size=batch_size
         )
+        digest = _digest(output)
+        deep_digests[f"p2-b{batch_size}"] = digest
         print(
             f"PERF {f'deep-p2-b{batch_size}':<18} best={seconds:.6f}s "
-            f"median={seconds:.6f}s checksum={checksum:.6f}"
+            f"median={seconds:.6f}s digest={digest}"
         )
+
+    if len(set(deep_digests.values())) != 1:
+        raise RuntimeError(f"deep-analysis configurations disagree: {deep_digests}")
     return 0
 
 
