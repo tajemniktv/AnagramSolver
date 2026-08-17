@@ -17,6 +17,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 import anagram_clause_validity as validity
+import anagram_comparative_grammar as comparatives
 import anagram_rerank_core as core
 
 
@@ -36,101 +37,9 @@ _FINITE_BE = frozenset(
     {"am", "is", "are", "was", "were", "isnt", "arent", "wasnt", "werent"}
 )
 _PRONOUN_CLASSES = frozenset({"PRON", "PRON_12", "PRON_PL", "PRON_SG3"})
-_IRREGULAR_COMPARATIVE_WORDS = frozenset({"elder", "farther", "further"})
 _COMPARATIVE_THAN_PAIR_BONUS = 1.90
 _THAN_COMPLEMENT_PAIR_BONUS = 0.65
 _PARTICIPIAL_SUBJECT_PAIR_BONUS = 0.85
-
-
-def _comparative_base_candidates(word: str) -> tuple[str, ...]:
-    """Return conservative regular bases for a surface ``-er`` comparative."""
-    word = core.norm_token(word)
-    if len(word) <= 3 or not word.endswith("er"):
-        return ()
-
-    stem = word[:-2]
-    candidates = {stem, word[:-1]}
-    if stem.endswith("i") and len(stem) > 1:
-        candidates.add(stem[:-1] + "y")
-    if len(stem) >= 2 and stem[-1] == stem[-2]:
-        candidates.add(stem[:-1])
-    return tuple(sorted(candidate for candidate in candidates if candidate))
-
-
-def _comparative_like(word: str, lex: LexiconLike) -> bool:
-    """Recognize lexical comparatives and regular ``-er`` forms with base evidence."""
-    word = core.norm_token(word)
-    if word in core.COMPARATIVE_WORDS or word in _IRREGULAR_COMPARATIVE_WORDS:
-        return True
-    if not word.endswith("er"):
-        return False
-
-    # Surface POS is not decisive here: an inflected spelling can have a
-    # homonymous noun/verb entry while still being a valid comparative (for
-    # example, ``closer`` -> ``close``). Require adjective/adverb evidence on a
-    # recovered base instead. False friends such as ``silver`` and ``worker``
-    # still fail because none of their regular base candidates has that evidence.
-    return any(
-        lex.features(base).adj or lex.features(base).adv
-        for base in _comparative_base_candidates(word)
-    )
-
-
-def _comparative_span_starting_at(
-    words: Sequence[str],
-    start: int,
-    lex: core.WordNetLexicon,
-) -> tuple[int, float] | None:
-    """Parse a compact comparative span with stricter regular ``-er`` evidence.
-
-    This intentionally tracks the core span parser while substituting the
-    stricter surface-comparative predicate above. Shared lexical cases are kept
-    in parity by regression tests so the extension cannot silently drift.
-    """
-    if start >= len(words):
-        return None
-
-    max_end = min(len(words), start + 5)
-    for than_idx in range(start + 1, max_end):
-        if words[than_idx] != "than":
-            continue
-
-        left = words[start:than_idx]
-        right = words[than_idx + 1 :]
-        if not left or not right:
-            continue
-
-        # A comparative construction must contain actual comparative evidence;
-        # a plain adjective/adverb such as "old" is not enough before "than".
-        if not any(_comparative_like(word, lex) for word in left):
-            continue
-
-        right_consumed = 0
-        np = core._np_span_starting_at(right, 0, lex)
-        if np is not None:
-            right_consumed = np[0] + 1
-        else:
-            features = lex.features(right[0])
-            right_class = core.function_class(right[0])
-            if (
-                features.noun
-                or features.adj
-                or features.adv
-                or right_class in _PRONOUN_CLASSES
-                or right_class in {"NEG", "NUM_DET"}
-            ):
-                right_consumed = 1
-
-        if right_consumed <= 0:
-            continue
-
-        end = than_idx + right_consumed
-        quality = 0.90
-        if _comparative_like(left[0], lex):
-            quality += 0.05
-        return end, min(1.0, quality)
-
-    return None
 
 
 @dataclass(slots=True, frozen=True)
@@ -501,7 +410,9 @@ def comparative_clause_structure(
         subj_start, subj_coh = subject_span
         subject_head_idx = verb_idx - 1
 
-        comparative = _comparative_span_starting_at(words, verb_idx + 1, lex)
+        comparative = comparatives.comparative_span_starting_at(
+            words, verb_idx + 1, lex
+        )
         if comparative is None or comparative[0] != n - 1:
             continue
         _comp_end, comparative_quality = comparative
@@ -707,8 +618,9 @@ def _construction_pair_bonus_for_classes(
     """Return construction evidence using precomputed function-word classes."""
     score = 0.0
 
-    if right == "than" and _comparative_like(left, lex):
-        score += _COMPARATIVE_THAN_PAIR_BONUS
+    if right == "than":
+        evidence = comparatives.comparative_evidence(left, lex)
+        score += _COMPARATIVE_THAN_PAIR_BONUS * evidence.confidence
 
     if left == "than":
         right_features = lex.features(right)
