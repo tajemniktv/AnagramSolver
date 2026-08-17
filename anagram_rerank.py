@@ -22,6 +22,9 @@ from anagram_auxiliary_grammar import (
     phrase_structure_with_auxiliaries,
 )
 from anagram_order_diversity import raw_pool_size, select_diverse_orders
+from anagram_performance import install_performance_hooks
+
+install_performance_hooks()
 
 if TYPE_CHECKING:
     from anagram_rerank_topk_impl import OrderCandidate
