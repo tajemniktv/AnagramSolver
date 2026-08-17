@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Active AnagramSolver front-end with scoped top-K and safety adapters."""
+"""Active AnagramSolver front-end with scoped top-K and runtime adapters."""
 
 from __future__ import annotations
 
@@ -24,6 +24,9 @@ from anagram_auxiliary_grammar import (
 from anagram_order_diversity import raw_pool_size, select_diverse_orders
 from anagram_performance import install_performance_hooks
 
+# Importing this active facade intentionally installs semantics-preserving
+# runtime adapters in the stable core module so all facade and worker paths use
+# the same optimized implementations.
 install_performance_hooks()
 
 if TYPE_CHECKING:
@@ -42,8 +45,8 @@ DEFAULT_WORDNET_DIR = core.DEFAULT_WORDNET_DIR
 _CORE_PREPARE_ROWS = core.prepare_rows
 
 # The top-K implementation predates this facade and historically patched core at
-# import time. Capture and restore the frozen core API immediately so merely
-# importing ``anagram_rerank`` is side-effect free.
+# import time. Capture and restore that frozen scoring API immediately so its
+# import adds no mutations beyond the intentional performance adapters above.
 _CORE_HOOK_NAMES = (
     "best_order",
     "deep_analyze",
