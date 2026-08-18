@@ -9,11 +9,13 @@ added when the base dictionary omits them.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import anagram_generate as generator
 from anagram_paths import DICTIONARY_DIR
@@ -28,11 +30,37 @@ POLICY_CACHE = DICTIONARY_DIR / f"normal_user_v{USER_LEXICON_SCHEMA}.json"
 class UserLexicon:
     dictionary: Path
     extra_short_words: tuple[str, ...]
+    cache_token: str
 
 
 def _source_stamp(path: Path) -> tuple[int, int]:
     stat = path.stat()
     return stat.st_size, stat.st_mtime_ns
+
+
+def _stamp_from_json(value: Any) -> tuple[int, int] | None:
+    """Validate a serialized source stamp, treating malformed cache data as stale."""
+    if not isinstance(value, list) or len(value) != 2:
+        return None
+    if not all(isinstance(item, int) and not isinstance(item, bool) for item in value):
+        return None
+    return value[0], value[1]
+
+
+def _policy_token(
+    dictionary_stamp: tuple[int, int],
+    unigram_stamp: tuple[int, int],
+    extra_short_words: tuple[str, ...],
+) -> str:
+    """Return a stable identity for the effective source-backed user lexicon."""
+    payload = {
+        "schema": USER_LEXICON_SCHEMA,
+        "dictionary_stamp": list(dictionary_stamp),
+        "unigram_stamp": list(unigram_stamp),
+        "extra_short_words": list(extra_short_words),
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(raw).hexdigest()[:20]
 
 
 def select_corpus_short_words(
@@ -99,18 +127,29 @@ def _load_cached_policy(
         payload = json.loads(POLICY_CACHE.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
+    if not isinstance(payload, dict):
+        return None
     if payload.get("schema") != USER_LEXICON_SCHEMA:
         return None
-    if tuple(payload.get("dictionary_stamp", ())) != dictionary_stamp:
+
+    cached_dictionary_stamp = _stamp_from_json(payload.get("dictionary_stamp"))
+    cached_unigram_stamp = _stamp_from_json(payload.get("unigram_stamp"))
+    if cached_dictionary_stamp != dictionary_stamp:
         return None
-    if tuple(payload.get("unigram_stamp", ())) != unigram_stamp:
+    if cached_unigram_stamp != unigram_stamp:
         return None
+
     short_words = payload.get("extra_short_words")
     if not isinstance(short_words, list) or not all(
         isinstance(word, str) and len(word) == 2 for word in short_words
     ):
         return None
-    return UserLexicon(AUGMENTED_DICTIONARY, tuple(short_words))
+    normalized_short_words = tuple(short_words)
+    return UserLexicon(
+        AUGMENTED_DICTIONARY,
+        normalized_short_words,
+        _policy_token(dictionary_stamp, unigram_stamp, normalized_short_words),
+    )
 
 
 def _save_policy(
@@ -159,4 +198,8 @@ def ensure_user_lexicon() -> UserLexicon:
         frozenset(generator.PRETTY_CONTRACTIONS),
     )
     _save_policy(dictionary_stamp, unigram_stamp, extra_short_words)
-    return UserLexicon(AUGMENTED_DICTIONARY, extra_short_words)
+    return UserLexicon(
+        AUGMENTED_DICTIONARY,
+        extra_short_words,
+        _policy_token(dictionary_stamp, unigram_stamp, extra_short_words),
+    )
