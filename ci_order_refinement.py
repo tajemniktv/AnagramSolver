@@ -4,10 +4,12 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 import anagram_benchmark as benchmark
 import anagram_rerank as reranker
+import anagram_rerank_core as core
 from anagram_order_refinement import augment_seed_pool
 
 HERE = Path(__file__).resolve().parent
@@ -15,7 +17,7 @@ HERE = Path(__file__).resolve().parent
 
 def _objective(order: tuple[str, ...], lex: reranker.WordNetLexicon) -> float:
     raw = reranker.local_grammar_raw(order, lex)
-    grammar = reranker.grammar_normalize(raw)
+    grammar = core.grammar_normalize(raw)
     structure = reranker.phrase_structure(order, lex)
     return (
         0.38 * grammar
@@ -32,26 +34,43 @@ def _load_cases() -> list[dict[str, object]]:
     return [dict(item) for item in payload["cases"] if isinstance(item, dict)]
 
 
-def main() -> int:
-    wordnet_dir = reranker.ensure_wordnet(reranker.DEFAULT_WORDNET_DIR)
-    lex = reranker.WordNetLexicon.load(wordnet_dir)
+def _acceptable(case: dict[str, object], answer: str) -> set[str]:
+    raw: object = case.get("acceptable_orders", [answer])
+    values: Sequence[object] = raw if isinstance(raw, list) else [answer]
+    return {
+        benchmark.phrase_key(value)
+        for item in values
+        if isinstance(item, str)
+        for value in (item,)
+    }
+
+
+def _run_configuration(
+    cases: list[dict[str, object]],
+    lex: reranker.WordNetLexicon,
+    *,
+    seed_limit: int,
+    max_window: int,
+    max_rounds: int,
+    max_evaluations_per_seed: int,
+) -> tuple[int, int, int, int, int]:
     evaluated_cases = 0
     recovered = 0
     improved_seed_best = 0
-    total_extra_evaluations = 0
+    total_evaluations = 0
     total_added_orders = 0
 
-    print("=== FORCED-BEAM K-OPT AUGMENTATION A/B ===")
-    for case in _load_cases():
+    print(
+        "\n--- "
+        f"seeds={seed_limit} window<={max_window} rounds={max_rounds} "
+        f"eval/seed<={max_evaluations_per_seed} ---"
+    )
+    for case in cases:
         answer = str(case.get("answer", ""))
         words = benchmark.tokens(answer)
         if not 5 <= len(words) <= 6:
             continue
-        acceptable = {
-            benchmark.phrase_key(str(value))
-            for value in case.get("acceptable_orders", [answer])
-            if isinstance(value, str)
-        }
+        acceptable = _acceptable(case, answer)
         seeds, _ = reranker.rank_orders(
             words,
             lex,
@@ -70,38 +89,81 @@ def main() -> int:
         augmented = augment_seed_pool(
             seed_orders,
             lambda order: _objective(order, lex),
-            seed_limit=8,
-            max_window=5,
-            max_rounds=3,
-            max_evaluations_per_seed=384,
+            seed_limit=seed_limit,
+            max_window=max_window,
+            max_rounds=max_rounds,
+            max_evaluations_per_seed=max_evaluations_per_seed,
         )
-        total_extra_evaluations += augmented.evaluated
-        total_added_orders += max(0, len(augmented.candidates) - len(set(seed_orders)))
+        total_evaluations += augmented.evaluated
+        added = max(0, len(augmented.candidates) - len(set(seed_orders[:seed_limit])))
+        total_added_orders += added
         augmented_target = any(
             benchmark.phrase_key(result.order) in acceptable
             for result in augmented.candidates
-        )
+        ) or seed_target
         augmented_best = max(
             (result.score for result in augmented.candidates),
             default=seed_best_score,
         )
-        recovered += int(augmented_target and not seed_target)
-        improved_seed_best += int(augmented_best > seed_best_score + 1e-12)
-        status = "RECOVER" if augmented_target and not seed_target else (
-            "KEEP" if augmented_target else "MISS"
-        )
-        print(
-            f"{status:7} {case.get('id', answer)!s:<24} "
-            f"seed_target={int(seed_target)} augmented_target={int(augmented_target)} "
-            f"added={max(0, len(augmented.candidates) - len(set(seed_orders))):>2} "
-            f"bestΔ={augmented_best - seed_best_score:+.4f}"
-        )
+        recovered_now = augmented_target and not seed_target
+        improved_now = augmented_best > seed_best_score + 1e-12
+        recovered += int(recovered_now)
+        improved_seed_best += int(improved_now)
+        if recovered_now or improved_now:
+            print(
+                f"{case.get('id', answer)!s:<24} "
+                f"recover={int(recovered_now)} added={added:>2} "
+                f"bestΔ={augmented_best - seed_best_score:+.4f}"
+            )
 
-    print(f"cases:                   {evaluated_cases}")
-    print(f"new target recoveries:   {recovered}")
-    print(f"better full-score best:  {improved_seed_best}")
-    print(f"added candidate orders:  {total_added_orders}")
-    print(f"refinement evaluations:  {total_extra_evaluations}")
+    print(
+        f"summary cases={evaluated_cases} recoveries={recovered} "
+        f"better_best={improved_seed_best} added={total_added_orders} "
+        f"evaluations={total_evaluations}"
+    )
+    return (
+        evaluated_cases,
+        recovered,
+        improved_seed_best,
+        total_added_orders,
+        total_evaluations,
+    )
+
+
+def main() -> int:
+    wordnet_dir = reranker.ensure_wordnet(reranker.DEFAULT_WORDNET_DIR)
+    lex = reranker.WordNetLexicon.load(wordnet_dir)
+    cases = _load_cases()
+
+    print("=== FORCED-BEAM K-OPT AUGMENTATION BUDGET A/B ===")
+    configurations = (
+        (1, 5, 2, 384),
+        (2, 5, 2, 384),
+        (4, 4, 2, 128),
+    )
+    results = [
+        (
+            config,
+            _run_configuration(
+                cases,
+                lex,
+                seed_limit=config[0],
+                max_window=config[1],
+                max_rounds=config[2],
+                max_evaluations_per_seed=config[3],
+            ),
+        )
+        for config in configurations
+    ]
+
+    print("\n=== K-OPT BUDGET SUMMARY ===")
+    for config, result in results:
+        _, recovered, improved, added, evaluated = result
+        print(
+            f"seeds={config[0]} window<={config[1]} rounds={config[2]} "
+            f"eval/seed<={config[3]}: recoveries={recovered} "
+            f"better_best={improved} added={added} evaluations={evaluated}"
+        )
     return 0
 
 
