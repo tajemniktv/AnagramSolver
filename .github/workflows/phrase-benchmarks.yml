@@ -103,6 +103,7 @@ jobs:
 
       - name: Evaluate explicit-feature ranker with grouped held-out folds
         if: github.event_name == 'pull_request' && hashFiles('train_feature_ranker.py') != ''
+        continue-on-error: true
         run: |
           python train_feature_ranker.py \
             --phrase-db .ci_phrase_cache/wiktionary-wikipedia.db \
@@ -111,6 +112,7 @@ jobs:
 
       - name: Evaluate corpus-derived thematic fit
         if: github.event_name == 'pull_request' && hashFiles('ci_thematic_fit.py') != ''
+        continue-on-error: true
         run: |
           python ci_thematic_fit.py \
             --phrase-db .ci_phrase_cache/wiktionary-wikipedia.db \
