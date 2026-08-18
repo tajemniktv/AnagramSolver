@@ -92,6 +92,13 @@ class ExplicitFeatureRankerTests(unittest.TestCase):
         self.assertEqual(features[6], 1.0)
         self.assertEqual(features[12], 0.5)
 
+    def test_rank_items_reject_stale_or_nonfinite_schema(self) -> None:
+        features = _features(0.5)
+        with self.assertRaisesRegex(ValueError, "feature vector"):
+            RankItem("short", features[:-1], True, 0.5)
+        with self.assertRaisesRegex(ValueError, "baseline score"):
+            RankItem("nan", features, True, float("nan"))
+
     def test_model_json_round_trip_and_schema_guard(self) -> None:
         model = LinearRankModel(tuple(index / 10 for index in range(len(FEATURE_NAMES))))
         with tempfile.TemporaryDirectory() as directory:
@@ -115,14 +122,13 @@ class ExplicitFeatureRankerTests(unittest.TestCase):
         self.assertEqual(learned.recall1, 1.0)
         self.assertEqual(learned.mrr, 1.0)
 
-    def test_group_fold_is_stable_and_keeps_bag_whole(self) -> None:
+    def test_group_fold_is_stable_and_distributed(self) -> None:
         first = fold_for_group("a b c", 5)
         self.assertEqual(first, fold_for_group("a b c", 5))
         self.assertTrue(0 <= first < 5)
-        self.assertNotEqual(
-            {fold_for_group(f"bag-{index}", 5) for index in range(20)},
-            set(),
-        )
+        distribution = {fold_for_group(f"bag-{index}", 5) for index in range(40)}
+        self.assertGreater(len(distribution), 1)
+        self.assertTrue(distribution.issubset(set(range(5))))
 
     def test_cross_validation_is_held_out_by_group(self) -> None:
         baseline, learned = cross_validate_pairwise_ranker(
@@ -136,6 +142,10 @@ class ExplicitFeatureRankerTests(unittest.TestCase):
         self.assertEqual(baseline.recall1, 0.0)
         self.assertEqual(learned.recall1, 1.0)
         self.assertEqual(learned.mrr, 1.0)
+
+    def test_cross_validation_rejects_invalid_fold_count(self) -> None:
+        with self.assertRaisesRegex(ValueError, "folds must be >= 2"):
+            cross_validate_pairwise_ranker(_synthetic_groups(4), folds=1)
 
 
 if __name__ == "__main__":
