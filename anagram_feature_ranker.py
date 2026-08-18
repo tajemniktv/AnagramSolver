@@ -1,8 +1,8 @@
 """Dependency-free learning-to-rank over explicit AnagramSolver features.
 
-This is deliberately not a language model.  It learns a small linear pairwise
+This is deliberately not a language model. It learns a small linear pairwise
 ranking function over grammar, structure, phrase and corpus-cohesion features
-that the deterministic solver already exposes.  Training and cross-validation
+that the deterministic solver already exposes. Training and cross-validation
 are grouped by unordered word bag so permutations of the same answer can never
 leak across train/test folds.
 """
@@ -48,6 +48,13 @@ def _bounded(value: object, default: float = 0.0) -> float:
     if not math.isfinite(number):
         return default
     return max(0.0, min(1.0, number))
+
+
+def _validate_feature_vector(features: Sequence[float]) -> None:
+    if len(features) != len(FEATURE_NAMES):
+        raise ValueError("feature vector does not match ranker schema")
+    if not all(math.isfinite(float(value)) for value in features):
+        raise ValueError("ranker features must be finite")
 
 
 def explicit_order_features(
@@ -113,6 +120,11 @@ class RankItem:
     positive: bool
     baseline_score: float
 
+    def __post_init__(self) -> None:
+        _validate_feature_vector(self.features)
+        if not math.isfinite(self.baseline_score):
+            raise ValueError("rank item baseline score must be finite")
+
 
 @dataclass(slots=True, frozen=True)
 class RankGroup:
@@ -142,9 +154,11 @@ class LinearRankModel:
             raise ValueError("ranker weights must be finite")
 
     def score(self, features: Sequence[float]) -> float:
-        if len(features) != len(self.weights):
-            raise ValueError("feature vector does not match ranker model")
-        return sum(weight * float(value) for weight, value in zip(self.weights, features))
+        _validate_feature_vector(features)
+        return sum(
+            weight * float(value)
+            for weight, value in zip(self.weights, features, strict=True)
+        )
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -195,10 +209,10 @@ def train_pairwise_ranker(
     """Fit deterministic pairwise logistic ranking with L2 regularization."""
     if epochs < 1:
         raise ValueError("epochs must be >= 1")
-    if learning_rate <= 0.0:
-        raise ValueError("learning_rate must be > 0")
-    if l2 < 0.0:
-        raise ValueError("l2 must be >= 0")
+    if not math.isfinite(learning_rate) or learning_rate <= 0.0:
+        raise ValueError("learning_rate must be finite and > 0")
+    if not math.isfinite(l2) or l2 < 0.0:
+        raise ValueError("l2 must be finite and >= 0")
 
     weights = [0.0] * len(FEATURE_NAMES)
     ordered_groups = sorted(groups, key=lambda group: group.key)
@@ -212,11 +226,20 @@ def train_pairwise_ranker(
                 continue
             for positive in positives:
                 for negative in negatives:
+                    _validate_feature_vector(positive.features)
+                    _validate_feature_vector(negative.features)
                     diff = [
                         p - n
-                        for p, n in zip(positive.features, negative.features)
+                        for p, n in zip(
+                            positive.features,
+                            negative.features,
+                            strict=True,
+                        )
                     ]
-                    margin = sum(weight * delta for weight, delta in zip(weights, diff))
+                    margin = sum(
+                        weight * delta
+                        for weight, delta in zip(weights, diff, strict=True)
+                    )
                     probability = _sigmoid_negative_margin(margin)
                     step += 1
                     rate = learning_rate / math.sqrt(1.0 + 0.0005 * step)
@@ -277,6 +300,9 @@ def cross_validate_pairwise_ranker(
     l2: float = 0.002,
 ) -> tuple[RankMetrics, RankMetrics]:
     """Return pooled held-out baseline/model metrics with bag-wise split isolation."""
+    if folds < 2:
+        raise ValueError("folds must be >= 2")
+
     baseline_reciprocal: list[float] = []
     model_reciprocal: list[float] = []
     baseline_top1 = 0
