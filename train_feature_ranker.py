@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Train/evaluate the explicit-feature order ranker on grouped benchmark bags.
 
-The regression answers are labels, never scorer inputs.  Cross-validation assigns
+The regression answers are labels, never scorer inputs. Cross-validation assigns
 an entire unordered word bag to one fold, so no permutation of a held-out answer
-can appear in its training set.  Saving a model is optional and is deliberately
+can appear in its training set. Saving a model is optional and is deliberately
 separate from the held-out report because all-group fitted metrics are not an
 honest generalization estimate.
 """
@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from typing import cast
 
 import anagram_benchmark as benchmark
 import anagram_rerank as reranker
@@ -56,10 +57,7 @@ def build_groups(
         if not isinstance(raw_acceptable, list):
             skipped.append(f"{case_id}: acceptable_orders is not a list")
             continue
-        acceptable = {
-            benchmark.phrase_key(str(value))
-            for value in raw_acceptable
-        }
+        acceptable = {benchmark.phrase_key(str(value)) for value in raw_acceptable}
         candidates, _ = reranker.rank_orders(
             words,
             lex,
@@ -142,8 +140,8 @@ def main() -> int:
 
     wordnet_dir = reranker.ensure_wordnet(reranker.DEFAULT_WORDNET_DIR)
     lex = reranker.WordNetLexicon.load(wordnet_dir)
-    phrase_index = (
-        reranker.PhraseIndex.open(args.phrase_db)
+    phrase_index: reranker.PhraseIndex | None = (
+        cast(reranker.PhraseIndex, reranker.PhraseIndex.open(args.phrase_db))
         if args.phrase_db is not None
         else None
     )
