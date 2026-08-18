@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +25,12 @@ CASES = (
 )
 
 _RESULT_RE = re.compile(r"^\s+\d+\.\s+.+?\s+score\s+\d", re.MULTILINE)
+_RUN_DIR_RE = re.compile(r"^Cached run files:\s*(?P<path>.+)$", re.MULTILINE)
+_CANDIDATE_PHRASE_RE = re.compile(
+    r"PCOV=\s*[\d.]+\s{2}(?P<phrase>.*?)\s{2}\[HINT=",
+)
+_CANON_RE = re.compile(r"\[CANON=(?P<phrase>[^;\]]+)")
+_TOKEN_RE = re.compile(r"[A-Za-z]+(?:['’][A-Za-z]+)?")
 
 
 def _displayed_result_lines(output: str, target: str) -> tuple[str, ...]:
@@ -37,6 +44,49 @@ def _displayed_result_lines(output: str, target: str) -> tuple[str, ...]:
         for line in final_output.splitlines()
         if _RESULT_RE.match(line)
     )
+
+
+def _normalized_bag(phrase: str) -> tuple[str, ...]:
+    words = []
+    for token in _TOKEN_RE.findall(phrase.lower()):
+        normalized = "".join(ch for ch in token if "a" <= ch <= "z")
+        if normalized:
+            words.append(normalized)
+    return tuple(sorted(words))
+
+
+def _file_contains_bag(
+    path: Path,
+    expected: tuple[str, ...],
+    pattern: re.Pattern[str],
+) -> bool:
+    if not path.is_file():
+        return False
+    with path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            match = pattern.search(line)
+            if match and _normalized_bag(match.group("phrase")) == expected:
+                return True
+    return False
+
+
+def _dropout_diagnostic(output: str, phrase: str) -> str:
+    run_match = _RUN_DIR_RE.search(output)
+    if run_match is None:
+        return "run directory unavailable"
+    run_dir = Path(run_match.group("path").strip())
+    expected = _normalized_bag(phrase)
+    generated = _file_contains_bag(
+        run_dir / "candidates.txt",
+        expected,
+        _CANDIDATE_PHRASE_RE,
+    )
+    deep_exported = _file_contains_bag(
+        run_dir / "reranked.txt",
+        expected,
+        _CANON_RE,
+    )
+    return f"candidate_present={generated}; reranked_present={deep_exported}"
 
 
 def run_case(case: SmokeCase) -> None:
@@ -82,9 +132,10 @@ def run_case(case: SmokeCase) -> None:
     if case.expected_phrase is not None and not any(
         case.expected_phrase in line.lower() for line in result_lines
     ):
+        diagnostic = _dropout_diagnostic(completed.stdout, case.expected_phrase)
         raise SystemExit(
             f"Normal user run {case.target} did not surface expected final phrase: "
-            f"{case.expected_phrase}"
+            f"{case.expected_phrase} ({diagnostic})"
         )
 
 
