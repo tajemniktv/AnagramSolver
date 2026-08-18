@@ -3,8 +3,10 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import anagram_generate as generator
+import anagram_solver as solver
 import anagram_user_lexicon as lexicon
 
 
@@ -109,6 +111,68 @@ class LexicalCoverageTests(unittest.TestCase):
         self.assertIn("dont", supplements)
         self.assertIn("cant", supplements)
         self.assertTrue(all("'" not in word for word in supplements))
+
+    def test_malformed_policy_cache_shapes_are_cache_misses(self) -> None:
+        bad_payloads = (
+            "null\n",
+            "[]\n",
+            '{}\n',
+            '{"schema": 2, "dictionary_stamp": null, "unigram_stamp": [3, 4], "extra_short_words": ["hi"]}\n',
+            '{"schema": 2, "dictionary_stamp": [1, 2], "unigram_stamp": "bad", "extra_short_words": ["hi"]}\n',
+            '{"schema": 2, "dictionary_stamp": [1, 2], "unigram_stamp": [3, 4], "extra_short_words": null}\n',
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            augmented = root / "augmented.txt"
+            policy = root / "policy.json"
+            augmented.write_text("hi\n", encoding="utf-8")
+            with (
+                patch.object(lexicon, "AUGMENTED_DICTIONARY", augmented),
+                patch.object(lexicon, "POLICY_CACHE", policy),
+            ):
+                for payload in bad_payloads:
+                    with self.subTest(payload=payload):
+                        policy.write_text(payload, encoding="utf-8")
+                        self.assertIsNone(
+                            lexicon._load_cached_policy((1, 2), (3, 4))
+                        )
+
+    def test_valid_policy_cache_returns_source_dependent_token(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            augmented = root / "augmented.txt"
+            policy = root / "policy.json"
+            augmented.write_text("hi\n", encoding="utf-8")
+            policy.write_text(
+                '{"schema":2,"dictionary_stamp":[1,2],"unigram_stamp":[3,4],'
+                '"extra_short_words":["hi"]}\n',
+                encoding="utf-8",
+            )
+            with (
+                patch.object(lexicon, "AUGMENTED_DICTIONARY", augmented),
+                patch.object(lexicon, "POLICY_CACHE", policy),
+            ):
+                cached = lexicon._load_cached_policy((1, 2), (3, 4))
+
+        self.assertIsNotNone(cached)
+        assert cached is not None
+        self.assertEqual(cached.extra_short_words, ("hi",))
+        self.assertEqual(
+            cached.cache_token,
+            lexicon._policy_token((1, 2), (3, 4), ("hi",)),
+        )
+        self.assertNotEqual(
+            cached.cache_token,
+            lexicon._policy_token((1, 3), (3, 4), ("hi",)),
+        )
+
+    def test_solver_run_key_changes_with_effective_lexicon_token(self) -> None:
+        args = solver.build_parser().parse_args(["OEEEVHYNRI"])
+        solver._validate_args(args)
+        self.assertNotEqual(
+            solver._run_key(args, user_lexicon_token="policy-a"),
+            solver._run_key(args, user_lexicon_token="policy-b"),
+        )
 
 
 if __name__ == "__main__":
