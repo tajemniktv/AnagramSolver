@@ -33,12 +33,13 @@ class ClueAwareGenerationTests(unittest.TestCase):
             )
         )
 
-        # Historical search order finds ("ab", "ab") first, but that exact
-        # decomposition does not satisfy the clue and therefore must not consume
-        # the one-result budget. The next clue-valid bag is retained instead.
+        # Historical uncued search would find ("ab", "ab") first. Because that
+        # branch can no longer include clue word "a", clue-aware search prunes it
+        # before the terminal leaf and spends the one-result budget on the first
+        # clue-valid bag instead.
         self.assertEqual(actual, [("a", "b", "ab")])
         self.assertEqual(stats.accepted, 1)
-        self.assertGreaterEqual(stats.exact_examined, 2)
+        self.assertEqual(stats.exact_examined, 1)
 
     def test_exactly_one_counts_distinct_clue_words(self) -> None:
         actual = list(
