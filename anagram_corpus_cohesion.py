@@ -1,12 +1,12 @@
 """Generic corpus-span cohesion evidence for ordered anagram candidates.
 
-The phrase index already tells us whether individual n-grams are attested.  This
+The phrase index already tells us whether individual n-grams are attested. This
 module asks a different question: how economically can an entire candidate order
 be explained by non-overlapping attested spans?
 
-The dynamic program is intentionally small and deterministic.  It rewards
+The dynamic program is intentionally small and deterministic. It rewards
 coverage and long spans, charges for every independent corpus fragment, and
-uses frequency only as a bounded tie-strength signal.  Missing corpus evidence
+uses frequency only as a bounded tie-strength signal. Missing corpus evidence
 is neutral rather than negative.
 """
 
@@ -90,15 +90,19 @@ def score_corpus_cohesion(
 ) -> CohesionResult:
     """Return positive-only cohesion evidence for one complete word order.
 
-    All positive corpus spans of length >= 2 are considered.  A DP then chooses
+    All positive corpus spans of length >= 2 are considered. A DP then chooses
     a non-overlapping explanation that balances covered words against a fixed
-    per-fragment cost.  That makes one long attested expression preferable to a
+    per-fragment cost. That makes one long attested expression preferable to a
     "Frankenphrase" assembled from many unrelated short hits, while still
     allowing two strong chunks to rescue an otherwise unseen full phrase.
+
+    Empty tokens are malformed solver orders. They are rejected as neutral
+    evidence rather than removed, because removing one could create a false
+    adjacency such as ``("foo", "", "bar") -> "foo bar"``.
     """
-    ordered = tuple(word for word in words if word)
+    ordered = tuple(words)
     n = len(ordered)
-    if n < 2 or max_n < 2:
+    if n < 2 or max_n < 2 or any(not word for word in ordered):
         return CohesionResult(0.0, 0.0, 0.0, 0, 0.0, 0.0, ())
 
     span_text: dict[tuple[int, int], str] = {}
@@ -129,7 +133,7 @@ def score_corpus_cohesion(
     if not by_start:
         return CohesionResult(0.0, 0.0, 0.0, 0, 0.0, 0.0, ())
 
-    # A covered word is worth 1.0 utility.  Each independent corpus fragment
+    # A covered word is worth 1.0 utility. Each independent corpus fragment
     # pays 0.55, so full coverage by two good chunks can beat one almost-full
     # chunk, but gratuitous chains of bigrams quickly become unattractive.
     fragment_cost = 0.55
@@ -179,7 +183,7 @@ def score_corpus_cohesion(
         else 0.0
     )
 
-    # Coverage is mandatory.  Long explanations dominate, bounded frequency
+    # Coverage is mandatory. Long explanations dominate, bounded frequency
     # nudges ties, and each additional splice discounts the final evidence.
     shape = 0.52 + 0.30 * longest_fraction + 0.18 * frequency
     score = coverage * shape * (1.0 - 0.22 * splice_penalty)
