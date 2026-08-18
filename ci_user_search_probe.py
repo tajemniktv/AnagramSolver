@@ -193,6 +193,8 @@ def main() -> int:
         f"retained={len(bags)}; exact_evaluated={exact_examined}; "
         f"partial_expansions={expansions}"
     )
+    if not present:
+        raise SystemExit("Target bag still drops out of the bounded multi-view beam")
     return 0
 
 
