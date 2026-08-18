@@ -5,9 +5,10 @@ exhaustive enumeration. Normal bounded searches need a different contract: the
 candidate cap should retain plausible word bags rather than whichever exact
 covers happen to occur first in DFS order.
 
-This module uses a bounded lexical beam over partial word bags. It is explicitly
-approximate: generation only needs to preserve a strong, varied shortlist for
-the deeper linguistic reranker, not prove the globally exact lexical top-K.
+Normal bounded search therefore keeps several cheap views of the same partial
+and completed bags: unigram lexical quality, observed pair/collocation evidence,
+and a small rare-word-anchor reserve. The deeper linguistic reranker remains the
+final authority.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ import math
 import sys
 from collections import defaultdict
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import Any
 
 import anagram_generate as generator
@@ -24,7 +26,10 @@ import anagram_generate as generator
 SolveCallable = Callable[..., Iterator[tuple[str, ...]]]
 BeamState = tuple[tuple[int, ...], int, int, tuple[int, ...]]
 ScoredItem = tuple[float, int, tuple[Any, ...]]
+PairItem = tuple[float, float, float, int, tuple[Any, ...]]
 ANCHOR_CHAMPIONS_PER_WORD = 2
+LEXICAL_SHARE = 0.55
+PAIR_SHARE = 0.35
 
 
 def _sparse_signature(sig: tuple[int, ...]) -> tuple[tuple[int, int], ...]:
@@ -67,15 +72,7 @@ def _optimistic_score(
     best_future_zipf: float,
     candidates: list[generator.Candidate],
 ) -> float:
-    """Return an optimistic lexical score for a partial bag.
-
-    Candidate indices are monotonic and the source list is descending by Zipf.
-    Filling every unknown slot with the best Zipf still available at ``start``
-    therefore cannot undershoot a real completion. Non-positive duplicate/junk
-    penalties are omitted as well. The beam uses this as a ranking heuristic;
-    unlike the previous exact branch-and-bound experiment, no correctness claim
-    depends on keeping every state whose bound is competitive.
-    """
+    """Return an optimistic unigram score for a partial bag."""
     values = [candidates[index].zipf for index in chosen_indices]
     values.extend([best_future_zipf] * words_left)
     if not values:
@@ -86,8 +83,43 @@ def _optimistic_score(
     return 0.78 * average + 0.22 * low_tail
 
 
+def _pair_priority(
+    indices: tuple[int, ...],
+    candidates: list[generator.Candidate],
+    bigrams: generator.BigramModel | None,
+) -> tuple[float, float, float]:
+    """Return an order-independent collocation priority for a partial/full bag."""
+    lexical = _lexical_score(indices, candidates)
+    if bigrams is None or len(indices) < 2:
+        return 0.0, -99.0, lexical
+    words = tuple(candidates[index].word for index in indices)
+    pair_raw, coverage = generator.bigram_pair_potential(words, bigrams)
+    # Observed-edge coverage is deliberately first. Search only needs to retain
+    # candidates with evidence that their words can connect; the deeper reranker
+    # later decides whether those connections form a valid sentence.
+    return coverage, pair_raw, lexical
+
+
+def _load_search_bigram_model(
+    candidates: list[generator.Candidate],
+) -> generator.BigramModel:
+    """Load only pair rows relevant to this puzzle's candidate vocabulary."""
+    one_path, two_path = generator.ensure_ngram_data(
+        Path(generator.DEFAULT_NGRAM_DIR),
+        refresh=False,
+        need_bigrams=True,
+    )
+    assert two_path is not None
+    unigrams = generator.load_unigram_model(one_path)
+    return generator.load_bigram_model(
+        two_path,
+        unigrams,
+        {candidate.word for candidate in candidates},
+    )
+
+
 def _bucket_result_cap(word_count: int, requested: int) -> int:
-    """Bound how much lexical-only material a bucket sends to deep reranking."""
+    """Bound how much cheap material a bucket sends to deep reranking."""
     if word_count <= 4:
         ceiling = 10_000
     elif word_count == 5:
@@ -129,41 +161,87 @@ def _push_bounded(
         heapq.heapreplace(heap, item)
 
 
-def _quality_anchor_limits(limit: int, candidate_count: int) -> tuple[int, int]:
-    """Split capacity between global quality and rare-word anchor champions."""
+def _push_pair_bounded(
+    heap: list[PairItem],
+    item: PairItem,
+    limit: int,
+) -> None:
+    if limit <= 0:
+        return
+    if len(heap) < limit:
+        heapq.heappush(heap, item)
+        return
+    if item[:4] > heap[0][:4]:
+        heapq.heapreplace(heap, item)
+
+
+def _view_quotas(limit: int) -> tuple[int, int]:
     if limit <= 1:
         return max(limit, 0), 0
-    possible_anchor_items = candidate_count * ANCHOR_CHAMPIONS_PER_WORD
-    anchor_capacity = min(limit // 4, possible_anchor_items)
-    return limit - anchor_capacity, anchor_capacity
+    lexical = max(1, int(limit * LEXICAL_SHARE))
+    pair = max(1, int(limit * PAIR_SHARE))
+    if lexical + pair > limit:
+        pair = max(0, limit - lexical)
+    return lexical, pair
 
 
-def _select_quality_with_anchors(
-    quality_heap: list[ScoredItem],
+def _select_multi_view(
+    lexical_heap: list[ScoredItem],
+    pair_heap: list[PairItem],
     anchor_heaps: dict[int, list[ScoredItem]],
     limit: int,
-) -> list[ScoredItem]:
-    """Combine the global score core with per-rarest-word champions.
-
-    Candidate indices are monotonic in a word bag, so the last chosen index is
-    also its least frequent chosen word. Keeping a couple of best states/bags per
-    such anchor prevents the entire bounded search from becoming thousands of
-    near-duplicates made only of the corpus's most frequent words.
-    """
-    selected = sorted(quality_heap, reverse=True)
-    seen = {item[2] for item in selected}
-    anchor_candidates = sorted(
+) -> list[tuple[Any, ...]]:
+    """Combine lexical, pair, and rare-word views without wasting duplicate slots."""
+    lexical = sorted(lexical_heap, reverse=True)
+    pair = sorted(pair_heap, reverse=True)
+    anchors = sorted(
         (item for heap in anchor_heaps.values() for item in heap),
         reverse=True,
     )
-    for item in anchor_candidates:
+    lexical_quota, pair_quota = _view_quotas(limit)
+
+    selected: list[tuple[Any, ...]] = []
+    seen: set[tuple[Any, ...]] = set()
+
+    def add_payload(payload: tuple[Any, ...]) -> bool:
+        if payload in seen or len(selected) >= limit:
+            return False
+        selected.append(payload)
+        seen.add(payload)
+        return True
+
+    lexical_added = 0
+    for _, _, payload in lexical:
+        if lexical_added >= lexical_quota:
+            break
+        if add_payload(payload):
+            lexical_added += 1
+
+    pair_added = 0
+    for _, _, _, _, payload in pair:
+        if pair_added >= pair_quota:
+            break
+        if add_payload(payload):
+            pair_added += 1
+
+    for _, _, payload in anchors:
         if len(selected) >= limit:
             break
-        if item[2] in seen:
-            continue
-        selected.append(item)
-        seen.add(item[2])
-    selected.sort(reverse=True)
+        add_payload(payload)
+
+    # Anchor champions often overlap the quality cores. Fill any resulting holes
+    # instead of silently returning fewer candidates than the bounded budget.
+    if len(selected) < limit:
+        for _, _, payload in lexical:
+            if len(selected) >= limit:
+                break
+            add_payload(payload)
+    if len(selected) < limit:
+        for _, _, _, _, payload in pair:
+            if len(selected) >= limit:
+                break
+            add_payload(payload)
+
     return selected
 
 
@@ -173,8 +251,9 @@ def _beam_bags_for_word_count(
     word_count: int,
     limit: int,
     allow_repeat: bool,
+    bigrams: generator.BigramModel | None,
 ) -> tuple[list[tuple[str, ...]], int, int]:
-    """Return a deterministic quality-plus-anchor beam for one word count."""
+    """Return a deterministic multi-view beam shortlist for one word count."""
     if limit <= 0 or not candidates:
         return [], 0, 0
 
@@ -193,7 +272,6 @@ def _beam_bags_for_word_count(
 
     states: list[BeamState] = [(remaining, remaining_len, 0, ())]
     width = _beam_width(word_count, limit)
-    quality_width, _ = _quality_anchor_limits(width, len(candidates))
     branch_limit = _branch_width(word_count)
     partial_expansions = 0
     serial = 0
@@ -204,7 +282,8 @@ def _beam_bags_for_word_count(
     for depth in range(max(0, word_count - 1)):
         words_left_before = word_count - depth
         words_left_after = words_left_before - 1
-        quality_heap: list[ScoredItem] = []
+        lexical_heap: list[ScoredItem] = []
+        pair_heap: list[PairItem] = []
         anchor_heaps: dict[int, list[ScoredItem]] = defaultdict(list)
 
         for rem, rem_len, start, chosen in states:
@@ -231,9 +310,6 @@ def _beam_bags_for_word_count(
                 next_start = index if allow_repeat else index + 1
                 if words_left_after > 0 and next_start >= len(candidates):
                     continue
-
-                # At the penultimate depth, avoid filling the beam with partial
-                # states whose residual signature has no legal exact closure.
                 if words_left_after == 1 and not any(
                     last_index >= next_start
                     for last_index in by_signature.get(new_rem, ())
@@ -243,26 +319,31 @@ def _beam_bags_for_word_count(
                 new_chosen = (*chosen, index)
                 if words_left_after:
                     best_future_zipf = candidates[next_start].zipf
-                    priority = _optimistic_score(
+                    lexical_priority = _optimistic_score(
                         new_chosen,
                         words_left_after,
                         best_future_zipf,
                         candidates,
                     )
                 else:
-                    priority = _lexical_score(new_chosen, candidates)
+                    lexical_priority = _lexical_score(new_chosen, candidates)
 
-                item: ScoredItem = (
-                    priority,
-                    -serial,
-                    (new_rem, new_rem_len, next_start, new_chosen),
+                payload: tuple[Any, ...] = (
+                    new_rem,
+                    new_rem_len,
+                    next_start,
+                    new_chosen,
                 )
+                lexical_item: ScoredItem = (lexical_priority, -serial, payload)
+                pair_priority = _pair_priority(new_chosen, candidates, bigrams)
+                pair_item: PairItem = (*pair_priority, -serial, payload)
                 serial += 1
                 partial_expansions += 1
-                _push_bounded(quality_heap, item, quality_width)
+                _push_bounded(lexical_heap, lexical_item, width)
+                _push_pair_bounded(pair_heap, pair_item, width)
                 _push_bounded(
                     anchor_heaps[new_chosen[-1]],
-                    item,
+                    lexical_item,
                     ANCHOR_CHAMPIONS_PER_WORD,
                 )
 
@@ -270,8 +351,9 @@ def _beam_bags_for_word_count(
                 if accepted_branches >= branch_limit:
                     break
 
-        selected = _select_quality_with_anchors(
-            quality_heap,
+        selected = _select_multi_view(
+            lexical_heap,
+            pair_heap,
             anchor_heaps,
             width,
         )
@@ -279,12 +361,12 @@ def _beam_bags_for_word_count(
             return [], 0, partial_expansions
         states = [
             (payload[0], payload[1], payload[2], payload[3])
-            for _, _, payload in selected
+            for payload in selected
         ]
 
     exact_examined = 0
-    result_quality_width, _ = _quality_anchor_limits(limit, len(candidates))
-    result_quality_heap: list[ScoredItem] = []
+    result_lexical_heap: list[ScoredItem] = []
+    result_pair_heap: list[PairItem] = []
     result_anchor_heaps: dict[int, list[ScoredItem]] = defaultdict(list)
     result_serial = 0
 
@@ -297,24 +379,29 @@ def _beam_bags_for_word_count(
                 continue
             indices = (*chosen, last_index)
             exact_examined += 1
-            score = _lexical_score(indices, candidates)
-            item: ScoredItem = (score, -result_serial, (indices,))
+            lexical_score = _lexical_score(indices, candidates)
+            payload: tuple[Any, ...] = (indices,)
+            lexical_item: ScoredItem = (lexical_score, -result_serial, payload)
+            pair_priority = _pair_priority(indices, candidates, bigrams)
+            pair_item: PairItem = (*pair_priority, -result_serial, payload)
             result_serial += 1
-            _push_bounded(result_quality_heap, item, result_quality_width)
+            _push_bounded(result_lexical_heap, lexical_item, limit)
+            _push_pair_bounded(result_pair_heap, pair_item, limit)
             _push_bounded(
                 result_anchor_heaps[indices[-1]],
-                item,
+                lexical_item,
                 ANCHOR_CHAMPIONS_PER_WORD,
             )
 
-    ranked = _select_quality_with_anchors(
-        result_quality_heap,
+    selected_results = _select_multi_view(
+        result_lexical_heap,
+        result_pair_heap,
         result_anchor_heaps,
         limit,
     )
     bags = [
         tuple(candidates[index].word for index in payload[0])
-        for _, _, payload in ranked
+        for payload in selected_results
     ]
     return bags, exact_examined, partial_expansions
 
@@ -328,8 +415,9 @@ def quality_guided_bounded_solve(
     allow_repeat: bool,
     *,
     stats: generator.SearchStats | None = None,
+    bigrams: generator.BigramModel | None = None,
 ) -> Iterator[tuple[str, ...]]:
-    """Yield a bounded lexical shortlist spread across requested word counts."""
+    """Yield a bounded multi-view shortlist spread across requested word counts."""
     if max_results <= 0:
         return
 
@@ -351,6 +439,7 @@ def quality_guided_bounded_solve(
             word_count,
             result_limit,
             allow_repeat,
+            bigrams,
         )
         bucket_results[word_count] = bags
         total_examined += examined
@@ -389,9 +478,6 @@ def make_quality_guided_solve(fallback: SolveCallable) -> SolveCallable:
         **kwargs: Any,
     ) -> Iterator[tuple[str, ...]]:
         clues = clue_words or set()
-        # Clue-aware DFS has semantics and pruning specifically designed for
-        # hints. Unlimited search must also stay genuinely exhaustive. Finally,
-        # if no corpus frequencies were loaded, lexical guidance has no signal.
         if (
             clues
             or max_results <= 0
@@ -414,6 +500,7 @@ def make_quality_guided_solve(fallback: SolveCallable) -> SolveCallable:
             )
             return
 
+        bigrams = _load_search_bigram_model(candidates)
         yield from quality_guided_bounded_solve(
             remaining,
             candidates,
@@ -422,6 +509,7 @@ def make_quality_guided_solve(fallback: SolveCallable) -> SolveCallable:
             max_results,
             allow_repeat,
             stats=stats,
+            bigrams=bigrams,
         )
 
     return solve
