@@ -1,8 +1,8 @@
-"""Semantics-preserving hot-path adapters for the active reranker.
+"""Hot-path adapters and corpus evidence for the active reranker.
 
-The core scorer intentionally stays simple and portable. The active facade can
-therefore layer a few runtime-only optimizations over it without changing the
-legacy parser's behavior or prepared-cache format.
+The stable core scorer intentionally stays simple and portable. The active
+facade layers runtime optimizations plus generic corpus-span cohesion over it
+without changing the prepared-cache format.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import cast
 
 import anagram_rerank_core as core
+from anagram_corpus_cohesion import blend_phrase_cohesion, score_corpus_cohesion
 
 _ORIGINAL_NORM_TOKEN = core.norm_token
 _ORIGINAL_FUNCTION_CLASS = core.function_class
@@ -101,7 +102,7 @@ class FastWordNetLexicon(core.WordNetLexicon):
 
 @dataclass(slots=True)
 class FastPhraseIndex(core.PhraseIndex):
-    """Bounded read-through cache for immutable phrase-index counts and misses."""
+    """Bounded phrase cache plus generic corpus-span cohesion evidence."""
 
     # None is an explicit database-miss sentinel. Real rows may legally contain
     # zero or negative counts, and counts() preserves those baseline semantics.
@@ -150,6 +151,25 @@ class FastPhraseIndex(core.PhraseIndex):
 
         return out
 
+    def score(self, words: Sequence[str]) -> tuple[float, dict[str, float]]:
+        """Blend legacy n-gram evidence with best corpus-span segmentation."""
+        base_score, details = super().score(words)
+        cohesion = score_corpus_cohesion(
+            words,
+            counts=self.counts,
+            max_n=self.max_n,
+        )
+        score = blend_phrase_cohesion(base_score, cohesion)
+        return score, {
+            **details,
+            "cohesion": cohesion.score,
+            "cohesion_coverage": cohesion.coverage,
+            "cohesion_longest_fraction": cohesion.longest_fraction,
+            "cohesion_segments": float(cohesion.segments),
+            "cohesion_splice_penalty": cohesion.splice_penalty,
+            "cohesion_frequency": cohesion.frequency_strength,
+        }
+
 
 def clear_performance_caches() -> None:
     """Reset process-global memoized helpers used by benchmark/test isolation."""
@@ -158,14 +178,14 @@ def clear_performance_caches() -> None:
 
 @contextmanager
 def performance_hooks() -> Iterator[None]:
-    """Temporarily install fast core adapters and restore exact prior bindings.
+    """Temporarily install active adapters and restore exact prior bindings.
 
     The depth counter keeps adapters active across nested or overlapping facade
     calls without holding the lock while user work executes. Importing the
     reranker therefore remains side-effect free. During an active facade call,
-    unrelated same-process core consumers may temporarily observe the fast
-    semantics-equivalent bindings; the last overlapping facade context restores
-    the exact bindings that were present before the first one entered.
+    unrelated same-process core consumers may temporarily observe the active
+    bindings; the last overlapping facade context restores the exact bindings
+    that were present before the first one entered.
     """
     global _HOOK_DEPTH, _HOOK_RESTORE
 
