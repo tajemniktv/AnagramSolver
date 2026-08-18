@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import io
+import sys
 import unittest
+from contextlib import redirect_stderr, redirect_stdout
+from unittest.mock import patch
 
 import anagram_generate as generator
 
@@ -73,6 +77,58 @@ class ClueAwareGenerationTests(unittest.TestCase):
             )
         )
         self.assertEqual(actual, [("ab", "ab")])
+
+    def test_zero_residual_exactly_one_rejects_multiple_required_clues(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        argv = [
+            "anagram_generate.py",
+            "ab",
+            "--require",
+            "a",
+            "--require",
+            "b",
+            "--contains-any",
+            "a,b",
+            "--hint-mode",
+            "exactly-one",
+        ]
+        with (
+            patch.object(sys, "argv", argv),
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+        ):
+            result = generator.main()
+
+        self.assertEqual(result, 1)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertIn("do not satisfy clue constraints", stderr.getvalue())
+
+    def test_zero_residual_exactly_one_accepts_one_required_clue(self) -> None:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        argv = [
+            "anagram_generate.py",
+            "ab",
+            "--require",
+            "a",
+            "--require",
+            "b",
+            "--contains-any",
+            "a",
+            "--hint-mode",
+            "exactly-one",
+        ]
+        with (
+            patch.object(sys, "argv", argv),
+            redirect_stdout(stdout),
+            redirect_stderr(stderr),
+        ):
+            result = generator.main()
+
+        self.assertEqual(result, 0)
+        self.assertEqual(stdout.getvalue().strip(), "a b")
+        self.assertEqual(stderr.getvalue(), "")
 
     def test_uncued_bounded_prefix_remains_unchanged(self) -> None:
         expected = [("ab", "ab"), ("a", "b", "ab")]

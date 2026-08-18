@@ -1281,6 +1281,15 @@ def main() -> int:
     short_whitelist.difference_update(excluded_words)
 
     if sum(remaining) == 0:
+        required_clues = contains_any.intersection(required_word_set)
+        clue_constraints_satisfied = (
+            not contains_any
+            or (args.hint_mode == "any" and bool(required_clues))
+            or (args.hint_mode == "exactly-one" and len(required_clues) == 1)
+        )
+        if not clue_constraints_satisfied:
+            print("Required words do not satisfy clue constraints.", file=sys.stderr)
+            return 1
         print(" ".join(required_words))
         return 0
 
@@ -1408,11 +1417,11 @@ def main() -> int:
         if stream is not None:
             stream.close()
 
-    generated = search_stats.exact_examined
+    evaluated = search_stats.exact_examined
     accepted = search_stats.accepted
     search_seconds = time.perf_counter() - search_started
     print(
-        f"Examined {generated:,} clue-relevant exact word set(s); "
+        f"Evaluated {evaluated:,} exact completion(s); "
         f"{accepted:,} satisfied clue constraints. "
         f"Exact search: {search_seconds:.2f}s.",
         file=sys.stderr,
