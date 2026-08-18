@@ -22,7 +22,6 @@ from typing import Any
 import anagram_generate as generator
 
 SolveCallable = Callable[..., Iterator[tuple[str, ...]]]
-_EPSILON = 1e-12
 
 
 def _sparse_signature(sig: tuple[int, ...]) -> tuple[tuple[int, int], ...]:
@@ -193,12 +192,11 @@ def _beam_bags_for_word_count(
 
                 # At the penultimate depth, avoid filling the beam with partial
                 # states whose residual signature has no legal exact closure.
-                if words_left_after == 1:
-                    if not any(
-                        last_index >= next_start
-                        for last_index in by_signature.get(new_rem, ())
-                    ):
-                        continue
+                if words_left_after == 1 and not any(
+                    last_index >= next_start
+                    for last_index in by_signature.get(new_rem, ())
+                ):
+                    continue
 
                 new_chosen = (*chosen, index)
                 if words_left_after:
