@@ -74,6 +74,19 @@ jobs:
             .anagram_data/dictionary
             .anagram_data/ngrams
           key: normal-user-corpora-${{ runner.os }}-v1
+      - name: Provision runtime corpora outside smoke timeouts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import anagram_generate as g
+          import anagram_rerank_core as r
+
+          print(g.get_dictionary(g.DEFAULT_DICT_URL))
+          one, two = g.ensure_ngram_data(Path(g.DEFAULT_NGRAM_DIR), refresh=False, need_bigrams=True)
+          print(one)
+          print(two)
+          print(r.ensure_wordnet(r.DEFAULT_WORDNET_DIR))
+          PY
       - name: Clear puzzle-specific caches
         run: rm -rf .anagram_data/prepared_cache .anagram_data/solver_runs
       - name: Run ordinary verbose user invocations
