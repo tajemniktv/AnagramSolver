@@ -25,6 +25,7 @@ from anagram_paths import SOLVER_RUNS_DIR
 HERE = Path(__file__).resolve().parent
 GENERATOR = HERE / "anagram_user_generate.py"
 GENERATOR_CORE = HERE / "anagram_generate.py"
+USER_LEXICON = HERE / "anagram_user_lexicon.py"
 RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_RUN_ROOT = SOLVER_RUNS_DIR
 BALANCED_MAX_RESULTS = 100_000
@@ -120,6 +121,7 @@ def _run_key(args: argparse.Namespace) -> str:
         "generation_cap": _generation_cap(args),
         "generator": _source_hash(GENERATOR),
         "generator_core": _source_hash(GENERATOR_CORE),
+        "user_lexicon": _source_hash(USER_LEXICON),
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(raw).hexdigest()[:20]
