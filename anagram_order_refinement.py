@@ -69,6 +69,7 @@ def refine_order(
     max_rounds: int = 3,
     max_evaluations: int = 512,
     epsilon: float = 1e-12,
+    initial_score: float | None = None,
 ) -> RefinementResult:
     """Hill-climb from one complete order using best-improvement k-opt moves."""
     if min_window < 2:
@@ -81,8 +82,12 @@ def refine_order(
         raise ValueError("max_evaluations must be >= 1")
 
     current = tuple(seed)
-    current_score = float(scorer(current))
-    evaluated = 1
+    if initial_score is None:
+        current_score = float(scorer(current))
+        evaluated = 1
+    else:
+        current_score = float(initial_score)
+        evaluated = 0
     rounds = 0
     changed = False
     score_cache: dict[Order, float] = {current: current_score}
@@ -172,41 +177,37 @@ def augment_seed_pool(
 
     Refinement is an expansion step, not a replacement step. A beam order that
     was already correct must remain available even if its local hill climb ends
-    at a different higher-scoring order. The returned evaluation count measures
-    only calls performed by the refinement searches.
+    at a different higher-scoring order.
     """
-    limited_seeds = tuple(tuple(seed) for seed in seeds[:seed_limit])
-    if not limited_seeds:
-        return RefinementPoolResult((), 0, 0)
-
-    endpoints = refine_seed_pool(
-        limited_seeds,
-        scorer,
-        seed_limit=seed_limit,
-        min_window=min_window,
-        max_window=max_window,
-        max_rounds=max_rounds,
-        max_evaluations_per_seed=max_evaluations_per_seed,
-    )
-    evaluated = sum(result.evaluated for result in endpoints)
-    improved_seeds = sum(result.improved for result in endpoints)
+    if seed_limit < 1:
+        raise ValueError("seed_limit must be >= 1")
 
     by_order: dict[Order, RefinementResult] = {}
-    for seed in limited_seeds:
-        # Seed scores are already included in refinement's evaluation accounting.
-        # Re-scoring here makes the augmented candidate pool self-contained; this
-        # helper is an experimental search utility, not the production hot path.
-        by_order[seed] = RefinementResult(
-            order=seed,
-            score=float(scorer(seed)),
-            evaluated=0,
-            rounds=0,
-            improved=False,
+    evaluated = 0
+    improved_seeds = 0
+    for raw_seed in seeds[:seed_limit]:
+        seed = tuple(raw_seed)
+        seed_score = float(scorer(seed))
+        evaluated += 1
+        seed_result = RefinementResult(seed, seed_score, 0, 0, False)
+        previous_seed = by_order.get(seed)
+        if previous_seed is None or seed_score > previous_seed.score:
+            by_order[seed] = seed_result
+
+        endpoint = refine_order(
+            seed,
+            scorer,
+            min_window=min_window,
+            max_window=max_window,
+            max_rounds=max_rounds,
+            max_evaluations=max_evaluations_per_seed,
+            initial_score=seed_score,
         )
-    for result in endpoints:
-        previous = by_order.get(result.order)
-        if previous is None or result.score > previous.score:
-            by_order[result.order] = result
+        evaluated += endpoint.evaluated
+        improved_seeds += int(endpoint.improved)
+        previous = by_order.get(endpoint.order)
+        if previous is None or endpoint.score > previous.score:
+            by_order[endpoint.order] = endpoint
 
     candidates = tuple(
         sorted(
