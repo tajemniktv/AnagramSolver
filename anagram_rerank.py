@@ -22,15 +22,17 @@ from anagram_auxiliary_grammar import (
     phrase_structure_with_auxiliaries,
 )
 from anagram_order_diversity import raw_pool_size, select_diverse_orders
+from anagram_performance import FastPhraseIndex, FastWordNetLexicon, performance_hooks
 
 if TYPE_CHECKING:
     from anagram_rerank_topk_impl import OrderCandidate
 
-# Explicit aliases keep the facade contract visible to Ruff/Pylance.
+# Explicit aliases keep the facade contract visible to Ruff/Pylance while using
+# optimized per-instance classes without mutating the stable core on import.
 Row = core.Row
-WordNetLexicon = core.WordNetLexicon
+WordNetLexicon = FastWordNetLexicon
 PositiveBigramModel = core.PositiveBigramModel
-PhraseIndex = core.PhraseIndex
+PhraseIndex = FastPhraseIndex
 ensure_wordnet = core.ensure_wordnet
 DEFAULT_WORDNET_DIR = core.DEFAULT_WORDNET_DIR
 
@@ -40,7 +42,7 @@ _CORE_PREPARE_ROWS = core.prepare_rows
 
 # The top-K implementation predates this facade and historically patched core at
 # import time. Capture and restore the frozen core API immediately so merely
-# importing ``anagram_rerank`` is side-effect free.
+# importing ``anagram_rerank`` remains side-effect free.
 _CORE_HOOK_NAMES = (
     "best_order",
     "deep_analyze",
@@ -51,6 +53,11 @@ _core_before_impl = {name: getattr(core, name) for name in _CORE_HOOK_NAMES}
 impl = importlib.import_module("anagram_rerank_topk_impl")
 for _name, _value in _core_before_impl.items():
     setattr(core, _name, _value)
+
+# Worker initializers resolve these names from the implementation module at run
+# time, so point them at the optimized per-instance classes without touching core.
+setattr(impl, "WordNetLexicon", FastWordNetLexicon)  # noqa: B010
+setattr(impl, "PhraseIndex", FastPhraseIndex)  # noqa: B010
 
 # Preserve the benchmark-facing API exposed by the implementation.
 for _name in dir(impl):
@@ -67,10 +74,13 @@ if not hasattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES"):
     setattr(impl, "_AUX_BASE_ORDER_LOCAL_TABLES", impl._order_local_tables)  # noqa: B010
 if not hasattr(impl, "_AUX_BASE_WORKER_INIT"):
     setattr(impl, "_AUX_BASE_WORKER_INIT", impl._worker_init)  # noqa: B010
+if not hasattr(impl, "_PERF_BASE_WORKER_ANALYZE_BATCH"):
+    setattr(impl, "_PERF_BASE_WORKER_ANALYZE_BATCH", impl._worker_analyze_batch)  # noqa: B010
 
 _BASE_PHRASE_STRUCTURE = impl._AUX_BASE_PHRASE_STRUCTURE
 _BASE_ORDER_LOCAL_TABLES = impl._AUX_BASE_ORDER_LOCAL_TABLES
 _BASE_WORKER_INIT = impl._AUX_BASE_WORKER_INIT
+_BASE_WORKER_ANALYZE_BATCH = impl._PERF_BASE_WORKER_ANALYZE_BATCH
 
 # Keep direct references to the implementation functions before this facade
 # shadows their public names with diversity-aware wrappers.
@@ -96,7 +106,8 @@ def phrase_structure(
     lex: WordNetLexicon,
 ) -> core.StructureResult:
     """Combine the legacy parser with explicit auxiliary-chain structures."""
-    return phrase_structure_with_auxiliaries(words, lex, _BASE_PHRASE_STRUCTURE)
+    with performance_hooks():
+        return phrase_structure_with_auxiliaries(words, lex, _BASE_PHRASE_STRUCTURE)
 
 
 def _order_local_tables(
@@ -104,12 +115,14 @@ def _order_local_tables(
     lex: WordNetLexicon,
 ) -> tuple[tuple[tuple[float, ...], ...], tuple[float, ...], tuple[float, ...]]:
     """Add bounded local evidence for BE/HAVE morphology transitions."""
-    return order_local_tables_with_auxiliaries(words, lex, _BASE_ORDER_LOCAL_TABLES)
+    with performance_hooks():
+        return order_local_tables_with_auxiliaries(words, lex, _BASE_ORDER_LOCAL_TABLES)
 
 
 def local_grammar_raw(words: Sequence[str], lex: WordNetLexicon) -> float:
     """Local grammar score using the same auxiliary-aware pair table as search."""
-    return local_grammar_raw_with_auxiliaries(words, lex, _BASE_ORDER_LOCAL_TABLES)
+    with performance_hooks():
+        return local_grammar_raw_with_auxiliaries(words, lex, _BASE_ORDER_LOCAL_TABLES)
 
 
 def _install_auxiliary_scoring() -> None:
@@ -136,8 +149,17 @@ def _worker_init_with_auxiliary_scoring(
     _install_auxiliary_scoring()
 
 
+def _worker_analyze_batch_with_performance_hooks(
+    batch: tuple[tuple[int, tuple[str, ...]], ...],
+) -> object:
+    """Give each spawned/thread worker the same scoped fast core adapters."""
+    with performance_hooks():
+        return _BASE_WORKER_ANALYZE_BATCH(batch)
+
+
 _install_auxiliary_scoring()
 setattr(impl, "_worker_init", _worker_init_with_auxiliary_scoring)  # noqa: B010
+setattr(impl, "_worker_analyze_batch", _worker_analyze_batch_with_performance_hooks)  # noqa: B010
 
 
 def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
@@ -318,7 +340,8 @@ def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
     for row in rows:
         row.words = tuple(sorted(row.words))
     rows.sort(key=lambda row: (row.word_count, row.words))
-    _CORE_PREPARE_ROWS(rows, lex)
+    with performance_hooks():
+        _CORE_PREPARE_ROWS(rows, lex)
 
 
 def rank_orders(
@@ -332,14 +355,15 @@ def rank_orders(
 ) -> tuple[tuple[OrderCandidate, ...], int]:
     """Rank a wider raw pool, then retain a quality-preserving diverse subset."""
     raw_k = raw_pool_size(top_k)
-    candidates, evaluated = _BASE_RANK_ORDERS(
-        words,
-        lex,
-        order_mode=order_mode,
-        beam_width=beam_width,
-        exact_max_words=exact_max_words,
-        top_k=raw_k,
-    )
+    with performance_hooks():
+        candidates, evaluated = _BASE_RANK_ORDERS(
+            words,
+            lex,
+            order_mode=order_mode,
+            beam_width=beam_width,
+            exact_max_words=exact_max_words,
+            top_k=raw_k,
+        )
     return select_diverse_orders(candidates, top_k), evaluated
 
 
@@ -373,7 +397,7 @@ def deep_analyze(
     same-process facade callers; spawned workers still receive the widened value
     through their normal initializer, and the original value is always restored.
     """
-    with _DEEP_ANALYZE_LOCK:
+    with _DEEP_ANALYZE_LOCK, performance_hooks():
         retained = int(
             getattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)
         )
@@ -417,13 +441,14 @@ def apply_phrase_rescore(
     for row in rows:
         row.words = tuple(sorted(row.words))
     try:
-        return impl.apply_phrase_rescore(
-            rows,
-            collocation=collocation,
-            phrase_index=phrase_index,
-            top_per_group=top_per_group,
-            bonus_max=bonus_max,
-        )
+        with performance_hooks():
+            return impl.apply_phrase_rescore(
+                rows,
+                collocation=collocation,
+                phrase_index=phrase_index,
+                top_per_group=top_per_group,
+                bonus_max=bonus_max,
+            )
     finally:
         _clear_order_side_tables()
 
@@ -456,10 +481,11 @@ def main() -> int:
     }
     originals = {name: getattr(core, name) for name in overrides}
     try:
-        for name, value in overrides.items():
-            setattr(core, name, value)
-        sys.argv = [original_argv[0], *cleaned]
-        return core.main()
+        with performance_hooks():
+            for name, value in overrides.items():
+                setattr(core, name, value)
+            sys.argv = [original_argv[0], *cleaned]
+            return core.main()
     finally:
         sys.argv = original_argv
         for name, value in originals.items():
