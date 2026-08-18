@@ -58,15 +58,50 @@ def _policy_source_token() -> str:
     return digest.hexdigest()[:20]
 
 
+def _normalized_dictionary_source(source: str) -> str:
+    if source.lower().startswith(("http://", "https://")):
+        return source
+    return str(Path(source).expanduser().resolve())
+
+
+def _cache_source_token(dictionary_source: str, ngram_dir: Path | str) -> str:
+    """Return a stable namespace for one dictionary/ngram source combination."""
+    payload = {
+        "dictionary_source": _normalized_dictionary_source(dictionary_source),
+        "ngram_dir": str(Path(ngram_dir).expanduser().resolve()),
+    }
+    raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(raw).hexdigest()[:20]
+
+
+def _derived_cache_paths(
+    dictionary_source: str,
+    ngram_dir: Path | str,
+) -> tuple[Path, Path, str]:
+    """Choose source-isolated derived files so custom sources cannot race."""
+    source_token = _cache_source_token(dictionary_source, ngram_dir)
+    default_token = _cache_source_token(
+        generator.DEFAULT_DICT_URL,
+        generator.DEFAULT_NGRAM_DIR,
+    )
+    if source_token == default_token:
+        return AUGMENTED_DICTIONARY, POLICY_CACHE, source_token
+    stem = f"normal_user_v{USER_LEXICON_SCHEMA}_{source_token}"
+    return DICTIONARY_DIR / f"{stem}.txt", DICTIONARY_DIR / f"{stem}.json", source_token
+
+
 def _policy_token(
     dictionary_stamp: tuple[int, int],
     unigram_stamp: tuple[int, int],
     extra_short_words: tuple[str, ...],
+    *,
+    source_token: str = "default",
 ) -> str:
     """Return a stable identity for the effective source-backed user lexicon."""
     payload = {
         "schema": USER_LEXICON_SCHEMA,
         "policy_source": _policy_source_token(),
+        "source_token": source_token,
         "dictionary_stamp": list(dictionary_stamp),
         "unigram_stamp": list(unigram_stamp),
         "extra_short_words": list(extra_short_words),
@@ -132,11 +167,17 @@ def build_augmented_dictionary(
 def _load_cached_policy(
     dictionary_stamp: tuple[int, int],
     unigram_stamp: tuple[int, int],
+    *,
+    source_token: str = "default",
+    augmented_dictionary: Path | None = None,
+    policy_cache: Path | None = None,
 ) -> UserLexicon | None:
-    if not AUGMENTED_DICTIONARY.is_file() or not POLICY_CACHE.is_file():
+    augmented_dictionary = augmented_dictionary or AUGMENTED_DICTIONARY
+    policy_cache = policy_cache or POLICY_CACHE
+    if not augmented_dictionary.is_file() or not policy_cache.is_file():
         return None
     try:
-        payload = json.loads(POLICY_CACHE.read_text(encoding="utf-8"))
+        payload = json.loads(policy_cache.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     if not isinstance(payload, dict):
@@ -144,6 +185,8 @@ def _load_cached_policy(
     if payload.get("schema") != USER_LEXICON_SCHEMA:
         return None
     if payload.get("policy_source") != _policy_source_token():
+        return None
+    if payload.get("source_token", "default") != source_token:
         return None
 
     cached_dictionary_stamp = _stamp_from_json(payload.get("dictionary_stamp"))
@@ -160,9 +203,14 @@ def _load_cached_policy(
         return None
     normalized_short_words = tuple(short_words)
     return UserLexicon(
-        AUGMENTED_DICTIONARY,
+        augmented_dictionary,
         normalized_short_words,
-        _policy_token(dictionary_stamp, unigram_stamp, normalized_short_words),
+        _policy_token(
+            dictionary_stamp,
+            unigram_stamp,
+            normalized_short_words,
+            source_token=source_token,
+        ),
     )
 
 
@@ -170,22 +218,27 @@ def _save_policy(
     dictionary_stamp: tuple[int, int],
     unigram_stamp: tuple[int, int],
     extra_short_words: tuple[str, ...],
+    *,
+    source_token: str = "default",
+    policy_cache: Path | None = None,
 ) -> None:
+    policy_cache = policy_cache or POLICY_CACHE
     payload = {
         "schema": USER_LEXICON_SCHEMA,
         "policy_source": _policy_source_token(),
+        "source_token": source_token,
         "dictionary_stamp": list(dictionary_stamp),
         "unigram_stamp": list(unigram_stamp),
         "extra_short_words": list(extra_short_words),
     }
-    POLICY_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    temporary = POLICY_CACHE.with_name(f".{POLICY_CACHE.name}.{uuid.uuid4().hex}.tmp")
+    policy_cache.parent.mkdir(parents=True, exist_ok=True)
+    temporary = policy_cache.with_name(f".{policy_cache.name}.{uuid.uuid4().hex}.tmp")
     try:
         temporary.write_text(
             json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
             encoding="utf-8",
         )
-        os.replace(temporary, POLICY_CACHE)
+        os.replace(temporary, policy_cache)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -197,16 +250,27 @@ def ensure_user_lexicon(
     refresh: bool = False,
 ) -> UserLexicon:
     """Provision and return the cached lexicon used by normal solver runs."""
+    resolved_ngram_dir = Path(ngram_dir).expanduser()
+    augmented_dictionary, policy_cache, source_token = _derived_cache_paths(
+        dictionary_source,
+        resolved_ngram_dir,
+    )
     base_dictionary = generator.get_dictionary(dictionary_source, refresh=refresh)
     unigram_path, _ = generator.ensure_ngram_data(
-        Path(ngram_dir).expanduser(),
+        resolved_ngram_dir,
         refresh=refresh,
         need_bigrams=False,
     )
     dictionary_stamp = _source_stamp(base_dictionary)
     unigram_stamp = _source_stamp(unigram_path)
 
-    cached = _load_cached_policy(dictionary_stamp, unigram_stamp)
+    cached = _load_cached_policy(
+        dictionary_stamp,
+        unigram_stamp,
+        source_token=source_token,
+        augmented_dictionary=augmented_dictionary,
+        policy_cache=policy_cache,
+    )
     if cached is not None:
         return cached
 
@@ -218,12 +282,23 @@ def ensure_user_lexicon(
     )
     build_augmented_dictionary(
         base_dictionary,
-        AUGMENTED_DICTIONARY,
+        augmented_dictionary,
         frozenset(generator.PRETTY_CONTRACTIONS),
     )
-    _save_policy(dictionary_stamp, unigram_stamp, extra_short_words)
-    return UserLexicon(
-        AUGMENTED_DICTIONARY,
+    _save_policy(
+        dictionary_stamp,
+        unigram_stamp,
         extra_short_words,
-        _policy_token(dictionary_stamp, unigram_stamp, extra_short_words),
+        source_token=source_token,
+        policy_cache=policy_cache,
+    )
+    return UserLexicon(
+        augmented_dictionary,
+        extra_short_words,
+        _policy_token(
+            dictionary_stamp,
+            unigram_stamp,
+            extra_short_words,
+            source_token=source_token,
+        ),
     )
