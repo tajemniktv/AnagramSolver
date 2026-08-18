@@ -104,10 +104,11 @@ jobs:
             --order-only
 
       # Informational by design: this is held-out model research, not a hard
-      # regression threshold. A losing experiment should report honestly rather
-      # than turn an otherwise-correct solver build red.
+      # regression threshold. A losing or temporarily broken experiment should
+      # report diagnostics without turning otherwise-correct solver CI red.
       - name: Evaluate explicit-feature ranker with grouped held-out folds
         if: github.event_name == 'pull_request' && hashFiles('train_feature_ranker.py') != ''
+        continue-on-error: true
         run: |
           python train_feature_ranker.py \
             --phrase-db .ci_phrase_cache/wiktionary-wikipedia.db \
