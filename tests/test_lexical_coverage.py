@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,6 +9,7 @@ from unittest.mock import patch
 
 import anagram_generate as generator
 import anagram_solver as solver
+import anagram_user_generate as user_generate
 import anagram_user_lexicon as lexicon
 
 
@@ -22,7 +25,7 @@ class LexicalCoverageTests(unittest.TestCase):
             selected = lexicon.select_corpus_short_words(
                 dictionary,
                 model,
-                min_zipf=4.5,
+                min_zipf=lexicon.DEFAULT_SHORT_WORD_MIN_ZIPF,
             )
 
         self.assertIn("hi", selected)
@@ -137,15 +140,44 @@ class LexicalCoverageTests(unittest.TestCase):
                             lexicon._load_cached_policy((1, 2), (3, 4))
                         )
 
-    def test_valid_policy_cache_returns_source_dependent_token(self) -> None:
+    def test_policy_cache_is_invalidated_by_policy_source_changes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             augmented = root / "augmented.txt"
             policy = root / "policy.json"
             augmented.write_text("hi\n", encoding="utf-8")
             policy.write_text(
-                '{"schema":2,"dictionary_stamp":[1,2],"unigram_stamp":[3,4],'
+                '{"schema":2,"policy_source":"old-policy",'
+                '"dictionary_stamp":[1,2],"unigram_stamp":[3,4],'
                 '"extra_short_words":["hi"]}\n',
+                encoding="utf-8",
+            )
+            with (
+                patch.object(lexicon, "AUGMENTED_DICTIONARY", augmented),
+                patch.object(lexicon, "POLICY_CACHE", policy),
+                patch.object(lexicon, "_policy_source_token", return_value="new-policy"),
+            ):
+                self.assertIsNone(lexicon._load_cached_policy((1, 2), (3, 4)))
+
+    def test_valid_policy_cache_returns_source_dependent_token(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            augmented = root / "augmented.txt"
+            policy = root / "policy.json"
+            augmented.write_text("hi\n", encoding="utf-8")
+            policy_source = lexicon._policy_source_token()
+            policy.write_text(
+                json.dumps(
+                    {
+                        "schema": 2,
+                        "policy_source": policy_source,
+                        "dictionary_stamp": [1, 2],
+                        "unigram_stamp": [3, 4],
+                        "extra_short_words": ["hi"],
+                    },
+                    separators=(",", ":"),
+                )
+                + "\n",
                 encoding="utf-8",
             )
             with (
@@ -173,6 +205,71 @@ class LexicalCoverageTests(unittest.TestCase):
             solver._run_key(args, user_lexicon_token="policy-a"),
             solver._run_key(args, user_lexicon_token="policy-b"),
         )
+
+    def test_user_wrapper_help_does_not_provision_lexicon(self) -> None:
+        with (
+            patch.object(sys, "argv", ["anagram_user_generate.py", "--help"]),
+            patch.object(user_generate, "ensure_user_lexicon") as ensure,
+            patch.object(user_generate.generator, "main", return_value=0) as run,
+        ):
+            self.assertEqual(user_generate.main(), 0)
+
+        ensure.assert_not_called()
+        run.assert_called_once_with()
+
+    def test_user_wrapper_forwards_source_settings_and_injects_before_separator(self) -> None:
+        captured: list[str] = []
+
+        def fake_generator_main() -> int:
+            captured.extend(sys.argv[1:])
+            return 0
+
+        user_lexicon = lexicon.UserLexicon(
+            Path("/tmp/augmented.txt"),
+            ("hi", "we"),
+            "policy-token",
+        )
+        original = [
+            "anagram_user_generate.py",
+            "--dict",
+            "/tmp/base.txt",
+            "--ngram-dir",
+            "/tmp/ngrams",
+            "--refresh",
+            "--",
+            "--letters",
+        ]
+        with (
+            patch.object(sys, "argv", original),
+            patch.object(
+                user_generate,
+                "ensure_user_lexicon",
+                return_value=user_lexicon,
+            ) as ensure,
+            patch.object(
+                user_generate.generator,
+                "main",
+                side_effect=fake_generator_main,
+            ),
+        ):
+            self.assertEqual(user_generate.main(), 0)
+
+        ensure.assert_called_once_with(
+            dictionary_source="/tmp/base.txt",
+            ngram_dir=Path("/tmp/ngrams"),
+            refresh=True,
+        )
+        separator = captured.index("--")
+        self.assertEqual(
+            captured[separator - 4:separator],
+            [
+                "--dict",
+                "/tmp/augmented.txt",
+                "--extra-short-words",
+                "hi,we",
+            ],
+        )
+        self.assertEqual(captured[separator + 1:], ["--letters"])
 
 
 if __name__ == "__main__":
