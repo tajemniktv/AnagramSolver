@@ -17,7 +17,9 @@ class SmokeCase:
 
 CASES = (
     SmokeCase("YOSCOZ", "so cozy"),
-    SmokeCase("OEEEVHYNRI"),
+    SmokeCase("OEEEVHYNRI", "hi everyone"),
+    SmokeCase("ODITIHNSLSHEEEPT", "these hips don't lie"),
+    # Proper names are intentionally still a separate lexical-source problem.
     SmokeCase("AHCWSOPSIO"),
 )
 
