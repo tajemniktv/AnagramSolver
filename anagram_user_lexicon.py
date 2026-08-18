@@ -18,8 +18,8 @@ from pathlib import Path
 import anagram_generate as generator
 from anagram_paths import DICTIONARY_DIR
 
-USER_LEXICON_SCHEMA = 1
-DEFAULT_SHORT_WORD_MIN_ZIPF = 4.5
+USER_LEXICON_SCHEMA = 2
+DEFAULT_SHORT_WORD_MIN_ZIPF = 5.0
 AUGMENTED_DICTIONARY = DICTIONARY_DIR / f"normal_user_v{USER_LEXICON_SCHEMA}.txt"
 POLICY_CACHE = DICTIONARY_DIR / f"normal_user_v{USER_LEXICON_SCHEMA}.json"
 
