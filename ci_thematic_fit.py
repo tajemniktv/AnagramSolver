@@ -108,15 +108,23 @@ def main() -> int:
             if category.startswith("ordinary-"):
                 ordinary_baseline.append(baseline_rank)
                 ordinary_thematic.append(thematic_rank)
-            if baseline_rank != thematic_rank or str(case.get("id")) in {
-                "dog_ball",
-                "phone_charge",
-            }:
+
+            case_id = str(case.get("id", answer))
+            if baseline_rank != thematic_rank or case_id in {"dog_ball", "phone_charge"}:
+                target_item = next(
+                    (
+                        item
+                        for item in thematic_sorted
+                        if benchmark.phrase_key(item[2]) in acceptable
+                    ),
+                    None,
+                )
+                target_fit = target_item[3] if target_item is not None else 0.0
                 print(
-                    f"{str(case.get('id', answer)):<24} "
+                    f"{case.get('id', answer)!s:<24} "
                     f"baseline={baseline_rank:>2} thematic={thematic_rank:>2} "
-                    f"best={ ' '.join(thematic_sorted[0][2]) } "
-                    f"fit={thematic_sorted[0][3]:.3f}"
+                    f"best={' '.join(thematic_sorted[0][2])} "
+                    f"best_fit={thematic_sorted[0][3]:.3f} target_fit={target_fit:.3f}"
                 )
     finally:
         phrase_index.connection.close()
