@@ -56,7 +56,7 @@ class QualityGuidedGenerationTests(unittest.TestCase):
 
         self.assertEqual(guided, [("ab", "ab"), ("ab", "a", "b")])
 
-    def test_unused_later_bucket_budget_rolls_back_to_saturated_bucket(self) -> None:
+    def test_sparse_bucket_does_not_force_expensive_rescan_of_other_bucket(self) -> None:
         candidates = [
             generator.Candidate("ab", sig(1, 1), 2, 5.0),
             generator.Candidate("aa", sig(2, 0), 2, 4.5),
@@ -73,8 +73,33 @@ class QualityGuidedGenerationTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(len(guided), 2)
-        self.assertEqual(set(guided), {("ab", "ab"), ("aa", "bb")})
+        # One result slot is reserved per requested bucket. The 3-word bucket is
+        # empty, and bounded normal search deliberately does not rerun the 2-word
+        # beam merely to fill the global cap.
+        self.assertEqual(guided, [("ab", "ab")])
+
+    def test_search_stats_report_exact_closures_not_just_retained_results(self) -> None:
+        candidates = [
+            generator.Candidate("ab", sig(1, 1), 2, 5.0),
+            generator.Candidate("aa", sig(2, 0), 2, 4.5),
+            generator.Candidate("bb", sig(0, 2), 2, 4.5),
+        ]
+        stats = generator.SearchStats()
+        guided = list(
+            user_search.quality_guided_bounded_solve(
+                sig(2, 2),
+                candidates,
+                2,
+                2,
+                1,
+                True,
+                stats=stats,
+            )
+        )
+
+        self.assertEqual(guided, [("ab", "ab")])
+        self.assertEqual(stats.accepted, 1)
+        self.assertGreaterEqual(stats.exact_examined, 2)
 
     def test_no_repeat_is_respected(self) -> None:
         candidates = [generator.Candidate("ab", sig(1, 1), 2, 5.0)]
