@@ -37,26 +37,50 @@ class QualityGuidedGenerationTests(unittest.TestCase):
         self.assertEqual(historical, [("high-a", "low-bb")])
         self.assertEqual(guided, [("good-ab", "good-b")])
 
-    def test_quality_anchor_selection_preserves_lower_scoring_rare_champion(self) -> None:
-        quality = [
+    def test_multi_view_selection_preserves_collocation_candidate(self) -> None:
+        lexical = [
             (10.0, 0, ("common-1",)),
             (9.0, -1, ("common-2",)),
             (8.0, -2, ("common-3",)),
+            (7.0, -3, ("common-4",)),
         ]
-        anchors = {
-            1: [(10.0, 0, ("common-1",))],
-            99: [(2.0, -3, ("rare-best-context",))],
-        }
+        pair = [
+            (1.0, -0.1, 4.0, -4, ("collocated",)),
+            (0.5, -0.2, 9.0, -1, ("common-2",)),
+        ]
+        anchors = {99: [(3.0, -5, ("rare-anchor",))]}
 
-        selected = user_search._select_quality_with_anchors(quality, anchors, 4)
+        selected = user_search._select_multi_view(lexical, pair, anchors, 4)
 
-        self.assertIn((2.0, -3, ("rare-best-context",)), selected)
+        self.assertIn(("collocated",), selected)
+        self.assertIn(("rare-anchor",), selected)
         self.assertEqual(len(selected), 4)
 
-    def test_anchor_capacity_can_cover_two_champions_per_candidate(self) -> None:
-        quality, anchors = user_search._quality_anchor_limits(10_000, 743)
-        self.assertEqual(anchors, 743 * user_search.ANCHOR_CHAMPIONS_PER_WORD)
-        self.assertEqual(quality + anchors, 10_000)
+    def test_view_quotas_leave_room_for_diversity(self) -> None:
+        lexical, pair = user_search._view_quotas(10_000)
+        self.assertEqual(lexical, 5_500)
+        self.assertEqual(pair, 3_500)
+        self.assertLess(lexical + pair, 10_000)
+
+    def test_pair_priority_prefers_observed_connectivity(self) -> None:
+        candidates = [
+            generator.Candidate("alpha", sig(1, 0), 5, 5.0),
+            generator.Candidate("beta", sig(0, 1), 4, 5.0),
+            generator.Candidate("gamma", sig(0, 1), 5, 5.0),
+        ]
+        unigrams = generator.UnigramModel(
+            counts={"alpha": 1000, "beta": 1000, "gamma": 1000},
+            total=3000,
+        )
+        model = generator.BigramModel(
+            unigrams,
+            {("alpha", "beta"): 500},
+        )
+
+        observed = user_search._pair_priority((0, 1), candidates, model)
+        unseen = user_search._pair_priority((0, 2), candidates, model)
+
+        self.assertGreater(observed, unseen)
 
     def test_balanced_budget_keeps_multiple_word_count_buckets(self) -> None:
         candidates = [
@@ -94,10 +118,6 @@ class QualityGuidedGenerationTests(unittest.TestCase):
             )
         )
 
-        # One result slot is reserved per requested bucket. The 3-word bucket is
-        # empty, and bounded normal search deliberately does not rerun the 2-word
-        # beam merely to fill the global cap. The non-repeating aa+bb bag beats
-        # ab+ab because the existing lexical score penalizes duplicate words.
         self.assertEqual(guided, [("aa", "bb")])
 
     def test_search_stats_report_exact_closures_not_just_retained_results(self) -> None:
