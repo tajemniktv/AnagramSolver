@@ -237,11 +237,16 @@ def quality_guided_bounded_solve(
     remaining_budget = max_results
     word_counts = tuple(range(min_words, max_words + 1))
     total_examined = 0
-    retained_total = 0
+    bucket_results: dict[int, list[tuple[str, ...]]] = {}
+    bucket_limits: dict[int, int] = {}
 
+    # First pass rolls sparse early buckets forward immediately. This is cheap
+    # for common 2/3-word cases and reserves meaningful space for longer bags.
     for position, word_count in enumerate(word_counts):
         if remaining_budget <= 0:
-            break
+            bucket_results[word_count] = []
+            bucket_limits[word_count] = 0
+            continue
         buckets_left = len(word_counts) - position
         quota = max(1, math.ceil(remaining_budget / buckets_left))
         bags, examined = _top_bags_for_word_count(
@@ -252,14 +257,46 @@ def quality_guided_bounded_solve(
             allow_repeat,
         )
         total_examined += examined
-        for bag in bags:
+        bucket_results[word_count] = bags
+        bucket_limits[word_count] = quota
+        remaining_budget -= len(bags)
+
+    # If later buckets were sparse, spend their unused reservation on an earlier
+    # bucket that proved it had at least its full quota. Re-running only happens
+    # in this spillover case and keeps the final total at the requested cap when
+    # enough exact bags exist anywhere in the requested range.
+    if remaining_budget > 0:
+        for word_count in word_counts:
+            if remaining_budget <= 0:
+                break
+            previous = bucket_results.get(word_count, [])
+            previous_limit = bucket_limits.get(word_count, 0)
+            if previous_limit <= 0 or len(previous) < previous_limit:
+                continue
+            expanded_limit = previous_limit + remaining_budget
+            expanded, examined = _top_bags_for_word_count(
+                remaining,
+                candidates,
+                word_count,
+                expanded_limit,
+                allow_repeat,
+            )
+            total_examined += examined
+            added = max(0, len(expanded) - len(previous))
+            if added <= 0:
+                continue
+            take = min(added, remaining_budget)
+            bucket_results[word_count] = expanded[: len(previous) + take]
+            bucket_limits[word_count] = expanded_limit
+            remaining_budget -= take
+
+    retained_total = 0
+    for word_count in word_counts:
+        for bag in bucket_results.get(word_count, ()):
             search_stats.exact_examined += 1
             search_stats.accepted += 1
             retained_total += 1
-            remaining_budget -= 1
             yield bag
-        if not bags:
-            continue
 
     print(
         f"Quality-guided bounded search examined {total_examined:,} exact bag(s); "
