@@ -47,6 +47,17 @@ def _stamp_from_json(value: Any) -> tuple[int, int] | None:
     return value[0], value[1]
 
 
+def _policy_source_token() -> str:
+    """Hash the code that determines derived user-lexicon contents."""
+    digest = hashlib.sha256()
+    for path in (Path(__file__).resolve(), Path(generator.__file__).resolve()):
+        digest.update(path.name.encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()[:20]
+
+
 def _policy_token(
     dictionary_stamp: tuple[int, int],
     unigram_stamp: tuple[int, int],
@@ -55,6 +66,7 @@ def _policy_token(
     """Return a stable identity for the effective source-backed user lexicon."""
     payload = {
         "schema": USER_LEXICON_SCHEMA,
+        "policy_source": _policy_source_token(),
         "dictionary_stamp": list(dictionary_stamp),
         "unigram_stamp": list(unigram_stamp),
         "extra_short_words": list(extra_short_words),
@@ -131,6 +143,8 @@ def _load_cached_policy(
         return None
     if payload.get("schema") != USER_LEXICON_SCHEMA:
         return None
+    if payload.get("policy_source") != _policy_source_token():
+        return None
 
     cached_dictionary_stamp = _stamp_from_json(payload.get("dictionary_stamp"))
     cached_unigram_stamp = _stamp_from_json(payload.get("unigram_stamp"))
@@ -159,6 +173,7 @@ def _save_policy(
 ) -> None:
     payload = {
         "schema": USER_LEXICON_SCHEMA,
+        "policy_source": _policy_source_token(),
         "dictionary_stamp": list(dictionary_stamp),
         "unigram_stamp": list(unigram_stamp),
         "extra_short_words": list(extra_short_words),
@@ -175,12 +190,17 @@ def _save_policy(
         temporary.unlink(missing_ok=True)
 
 
-def ensure_user_lexicon() -> UserLexicon:
+def ensure_user_lexicon(
+    *,
+    dictionary_source: str = generator.DEFAULT_DICT_URL,
+    ngram_dir: Path | str = generator.DEFAULT_NGRAM_DIR,
+    refresh: bool = False,
+) -> UserLexicon:
     """Provision and return the cached lexicon used by normal solver runs."""
-    base_dictionary = generator.get_dictionary(generator.DEFAULT_DICT_URL)
+    base_dictionary = generator.get_dictionary(dictionary_source, refresh=refresh)
     unigram_path, _ = generator.ensure_ngram_data(
-        Path(generator.DEFAULT_NGRAM_DIR),
-        refresh=False,
+        Path(ngram_dir).expanduser(),
+        refresh=refresh,
         need_bigrams=False,
     )
     dictionary_stamp = _source_stamp(base_dictionary)
