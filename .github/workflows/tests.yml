@@ -32,13 +32,13 @@ jobs:
           anagram_paths.py anagram_benchmark.py anagram_generate.py anagram_rerank.py anagram_rerank_core.py
           anagram_rerank_topk_impl.py anagram_solver.py anagram_performance.py anagram_corpus_cohesion.py
           anagram_feature_ranker.py anagram_order_refinement.py train_feature_ranker.py build_wikimedia_phrase_index.py
-          ci_phrase_matrix.py ci_ordering_gate.py ci_performance_probe.py ci_order_refinement.py
+          ci_phrase_matrix.py ci_ordering_gate.py ci_performance_probe.py ci_order_refinement.py ci_user_runs.py
       - name: Enforce Pylance/Pyright diagnostics
         run: >-
           pyright anagram_paths.py anagram_rerank_core.py anagram_rerank.py
           anagram_rerank_topk_impl.py anagram_performance.py anagram_corpus_cohesion.py
           anagram_feature_ranker.py anagram_order_refinement.py train_feature_ranker.py
-          ci_ordering_gate.py ci_performance_probe.py ci_order_refinement.py
+          ci_ordering_gate.py ci_performance_probe.py ci_order_refinement.py ci_user_runs.py
 
   unit-tests:
     name: unit tests (Python ${{ matrix.python-version }})
@@ -55,6 +55,29 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
+
+  normal-user-cli:
+    name: normal user CLI smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .anagram_data/wordnet31
+            .anagram_data/dictionary
+            .anagram_data/ngrams
+          key: normal-user-corpora-${{ runner.os }}-v1
+      - name: Clear puzzle-specific caches
+        run: rm -rf .anagram_data/prepared_cache .anagram_data/solver_runs
+      - name: Run ordinary verbose user invocations
+        run: python ci_user_runs.py
 
   ordering-regression:
     name: ordering regression
