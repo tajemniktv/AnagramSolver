@@ -1408,11 +1408,11 @@ def main() -> int:
         if stream is not None:
             stream.close()
 
-    generated = search_stats.exact_examined
+    evaluated = search_stats.exact_examined
     accepted = search_stats.accepted
     search_seconds = time.perf_counter() - search_started
     print(
-        f"Examined {generated:,} clue-relevant exact word set(s); "
+        f"Evaluated {evaluated:,} exact completion(s); "
         f"{accepted:,} satisfied clue constraints. "
         f"Exact search: {search_seconds:.2f}s.",
         file=sys.stderr,
