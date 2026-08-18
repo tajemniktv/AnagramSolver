@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from anagram_paths import SOLVER_RUNS_DIR
+from anagram_user_lexicon import ensure_user_lexicon
 
 HERE = Path(__file__).resolve().parent
 GENERATOR = HERE / "anagram_user_generate.py"
@@ -106,7 +107,11 @@ def _source_hash(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()[:12]
 
 
-def _run_key(args: argparse.Namespace) -> str:
+def _run_key(
+    args: argparse.Namespace,
+    *,
+    user_lexicon_token: str | None = None,
+) -> str:
     payload = {
         "schema": GENERATION_CACHE_SCHEMA,
         "text": _normalized_target(args.text),
@@ -122,6 +127,7 @@ def _run_key(args: argparse.Namespace) -> str:
         "generator": _source_hash(GENERATOR),
         "generator_core": _source_hash(GENERATOR_CORE),
         "user_lexicon": _source_hash(USER_LEXICON),
+        "user_lexicon_token": user_lexicon_token or "unresolved",
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(raw).hexdigest()[:20]
@@ -433,7 +439,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     _validate_args(args)
 
-    run_dir = args.work_root.expanduser() / _run_key(args)
+    # The normal-user lexicon is source-data dependent. Resolve it before
+    # selecting a candidate-cache directory so refreshed dictionary/frequency
+    # data cannot silently reuse candidates generated under an older policy.
+    user_lexicon = ensure_user_lexicon()
+    run_dir = args.work_root.expanduser() / _run_key(
+        args,
+        user_lexicon_token=user_lexicon.cache_token,
+    )
     run_dir.mkdir(parents=True, exist_ok=True)
     candidates = run_dir / "candidates.txt"
     reranked = run_dir / "reranked.txt"
