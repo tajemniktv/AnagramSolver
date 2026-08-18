@@ -8,7 +8,7 @@ from pathlib import Path
 
 import anagram_benchmark as benchmark
 import anagram_rerank as reranker
-from anagram_order_refinement import refine_seed_pool
+from anagram_order_refinement import augment_seed_pool
 
 HERE = Path(__file__).resolve().parent
 
@@ -39,8 +39,9 @@ def main() -> int:
     recovered = 0
     improved_seed_best = 0
     total_extra_evaluations = 0
+    total_added_orders = 0
 
-    print("=== FORCED-BEAM K-OPT REFINEMENT A/B ===")
+    print("=== FORCED-BEAM K-OPT AUGMENTATION A/B ===")
     for case in _load_cases():
         answer = str(case.get("answer", ""))
         words = benchmark.tokens(answer)
@@ -66,7 +67,7 @@ def main() -> int:
         seed_target = any(benchmark.phrase_key(order) in acceptable for order in seed_orders)
         seed_best_score = max(candidate.objective for candidate in seeds)
 
-        refined = refine_seed_pool(
+        augmented = augment_seed_pool(
             seed_orders,
             lambda order: _objective(order, lex),
             seed_limit=8,
@@ -74,26 +75,33 @@ def main() -> int:
             max_rounds=3,
             max_evaluations_per_seed=384,
         )
-        total_extra_evaluations += sum(result.evaluated for result in refined)
-        refined_target = any(
-            benchmark.phrase_key(result.order) in acceptable for result in refined
+        total_extra_evaluations += augmented.evaluated
+        total_added_orders += max(0, len(augmented.candidates) - len(set(seed_orders)))
+        augmented_target = any(
+            benchmark.phrase_key(result.order) in acceptable
+            for result in augmented.candidates
         )
-        refined_best = max((result.score for result in refined), default=seed_best_score)
-        recovered += int(refined_target and not seed_target)
-        improved_seed_best += int(refined_best > seed_best_score + 1e-12)
-        status = "RECOVER" if refined_target and not seed_target else (
-            "KEEP" if refined_target else "MISS"
+        augmented_best = max(
+            (result.score for result in augmented.candidates),
+            default=seed_best_score,
+        )
+        recovered += int(augmented_target and not seed_target)
+        improved_seed_best += int(augmented_best > seed_best_score + 1e-12)
+        status = "RECOVER" if augmented_target and not seed_target else (
+            "KEEP" if augmented_target else "MISS"
         )
         print(
-            f"{status:7} {str(case.get('id', answer)):<24} "
-            f"seed_target={int(seed_target)} refined_target={int(refined_target)} "
-            f"bestΔ={refined_best - seed_best_score:+.4f}"
+            f"{status:7} {case.get('id', answer)!s:<24} "
+            f"seed_target={int(seed_target)} augmented_target={int(augmented_target)} "
+            f"added={max(0, len(augmented.candidates) - len(set(seed_orders))):>2} "
+            f"bestΔ={augmented_best - seed_best_score:+.4f}"
         )
 
-    print(f"cases:                  {evaluated_cases}")
-    print(f"new target recoveries:  {recovered}")
-    print(f"better full-score best: {improved_seed_best}")
-    print(f"refinement evaluations: {total_extra_evaluations}")
+    print(f"cases:                   {evaluated_cases}")
+    print(f"new target recoveries:   {recovered}")
+    print(f"better full-score best:  {improved_seed_best}")
+    print(f"added candidate orders:  {total_added_orders}")
+    print(f"refinement evaluations:  {total_extra_evaluations}")
     return 0
 
 
