@@ -1,8 +1,8 @@
-"""Semantics-preserving hot-path adapters for the active reranker.
+"""Hot-path adapters and corpus evidence for the active reranker.
 
-The core scorer intentionally stays simple and portable. The active facade can
-therefore layer a few runtime-only optimizations over it without changing the
-legacy parser's behavior or prepared-cache format.
+The stable core scorer intentionally stays simple and portable. The active
+facade layers runtime optimizations plus generic corpus-span cohesion over it
+without changing the prepared-cache format.
 """
 
 from __future__ import annotations
@@ -11,12 +11,14 @@ import threading
 from collections import OrderedDict
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
 import anagram_rerank_core as core
+from anagram_corpus_cohesion import blend_phrase_cohesion, score_corpus_cohesion
 
 _ORIGINAL_NORM_TOKEN = core.norm_token
 _ORIGINAL_FUNCTION_CLASS = core.function_class
@@ -30,6 +32,14 @@ _HOOK_RESTORE: tuple[
     type[core.WordNetLexicon],
     type[core.PhraseIndex],
 ] | None = None
+
+# Cohesion changes ranking semantics, unlike the cache-only adapters. Keep that
+# policy context-local so an unrelated thread touching stable core while facade
+# work is active cannot accidentally inherit cohesion scoring.
+_COHESION_ACTIVE: ContextVar[bool] = ContextVar(
+    "anagram_cohesion_active",
+    default=False,
+)
 
 
 def fast_norm_token(text: str) -> str:
@@ -64,7 +74,10 @@ class FastWordNetLexicon(core.WordNetLexicon):
     def load(cls, dictionary_dir: Path) -> FastWordNetLexicon:
         # The core classmethod constructs ``cls`` already; narrow its historical
         # base-class return annotation for callers of the optimized subclass.
-        return cast(FastWordNetLexicon, super().load(dictionary_dir))
+        return cast(
+            FastWordNetLexicon,
+            super(FastWordNetLexicon, cls).load(dictionary_dir),
+        )
 
     def frames_for(self, raw_word: str) -> frozenset[int]:
         word = fast_norm_token(raw_word)
@@ -100,8 +113,8 @@ class FastWordNetLexicon(core.WordNetLexicon):
 
 
 @dataclass(slots=True)
-class FastPhraseIndex(core.PhraseIndex):
-    """Bounded read-through cache for immutable phrase-index counts and misses."""
+class CachedPhraseIndex(core.PhraseIndex):
+    """Bounded read-through cache with stable-core phrase scoring semantics."""
 
     # None is an explicit database-miss sentinel. Real rows may legally contain
     # zero or negative counts, and counts() preserves those baseline semantics.
@@ -150,6 +163,45 @@ class FastPhraseIndex(core.PhraseIndex):
 
         return out
 
+    def _blend_cohesion(
+        self,
+        words: Sequence[str],
+        base_score: float,
+        details: dict[str, float],
+    ) -> tuple[float, dict[str, float]]:
+        cohesion = score_corpus_cohesion(
+            words,
+            counts=self.counts,
+            max_n=self.max_n,
+        )
+        score = blend_phrase_cohesion(base_score, cohesion)
+        return score, {
+            **details,
+            "cohesion": cohesion.score,
+            "cohesion_coverage": cohesion.coverage,
+            "cohesion_longest_fraction": cohesion.longest_fraction,
+            "cohesion_segments": float(cohesion.segments),
+            "cohesion_splice_penalty": cohesion.splice_penalty,
+            "cohesion_frequency": cohesion.frequency_strength,
+        }
+
+    def score(self, words: Sequence[str]) -> tuple[float, dict[str, float]]:
+        """Keep core semantics unless the active facade context requests cohesion."""
+        base_score, details = _ORIGINAL_PHRASE_INDEX.score(self, words)
+        if not _COHESION_ACTIVE.get():
+            return base_score, details
+        return self._blend_cohesion(words, base_score, details)
+
+
+class FastPhraseIndex(CachedPhraseIndex):
+    """Facade phrase index with cohesion scoring enabled explicitly."""
+
+    __slots__ = ()
+
+    def score(self, words: Sequence[str]) -> tuple[float, dict[str, float]]:
+        base_score, details = _ORIGINAL_PHRASE_INDEX.score(self, words)
+        return self._blend_cohesion(words, base_score, details)
+
 
 def clear_performance_caches() -> None:
     """Reset process-global memoized helpers used by benchmark/test isolation."""
@@ -158,44 +210,47 @@ def clear_performance_caches() -> None:
 
 @contextmanager
 def performance_hooks() -> Iterator[None]:
-    """Temporarily install fast core adapters and restore exact prior bindings.
+    """Temporarily install semantics-preserving fast core adapters.
 
-    The depth counter keeps adapters active across nested or overlapping facade
-    calls without holding the lock while user work executes. Importing the
-    reranker therefore remains side-effect free. During an active facade call,
-    unrelated same-process core consumers may temporarily observe the fast
-    semantics-equivalent bindings; the last overlapping facade context restores
-    the exact bindings that were present before the first one entered.
+    Normalization, function metadata, WordNet frames and phrase-count caching are
+    safe to expose through stable core because they preserve its results. Corpus
+    cohesion is different: it is a ranking policy. A ContextVar enables that
+    policy only for facade execution while unrelated concurrent threads keep the
+    original PhraseIndex.score semantics even if they observe CachedPhraseIndex.
     """
     global _HOOK_DEPTH, _HOOK_RESTORE
 
-    with _HOOK_LOCK:
-        if _HOOK_DEPTH == 0:
-            _HOOK_RESTORE = (
-                core.norm_token,
-                core.function_class,
-                core.WordNetLexicon,
-                core.PhraseIndex,
-            )
-            core.norm_token = fast_norm_token
-            core.function_class = cached_function_class
-            core.WordNetLexicon = FastWordNetLexicon
-            core.PhraseIndex = FastPhraseIndex
-        _HOOK_DEPTH += 1
-
+    cohesion_token = _COHESION_ACTIVE.set(True)
     try:
-        yield
-    finally:
         with _HOOK_LOCK:
-            _HOOK_DEPTH -= 1
             if _HOOK_DEPTH == 0:
-                restore = _HOOK_RESTORE
-                if restore is None:
-                    raise RuntimeError("performance hook restore state was lost")
-                (
+                _HOOK_RESTORE = (
                     core.norm_token,
                     core.function_class,
                     core.WordNetLexicon,
                     core.PhraseIndex,
-                ) = restore
-                _HOOK_RESTORE = None
+                )
+                core.norm_token = fast_norm_token
+                core.function_class = cached_function_class
+                core.WordNetLexicon = FastWordNetLexicon
+                core.PhraseIndex = CachedPhraseIndex
+            _HOOK_DEPTH += 1
+
+        try:
+            yield
+        finally:
+            with _HOOK_LOCK:
+                _HOOK_DEPTH -= 1
+                if _HOOK_DEPTH == 0:
+                    restore = _HOOK_RESTORE
+                    if restore is None:
+                        raise RuntimeError("performance hook restore state was lost")
+                    (
+                        core.norm_token,
+                        core.function_class,
+                        core.WordNetLexicon,
+                        core.PhraseIndex,
+                    ) = restore
+                    _HOOK_RESTORE = None
+    finally:
+        _COHESION_ACTIVE.reset(cohesion_token)

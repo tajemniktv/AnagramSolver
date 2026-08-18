@@ -128,7 +128,7 @@ class PerformanceHotPathTests(unittest.TestCase):
         self.assertEqual(actual, [frame_map[word] for word in workload])
         self.assertLessEqual(len(lex._frames_cache), lex._frames_cache_limit)
 
-    def test_fast_phrase_index_matches_original_and_reuses_counts(self) -> None:
+    def test_fast_phrase_index_exposes_cohesion_and_reuses_counts(self) -> None:
         baseline_connection = _phrase_connection()
         fast_connection = _phrase_connection()
         try:
@@ -136,7 +136,7 @@ class PerformanceHotPathTests(unittest.TestCase):
             fast = perf.FastPhraseIndex(fast_connection, 5)
             words = ("actions", "speak", "louder", "than", "words")
 
-            expected = baseline.score(words)
+            expected_score, expected_details = baseline.score(words)
             select_statements: list[str] = []
             fast_connection.set_trace_callback(
                 lambda statement: (
@@ -145,12 +145,33 @@ class PerformanceHotPathTests(unittest.TestCase):
                     else None
                 )
             )
-            actual = fast.score(words)
+            actual_score, actual_details = fast.score(words)
             queries_after_first = len(select_statements)
             repeated = fast.score(words)
 
-            self.assertEqual(actual, expected)
-            self.assertEqual(repeated, expected)
+            self.assertGreaterEqual(actual_score, expected_score)
+            for key, value in expected_details.items():
+                self.assertEqual(actual_details[key], value)
+            for key in (
+                "cohesion",
+                "cohesion_coverage",
+                "cohesion_longest_fraction",
+                "cohesion_segments",
+                "cohesion_splice_penalty",
+                "cohesion_frequency",
+            ):
+                self.assertIn(key, actual_details)
+            for key in (
+                "cohesion",
+                "cohesion_coverage",
+                "cohesion_longest_fraction",
+                "cohesion_splice_penalty",
+                "cohesion_frequency",
+            ):
+                self.assertGreaterEqual(actual_details[key], 0.0)
+                self.assertLessEqual(actual_details[key], 1.0)
+            self.assertGreaterEqual(actual_details["cohesion_segments"], 0.0)
+            self.assertEqual(repeated, (actual_score, actual_details))
             self.assertGreater(queries_after_first, 0)
             self.assertEqual(len(select_statements), queries_after_first)
             self.assertIn("actions speak louder than words", fast._count_cache)
@@ -212,10 +233,11 @@ class PerformanceHotPathTests(unittest.TestCase):
             self.assertIs(core.norm_token, perf.fast_norm_token)
             self.assertIs(core.function_class, perf.cached_function_class)
             self.assertIs(core.WordNetLexicon, perf.FastWordNetLexicon)
-            self.assertIs(core.PhraseIndex, perf.FastPhraseIndex)
+            self.assertIs(core.PhraseIndex, perf.CachedPhraseIndex)
             with perf.performance_hooks():
                 self.assertIs(core.norm_token, perf.fast_norm_token)
                 self.assertIs(core.WordNetLexicon, perf.FastWordNetLexicon)
+                self.assertIs(core.PhraseIndex, perf.CachedPhraseIndex)
 
         self.assertEqual(
             (
@@ -226,6 +248,33 @@ class PerformanceHotPathTests(unittest.TestCase):
             ),
             before,
         )
+
+    def test_concurrent_core_consumer_does_not_inherit_cohesion_policy(self) -> None:
+        words = ("actions", "speak", "louder", "than", "words")
+
+        def core_thread_score() -> tuple[float, dict[str, float], type[core.PhraseIndex]]:
+            baseline_connection = _phrase_connection()
+            observed_connection = _phrase_connection()
+            try:
+                baseline = perf._ORIGINAL_PHRASE_INDEX(baseline_connection, 5)
+                observed_type = core.PhraseIndex
+                observed = observed_type(observed_connection, 5)
+                expected = baseline.score(words)
+                actual = observed.score(words)
+                self.assertEqual(actual, expected)
+                self.assertNotIn("cohesion", actual[1])
+                return actual[0], actual[1], observed_type
+            finally:
+                baseline_connection.close()
+                observed_connection.close()
+
+        with perf.performance_hooks():
+            self.assertIs(core.PhraseIndex, perf.CachedPhraseIndex)
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                score, details, observed_type = pool.submit(core_thread_score).result()
+            self.assertIs(observed_type, perf.CachedPhraseIndex)
+            self.assertGreaterEqual(score, 0.0)
+            self.assertNotIn("cohesion", details)
 
     def test_reranker_import_and_reload_preserve_core_bindings(self) -> None:
         before = (
