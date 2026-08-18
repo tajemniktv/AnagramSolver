@@ -3,7 +3,6 @@ name: phrase corpus benchmarks
 on:
   pull_request:
   schedule:
-    # Refresh the default-branch corpus snapshot near the start of each month.
     - cron: "17 3 1 * *"
   workflow_dispatch:
 
@@ -23,7 +22,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
@@ -103,9 +101,6 @@ jobs:
             --workers 8 \
             --order-only
 
-      # Informational by design: this is held-out model research, not a hard
-      # regression threshold. A losing experiment should report honestly rather
-      # than turn an otherwise-correct solver build red.
       - name: Evaluate explicit-feature ranker with grouped held-out folds
         if: github.event_name == 'pull_request' && hashFiles('train_feature_ranker.py') != ''
         run: |
@@ -113,6 +108,13 @@ jobs:
             --phrase-db .ci_phrase_cache/wiktionary-wikipedia.db \
             --order-candidates 56 \
             --folds 5
+
+      - name: Evaluate corpus-derived thematic fit
+        if: github.event_name == 'pull_request' && hashFiles('ci_thematic_fit.py') != ''
+        run: |
+          python ci_thematic_fit.py \
+            --phrase-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --order-candidates 56
 
       - name: Run manual full corpus benchmark matrix
         if: github.event_name == 'workflow_dispatch'
