@@ -105,7 +105,7 @@ def score_corpus_cohesion(
     queries: list[str] = []
     upper = min(max_n, n)
     for length in range(2, upper + 1):
-        for start in range(0, n - length + 1):
+        for start in range(n - length + 1):
             end = start + length
             text = " ".join(ordered[start:end])
             span_text[(start, end)] = text
