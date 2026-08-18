@@ -1,0 +1,162 @@
+"""Cached lexical policy for ordinary one-command solver runs.
+
+The research generator intentionally exposes low-level dictionary and short-word
+controls. The normal user frontend applies a safer broader policy: corpus-common
+two-letter words are admitted without hard-coding individual puzzle answers,
+and standard punctuationless contractions already known to the project are
+added when the base dictionary omits them.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import uuid
+from dataclasses import dataclass
+from pathlib import Path
+
+import anagram_generate as generator
+from anagram_paths import DICTIONARY_DIR
+
+USER_LEXICON_SCHEMA = 1
+DEFAULT_SHORT_WORD_MIN_ZIPF = 4.5
+AUGMENTED_DICTIONARY = DICTIONARY_DIR / f"normal_user_v{USER_LEXICON_SCHEMA}.txt"
+POLICY_CACHE = DICTIONARY_DIR / f"normal_user_v{USER_LEXICON_SCHEMA}.json"
+
+
+@dataclass(frozen=True, slots=True)
+class UserLexicon:
+    dictionary: Path
+    extra_short_words: tuple[str, ...]
+
+
+def _source_stamp(path: Path) -> tuple[int, int]:
+    stat = path.stat()
+    return stat.st_size, stat.st_mtime_ns
+
+
+def select_corpus_short_words(
+    dictionary: Path,
+    unigrams: generator.UnigramModel,
+    *,
+    min_zipf: float = DEFAULT_SHORT_WORD_MIN_ZIPF,
+) -> tuple[str, ...]:
+    """Return corpus-common two-letter dictionary words in lexical order."""
+    selected: set[str] = set()
+    with dictionary.open("r", encoding="utf-8", errors="ignore") as handle:
+        for line in handle:
+            word = generator.normalize_token(line)
+            if len(word) != 2:
+                continue
+            if unigrams.zipf(word) >= min_zipf:
+                selected.add(word)
+    return tuple(sorted(selected))
+
+
+def build_augmented_dictionary(
+    base_dictionary: Path,
+    output: Path,
+    supplements: set[str] | frozenset[str],
+) -> Path:
+    """Copy the base word list and append normalized missing supplements."""
+    original = base_dictionary.read_text(encoding="utf-8", errors="ignore")
+    existing = {
+        word
+        for line in original.splitlines()
+        if (word := generator.normalize_token(line))
+    }
+    additions = sorted(
+        {
+            normalized
+            for word in supplements
+            if (normalized := generator.normalize_token(word))
+            and normalized not in existing
+        }
+    )
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_name(f".{output.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with temporary.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(original)
+            if original and not original.endswith("\n"):
+                handle.write("\n")
+            for word in additions:
+                handle.write(word + "\n")
+        os.replace(temporary, output)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return output
+
+
+def _load_cached_policy(
+    dictionary_stamp: tuple[int, int],
+    unigram_stamp: tuple[int, int],
+) -> UserLexicon | None:
+    if not AUGMENTED_DICTIONARY.is_file() or not POLICY_CACHE.is_file():
+        return None
+    try:
+        payload = json.loads(POLICY_CACHE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if payload.get("schema") != USER_LEXICON_SCHEMA:
+        return None
+    if tuple(payload.get("dictionary_stamp", ())) != dictionary_stamp:
+        return None
+    if tuple(payload.get("unigram_stamp", ())) != unigram_stamp:
+        return None
+    short_words = payload.get("extra_short_words")
+    if not isinstance(short_words, list) or not all(
+        isinstance(word, str) and len(word) == 2 for word in short_words
+    ):
+        return None
+    return UserLexicon(AUGMENTED_DICTIONARY, tuple(short_words))
+
+
+def _save_policy(
+    dictionary_stamp: tuple[int, int],
+    unigram_stamp: tuple[int, int],
+    extra_short_words: tuple[str, ...],
+) -> None:
+    payload = {
+        "schema": USER_LEXICON_SCHEMA,
+        "dictionary_stamp": list(dictionary_stamp),
+        "unigram_stamp": list(unigram_stamp),
+        "extra_short_words": list(extra_short_words),
+    }
+    POLICY_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    temporary = POLICY_CACHE.with_name(f".{POLICY_CACHE.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, POLICY_CACHE)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def ensure_user_lexicon() -> UserLexicon:
+    """Provision and return the cached lexicon used by normal solver runs."""
+    base_dictionary = generator.get_dictionary(generator.DEFAULT_DICT_URL)
+    unigram_path, _ = generator.ensure_ngram_data(
+        Path(generator.DEFAULT_NGRAM_DIR),
+        refresh=False,
+        need_bigrams=False,
+    )
+    dictionary_stamp = _source_stamp(base_dictionary)
+    unigram_stamp = _source_stamp(unigram_path)
+
+    cached = _load_cached_policy(dictionary_stamp, unigram_stamp)
+    if cached is not None:
+        return cached
+
+    unigrams = generator.load_unigram_model(unigram_path)
+    extra_short_words = select_corpus_short_words(base_dictionary, unigrams)
+    build_augmented_dictionary(
+        base_dictionary,
+        AUGMENTED_DICTIONARY,
+        frozenset(generator.PRETTY_CONTRACTIONS),
+    )
+    _save_policy(dictionary_stamp, unigram_stamp, extra_short_words)
+    return UserLexicon(AUGMENTED_DICTIONARY, extra_short_words)
