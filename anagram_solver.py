@@ -142,19 +142,19 @@ def _residual_word_limits(args: argparse.Namespace) -> tuple[int, int]:
             f"--max-words {args.max_words}."
         )
 
+    target_letters = sorted(_normalized_target(args.text))
+    required_letters = sorted("".join(_normalized_required_words(args.require)))
+    if target_letters == required_letters:
+        raise SystemExit(
+            "Required words consume the entire target; zero-residual answers are "
+            "not supported by the ranked solver."
+        )
     if residual_max == 0:
-        target_letters = sorted(_normalized_target(args.text))
-        required_letters = sorted("".join(_normalized_required_words(args.require)))
-        if target_letters != required_letters:
-            raise SystemExit(
-                "Required words do not exactly consume the target, but the requested "
-                "total word count leaves no residual word slots."
-            )
+        raise SystemExit(
+            "Required words leave target letters unused, but the requested total "
+            "word count leaves no residual word slots."
+        )
 
-    # The generator has a special early return when required words consume all
-    # target letters, so a zero-word residual is valid even though its parser's
-    # normal search range starts at one. When letters remain, at least one
-    # residual word is necessarily required.
     residual_min = max(0, args.min_words - required_count)
     return residual_min, residual_max
 

@@ -62,11 +62,15 @@ class RequiredWordCountTests(unittest.TestCase):
         with self.assertRaisesRegex(SystemExit, "exceeding --max-words"):
             solver._validate_args(args)
 
-    def test_zero_residual_is_allowed_only_when_require_consumes_target(self) -> None:
-        self.assertEqual(
-            self._generator_limits("alpha", "--words", "1", "--require", "alpha"),
-            (1, 1),
-        )
+    def test_zero_residual_ranked_runs_are_rejected_explicitly(self) -> None:
+        for argv in (
+            ["alpha", "--words", "1", "--require", "alpha"],
+            ["alpha", "--words", "2", "--require", "alpha"],
+        ):
+            with self.subTest(argv=argv):
+                args = solver.build_parser().parse_args(argv)
+                with self.assertRaisesRegex(SystemExit, "zero-residual answers"):
+                    solver._validate_args(args)
 
         args = solver.build_parser().parse_args(
             ["alphabeta", "--words", "1", "--require", "alpha"]
