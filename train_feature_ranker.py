@@ -111,10 +111,15 @@ def build_groups(
 
 def _load_cases(path: Path) -> list[dict[str, object]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, list):
-        raise ValueError("benchmark case file must contain a JSON list")
+    raw_cases: object
+    if isinstance(payload, dict):
+        raw_cases = payload.get("cases")
+    else:
+        raw_cases = payload
+    if not isinstance(raw_cases, list):
+        raise ValueError("benchmark case file must contain a cases list")
     cases: list[dict[str, object]] = []
-    for item in payload:
+    for item in raw_cases:
         if isinstance(item, dict) and "answer" in item:
             cases.append(dict(item))
     return cases
