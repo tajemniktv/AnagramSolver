@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Train/evaluate the explicit-feature order ranker on grouped benchmark bags.
 
 The regression answers are labels, never scorer inputs. Cross-validation assigns
@@ -12,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 from typing import cast
 
@@ -117,7 +117,7 @@ def _load_cases(path: Path) -> list[dict[str, object]]:
     else:
         raw_cases = payload
     if not isinstance(raw_cases, list):
-        raise ValueError("benchmark case file must contain a cases list")
+        raise TypeError("benchmark case file must contain a cases list")
     cases: list[dict[str, object]] = []
     for item in raw_cases:
         if isinstance(item, dict) and "answer" in item:
@@ -140,8 +140,16 @@ def main() -> int:
 
     if args.order_candidates < 2:
         parser.error("--order-candidates must be >= 2")
-    if args.phrase_bonus_max < 0.0:
-        parser.error("--phrase-bonus-max must be >= 0")
+    if not math.isfinite(args.phrase_bonus_max) or args.phrase_bonus_max < 0.0:
+        parser.error("--phrase-bonus-max must be finite and >= 0")
+    if args.folds < 2:
+        parser.error("--folds must be >= 2")
+    if args.epochs < 1:
+        parser.error("--epochs must be >= 1")
+    if not math.isfinite(args.learning_rate) or args.learning_rate <= 0.0:
+        parser.error("--learning-rate must be finite and > 0")
+    if not math.isfinite(args.l2) or args.l2 < 0.0:
+        parser.error("--l2 must be finite and >= 0")
 
     wordnet_dir = reranker.ensure_wordnet(reranker.DEFAULT_WORDNET_DIR)
     lex = reranker.WordNetLexicon.load(wordnet_dir)
