@@ -61,8 +61,8 @@ def _run_configuration(
 
     print(
         "\n--- "
-        f"seeds={seed_limit} window<={max_window} rounds={max_rounds} "
-        f"eval/seed<={max_evaluations_per_seed} ---"
+        f"refine-first={seed_limit} window<={max_window} rounds={max_rounds} "
+        f"eval/refined-seed<={max_evaluations_per_seed} ---"
     )
     for case in cases:
         answer = str(case.get("answer", ""))
@@ -81,6 +81,11 @@ def _run_configuration(
         if not seeds:
             continue
         evaluated_cases += 1
+
+        # Baseline is deliberately the full retained beam. `seed_limit` controls
+        # how many existing seeds receive refinement, not which existing seeds
+        # count as available answers. Otherwise the A/B could claim a recovery
+        # merely by ignoring a correct answer already present later in the beam.
         seed_orders = tuple(candidate.order for candidate in seeds)
         seed_target = any(benchmark.phrase_key(order) in acceptable for order in seed_orders)
         seed_best_score = max(candidate.objective for candidate in seeds)
@@ -94,12 +99,12 @@ def _run_configuration(
             max_evaluations_per_seed=max_evaluations_per_seed,
         )
         total_evaluations += augmented.evaluated
-        added = max(0, len(augmented.candidates) - len(set(seed_orders[:seed_limit])))
+        added = max(0, len(augmented.candidates) - len(set(seed_orders)))
         total_added_orders += added
         augmented_target = any(
             benchmark.phrase_key(result.order) in acceptable
             for result in augmented.candidates
-        ) or seed_target
+        )
         augmented_best = max(
             (result.score for result in augmented.candidates),
             default=seed_best_score,
@@ -118,7 +123,7 @@ def _run_configuration(
     print(
         f"summary cases={evaluated_cases} recoveries={recovered} "
         f"better_best={improved_seed_best} added={total_added_orders} "
-        f"evaluations={total_evaluations}"
+        f"scorer_evaluations={total_evaluations}"
     )
     return (
         evaluated_cases,
@@ -159,9 +164,9 @@ def main() -> int:
     for config, result in results:
         _, recovered, improved, added, evaluated = result
         print(
-            f"seeds={config[0]} window<={config[1]} rounds={config[2]} "
-            f"eval/seed<={config[3]}: recoveries={recovered} "
-            f"better_best={improved} added={added} evaluations={evaluated}"
+            f"refine-first={config[0]} window<={config[1]} rounds={config[2]} "
+            f"eval/refined-seed<={config[3]}: recoveries={recovered} "
+            f"better_best={improved} added={added} scorer_evaluations={evaluated}"
         )
     return 0
 
