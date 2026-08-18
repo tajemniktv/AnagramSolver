@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -116,13 +117,51 @@ class LexicalCoverageTests(unittest.TestCase):
         self.assertTrue(all("'" not in word for word in supplements))
 
     def test_malformed_policy_cache_shapes_are_cache_misses(self) -> None:
+        policy_source = "test-policy-source"
         bad_payloads = (
             "null\n",
             "[]\n",
             '{}\n',
-            '{"schema": 2, "dictionary_stamp": null, "unigram_stamp": [3, 4], "extra_short_words": ["hi"]}\n',
-            '{"schema": 2, "dictionary_stamp": [1, 2], "unigram_stamp": "bad", "extra_short_words": ["hi"]}\n',
-            '{"schema": 2, "dictionary_stamp": [1, 2], "unigram_stamp": [3, 4], "extra_short_words": null}\n',
+            json.dumps(
+                {
+                    "schema": 2,
+                    "policy_source": policy_source,
+                    "dictionary_stamp": None,
+                    "unigram_stamp": [3, 4],
+                    "extra_short_words": ["hi"],
+                }
+            )
+            + "\n",
+            json.dumps(
+                {
+                    "schema": 2,
+                    "policy_source": policy_source,
+                    "dictionary_stamp": [1, 2],
+                    "unigram_stamp": "bad",
+                    "extra_short_words": ["hi"],
+                }
+            )
+            + "\n",
+            json.dumps(
+                {
+                    "schema": 2,
+                    "policy_source": policy_source,
+                    "dictionary_stamp": [1, 2],
+                    "unigram_stamp": [3, 4],
+                    "extra_short_words": None,
+                }
+            )
+            + "\n",
+            json.dumps(
+                {
+                    "schema": 2,
+                    "policy_source": policy_source,
+                    "dictionary_stamp": [1, 2],
+                    "unigram_stamp": [3, 4],
+                    "extra_short_words": ["toolong"],
+                }
+            )
+            + "\n",
         )
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -132,6 +171,11 @@ class LexicalCoverageTests(unittest.TestCase):
             with (
                 patch.object(lexicon, "AUGMENTED_DICTIONARY", augmented),
                 patch.object(lexicon, "POLICY_CACHE", policy),
+                patch.object(
+                    lexicon,
+                    "_policy_source_token",
+                    return_value=policy_source,
+                ),
             ):
                 for payload in bad_payloads:
                     with self.subTest(payload=payload):
@@ -197,6 +241,52 @@ class LexicalCoverageTests(unittest.TestCase):
             cached.cache_token,
             lexicon._policy_token((1, 3), (3, 4), ("hi",)),
         )
+
+    def test_custom_sources_use_isolated_derived_lexicons_concurrently(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            dictionary_dir = root / "derived"
+            ngram_dir = root / "ngrams"
+            ngram_dir.mkdir()
+            (ngram_dir / "count_1w.txt").write_text(
+                "alpha\t100\nbeta\t100\n",
+                encoding="utf-8",
+            )
+            first = root / "first.txt"
+            second = root / "second.txt"
+            first.write_text("alpha\n", encoding="utf-8")
+            second.write_text("beta\n", encoding="utf-8")
+
+            def provision(path: Path) -> lexicon.UserLexicon:
+                return lexicon.ensure_user_lexicon(
+                    dictionary_source=str(path),
+                    ngram_dir=ngram_dir,
+                )
+
+            with patch.object(lexicon, "DICTIONARY_DIR", dictionary_dir):
+                with ThreadPoolExecutor(max_workers=2) as pool:
+                    first_result, second_result = list(
+                        pool.map(provision, (first, second))
+                    )
+
+            self.assertNotEqual(first_result.dictionary, second_result.dictionary)
+            self.assertNotEqual(first_result.cache_token, second_result.cache_token)
+            self.assertIn(
+                "alpha",
+                first_result.dictionary.read_text(encoding="utf-8").splitlines(),
+            )
+            self.assertNotIn(
+                "beta",
+                first_result.dictionary.read_text(encoding="utf-8").splitlines(),
+            )
+            self.assertIn(
+                "beta",
+                second_result.dictionary.read_text(encoding="utf-8").splitlines(),
+            )
+            self.assertNotIn(
+                "alpha",
+                second_result.dictionary.read_text(encoding="utf-8").splitlines(),
+            )
 
     def test_solver_run_key_changes_with_effective_lexicon_token(self) -> None:
         args = solver.build_parser().parse_args(["OEEEVHYNRI"])
