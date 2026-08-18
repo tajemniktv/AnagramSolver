@@ -53,6 +53,12 @@ class FastWordNetLexicon(core.WordNetLexicon):
         default_factory=OrderedDict
     )
     _frames_cache_limit: int = field(default=4096, repr=False)
+    _frames_cache_lock: threading.Lock = field(
+        default_factory=threading.Lock,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     @classmethod
     def load(cls, dictionary_dir: Path) -> FastWordNetLexicon:
@@ -62,16 +68,30 @@ class FastWordNetLexicon(core.WordNetLexicon):
 
     def frames_for(self, raw_word: str) -> frozenset[int]:
         word = fast_norm_token(raw_word)
-        if word in self._frames_cache:
-            result = self._frames_cache[word]
-            self._frames_cache.move_to_end(word)
-            return result
+        with self._frames_cache_lock:
+            cached = self._frames_cache.get(word)
+            if cached is not None:
+                self._frames_cache.move_to_end(word)
+                return cached
 
+        # Keep lexical computation outside the cache lock. Concurrent misses for
+        # the same surface form may duplicate this immutable work, but unrelated
+        # threaded lookups should not serialize on WordNet traversal.
         frames: set[int] = set()
         for lemma in self.verb_base_lemmas(word):
             frames.update(self.verb_frames.get(lemma, ()))
         result = frozenset(frames)
-        if self._frames_cache_limit > 0:
+        if self._frames_cache_limit <= 0:
+            return result
+
+        with self._frames_cache_lock:
+            # Another worker may have populated this key while we were resolving
+            # WordNet frames. Prefer that equivalent cached value and refresh LRU
+            # order rather than needlessly replacing it.
+            cached = self._frames_cache.get(word)
+            if cached is not None:
+                self._frames_cache.move_to_end(word)
+                return cached
             self._frames_cache[word] = result
             self._frames_cache.move_to_end(word)
             while len(self._frames_cache) > self._frames_cache_limit:
