@@ -26,6 +26,15 @@ class RefinementResult:
     improved: bool
 
 
+@dataclass(slots=True, frozen=True)
+class RefinementPoolResult:
+    """Original beam seeds augmented with unique refined endpoints."""
+
+    candidates: tuple[RefinementResult, ...]
+    evaluated: int
+    improved_seeds: int
+
+
 def window_neighbors(
     order: Sequence[str],
     *,
@@ -125,7 +134,7 @@ def refine_seed_pool(
     max_rounds: int = 3,
     max_evaluations_per_seed: int = 512,
 ) -> tuple[RefinementResult, ...]:
-    """Refine several complete seeds and deduplicate final orders best-first."""
+    """Refine several complete seeds and deduplicate final endpoints best-first."""
     if seed_limit < 1:
         raise ValueError("seed_limit must be >= 1")
     by_order: dict[Order, RefinementResult] = {}
@@ -147,3 +156,62 @@ def refine_seed_pool(
             key=lambda result: (-result.score, result.order),
         )
     )
+
+
+def augment_seed_pool(
+    seeds: Sequence[Sequence[str]],
+    scorer: OrderScorer,
+    *,
+    seed_limit: int = 8,
+    min_window: int = 3,
+    max_window: int = 5,
+    max_rounds: int = 3,
+    max_evaluations_per_seed: int = 512,
+) -> RefinementPoolResult:
+    """Keep every original seed and add any distinct improved endpoint.
+
+    Refinement is an expansion step, not a replacement step. A beam order that
+    was already correct must remain available even if its local hill climb ends
+    at a different higher-scoring order. The returned evaluation count measures
+    only calls performed by the refinement searches.
+    """
+    limited_seeds = tuple(tuple(seed) for seed in seeds[:seed_limit])
+    if not limited_seeds:
+        return RefinementPoolResult((), 0, 0)
+
+    endpoints = refine_seed_pool(
+        limited_seeds,
+        scorer,
+        seed_limit=seed_limit,
+        min_window=min_window,
+        max_window=max_window,
+        max_rounds=max_rounds,
+        max_evaluations_per_seed=max_evaluations_per_seed,
+    )
+    evaluated = sum(result.evaluated for result in endpoints)
+    improved_seeds = sum(result.improved for result in endpoints)
+
+    by_order: dict[Order, RefinementResult] = {}
+    for seed in limited_seeds:
+        # Seed scores are already included in refinement's evaluation accounting.
+        # Re-scoring here makes the augmented candidate pool self-contained; this
+        # helper is an experimental search utility, not the production hot path.
+        by_order[seed] = RefinementResult(
+            order=seed,
+            score=float(scorer(seed)),
+            evaluated=0,
+            rounds=0,
+            improved=False,
+        )
+    for result in endpoints:
+        previous = by_order.get(result.order)
+        if previous is None or result.score > previous.score:
+            by_order[result.order] = result
+
+    candidates = tuple(
+        sorted(
+            by_order.values(),
+            key=lambda result: (-result.score, result.order),
+        )
+    )
+    return RefinementPoolResult(candidates, evaluated, improved_seeds)
