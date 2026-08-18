@@ -1,8 +1,12 @@
 """Corpus-derived directional argument-fit evidence around candidate verbs.
 
-This deliberately contains no verb-specific semantic table.  It asks the phrase
+This deliberately contains no verb-specific semantic table. It asks the phrase
 corpus which noun/verb and verb/noun spans are actually attested in the proposed
 order, giving extra weight to spans centered on a WordNet-recognized verb.
+
+This is positive evidence, not a substitute for dependency-role statistics. If
+the phrase index contains no relevant directional span, the result is neutral by
+design; the scorer must not invent agent/patient knowledge from corpus absence.
 """
 
 from __future__ import annotations
@@ -50,7 +54,7 @@ def score_thematic_fit(
     """Score positive directional corpus evidence around recognized verbs.
 
     For each candidate verb, query short contiguous spans ending at the verb and
-    starting at the verb.  A span is considered role-like only when its non-verb
+    starting at the verb. A span is considered role-like only when its non-verb
     side contains at least one nominal token. This emphasizes evidence such as
     ``dog chased`` / ``chased the ball`` without encoding that dogs, balls,
     phones, charges, or any particular verb belong to hand-maintained classes.
@@ -105,8 +109,16 @@ def score_thematic_fit(
     if not evidence_verbs:
         return ThematicFitResult(0.0, 0.0, 0.0, 0.0, 0, ())
 
-    subject_values = [best_subject[index].strength for index in evidence_verbs if index in best_subject]
-    object_values = [best_object[index].strength for index in evidence_verbs if index in best_object]
+    subject_values = [
+        best_subject[index].strength
+        for index in evidence_verbs
+        if index in best_subject
+    ]
+    object_values = [
+        best_object[index].strength
+        for index in evidence_verbs
+        if index in best_object
+    ]
     subject_strength = sum(subject_values) / len(subject_values) if subject_values else 0.0
     object_strength = sum(object_values) / len(object_values) if object_values else 0.0
 
