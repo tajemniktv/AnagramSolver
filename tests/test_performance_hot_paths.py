@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import sqlite3
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 
 import anagram_performance as perf
 import anagram_rerank_core as core
@@ -97,6 +98,34 @@ class PerformanceHotPathTests(unittest.TestCase):
         lex.frames_for("run")
         lex.frames_for("jump")
         self.assertEqual(tuple(lex._frames_cache), ("run", "jump"))
+        self.assertLessEqual(len(lex._frames_cache), lex._frames_cache_limit)
+
+    def test_fast_wordnet_frame_cache_handles_concurrent_eviction(self) -> None:
+        frame_map = {
+            "run": frozenset({1}),
+            "walk": frozenset({2}),
+            "jump": frozenset({3}),
+            "talk": frozenset({4}),
+            "sing": frozenset({5}),
+            "dance": frozenset({6}),
+        }
+        lex = perf.FastWordNetLexicon(
+            nouns=set(),
+            verbs=set(frame_map),
+            adjs=set(),
+            advs=set(),
+            noun_exc={},
+            verb_exc={},
+            verb_frames=frame_map,
+            _frames_cache_limit=2,
+        )
+        words = tuple(frame_map)
+        workload = tuple(words[i % len(words)] for i in range(4000))
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            actual = list(pool.map(lex.frames_for, workload))
+
+        self.assertEqual(actual, [frame_map[word] for word in workload])
         self.assertLessEqual(len(lex._frames_cache), lex._frames_cache_limit)
 
     def test_fast_phrase_index_matches_original_and_reuses_counts(self) -> None:
