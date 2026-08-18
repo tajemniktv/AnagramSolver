@@ -56,11 +56,6 @@ def raw_pool_size(
     if max_pool < 1:
         raise ValueError("max_pool must be >= 1")
 
-    # Explicit K at or below the quality core remains score-only and avoids the
-    # cost of a wider search. Above it, spend a bounded fixed number of extra
-    # raw slots on structural alternatives rather than multiplying beam cost as
-    # K grows. If callers deliberately request more than max_pool, honor their K
-    # and simply stop widening beyond it.
     if retained <= quality_core:
         return retained
     return max(retained, min(max_pool, retained + pool_extra))
@@ -76,6 +71,13 @@ def _fingerprint(candidate: OrderLike) -> _OrderFingerprint:
     )
 
 
+def _fingerprint_for_order(order: Sequence[str]) -> _OrderFingerprint:
+    """Build an adjacency-only fingerprint for the legacy test helper."""
+    realized = tuple(order)
+    adjacency = Counter(pairwise(realized))
+    return _OrderFingerprint(realized, adjacency, sum(adjacency.values()), "")
+
+
 def _adjacency_overlap(
     left: _OrderFingerprint,
     right: _OrderFingerprint,
@@ -84,14 +86,17 @@ def _adjacency_overlap(
     if len(left.order) <= 1 or len(right.order) <= 1:
         return 1.0 if left.order == right.order else 0.0
 
-    # Iterate the smaller precomputed mapping. This is equivalent to Counter
-    # intersection and preserves repeated-token multiplicity through min counts.
     if len(left.adjacency) <= len(right.adjacency):
         smaller, larger = left.adjacency, right.adjacency
     else:
         smaller, larger = right.adjacency, left.adjacency
     overlap = sum(min(count, larger.get(edge, 0)) for edge, count in smaller.items())
     return overlap / max(left.adjacency_total, right.adjacency_total, 1)
+
+
+def _adjacency_similarity(left: Sequence[str], right: Sequence[str]) -> float:
+    """Compatibility helper for existing tests; production uses fingerprints."""
+    return _adjacency_overlap(_fingerprint_for_order(left), _fingerprint_for_order(right))
 
 
 def _fingerprint_similarity(
@@ -180,8 +185,6 @@ def select_diverse_orders(
         for index in remaining:
             candidate = candidates[index]
             utility = candidate.objective - diversity_strength * max_similarity[index]
-            # min() semantics encoded explicitly: highest utility/objective first,
-            # lexical order as the deterministic final tie break.
             key = (-utility, -candidate.objective, candidate.order)
             if best_key is None or key < best_key:
                 best_key = key
