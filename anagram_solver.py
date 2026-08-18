@@ -21,10 +21,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from anagram_paths import SOLVER_RUNS_DIR
-from anagram_user_lexicon import USER_LEXICON_SCHEMA, ensure_user_lexicon
 
 HERE = Path(__file__).resolve().parent
-GENERATOR = HERE / "anagram_generate.py"
+GENERATOR = HERE / "anagram_user_generate.py"
+GENERATOR_CORE = HERE / "anagram_generate.py"
 RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_RUN_ROOT = SOLVER_RUNS_DIR
 BALANCED_MAX_RESULTS = 100_000
@@ -119,7 +119,7 @@ def _run_key(args: argparse.Namespace) -> str:
         "generation_mode": _generation_mode(args),
         "generation_cap": _generation_cap(args),
         "generator": _source_hash(GENERATOR),
-        "user_lexicon_schema": USER_LEXICON_SCHEMA,
+        "generator_core": _source_hash(GENERATOR_CORE),
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(raw).hexdigest()[:20]
@@ -161,13 +161,7 @@ def _residual_word_limits(args: argparse.Namespace) -> tuple[int, int]:
     return residual_min, residual_max
 
 
-def build_generator_command(
-    args: argparse.Namespace,
-    output: Path,
-    *,
-    dictionary: Path | None = None,
-    extra_short_words: Sequence[str] = (),
-) -> list[str]:
+def build_generator_command(args: argparse.Namespace, output: Path) -> list[str]:
     residual_min_words, residual_max_words = _residual_word_limits(args)
     cmd = [
         sys.executable,
@@ -185,11 +179,6 @@ def build_generator_command(
         "--top-per-group", "1",
         "--export", str(output),
     ]
-
-    if dictionary is not None:
-        cmd += ["--dict", str(dictionary)]
-    if extra_short_words:
-        cmd += ["--extra-short-words", ",".join(extra_short_words)]
 
     cap = _generation_cap(args)
     if cap is None:
@@ -428,16 +417,7 @@ def _generate_candidates(args: argparse.Namespace, candidates: Path) -> None:
         f".{candidates.name}.{uuid.uuid4().hex}.tmp"
     )
     try:
-        lexicon = ensure_user_lexicon()
-        _run(
-            build_generator_command(
-                args,
-                temporary,
-                dictionary=lexicon.dictionary,
-                extra_short_words=lexicon.extra_short_words,
-            ),
-            verbose=args.verbose,
-        )
+        _run(build_generator_command(args, temporary), verbose=args.verbose)
         if not temporary.is_file():
             raise SystemExit(
                 f"Generator completed without writing its candidate export: {temporary}"
