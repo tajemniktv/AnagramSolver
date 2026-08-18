@@ -21,7 +21,7 @@ import anagram_generate as generator
 from anagram_paths import DICTIONARY_DIR
 
 USER_LEXICON_SCHEMA = 2
-DEFAULT_SHORT_WORD_MIN_ZIPF = 5.0
+DEFAULT_SHORT_WORD_MIN_ZIPF: float = 5.0
 AUGMENTED_DICTIONARY = DICTIONARY_DIR / f"normal_user_v{USER_LEXICON_SCHEMA}.txt"
 POLICY_CACHE = DICTIONARY_DIR / f"normal_user_v{USER_LEXICON_SCHEMA}.json"
 
@@ -211,7 +211,11 @@ def ensure_user_lexicon(
         return cached
 
     unigrams = generator.load_unigram_model(unigram_path)
-    extra_short_words = select_corpus_short_words(base_dictionary, unigrams)
+    extra_short_words = select_corpus_short_words(
+        base_dictionary,
+        unigrams,
+        min_zipf=DEFAULT_SHORT_WORD_MIN_ZIPF,
+    )
     build_augmented_dictionary(
         base_dictionary,
         AUGMENTED_DICTIONARY,
