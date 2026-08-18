@@ -42,19 +42,38 @@ class OrderRefinementTests(unittest.TestCase):
         neighbors = tuple(window_neighbors(seed, min_window=3, max_window=3))
         expected = min(neighbors)
 
-        def scorer(order: tuple[str, ...]) -> float:
+        def improving_scorer(order: tuple[str, ...]) -> float:
             return 0.0 if order == seed else 1.0
 
-        result = refine_order(
+        improved = refine_order(
             seed,
-            scorer,
+            improving_scorer,
             min_window=3,
             max_window=3,
             max_rounds=1,
             epsilon=1e-9,
         )
-        self.assertEqual(result.order, expected)
-        self.assertEqual(result.score, 1.0)
+        self.assertEqual(improved.order, expected)
+        self.assertEqual(improved.score, 1.0)
+        self.assertTrue(improved.improved)
+
+        # The same lexical ordering must never promote a neighbor that is merely
+        # within epsilon but still below the seed. This is the guard that keeps
+        # deterministic tie-breaking from becoming deterministic degradation.
+        def below_seed_scorer(order: tuple[str, ...]) -> float:
+            return 1.0 if order == seed else 1.0 - 5e-10
+
+        retained = refine_order(
+            seed,
+            below_seed_scorer,
+            min_window=3,
+            max_window=3,
+            max_rounds=1,
+            epsilon=1e-9,
+        )
+        self.assertEqual(retained.order, seed)
+        self.assertEqual(retained.score, 1.0)
+        self.assertFalse(retained.improved)
 
     def test_parameter_guards_and_initial_score_path(self) -> None:
         seed = ("a", "b", "c")
