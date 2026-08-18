@@ -37,6 +37,27 @@ class QualityGuidedGenerationTests(unittest.TestCase):
         self.assertEqual(historical, [("high-a", "low-bb")])
         self.assertEqual(guided, [("good-ab", "good-b")])
 
+    def test_quality_anchor_selection_preserves_lower_scoring_rare_champion(self) -> None:
+        quality = [
+            (10.0, 0, ("common-1",)),
+            (9.0, -1, ("common-2",)),
+            (8.0, -2, ("common-3",)),
+        ]
+        anchors = {
+            1: [(10.0, 0, ("common-1",))],
+            99: [(2.0, -3, ("rare-best-context",))],
+        }
+
+        selected = user_search._select_quality_with_anchors(quality, anchors, 4)
+
+        self.assertIn((2.0, -3, ("rare-best-context",)), selected)
+        self.assertEqual(len(selected), 4)
+
+    def test_anchor_capacity_can_cover_two_champions_per_candidate(self) -> None:
+        quality, anchors = user_search._quality_anchor_limits(10_000, 743)
+        self.assertEqual(anchors, 743 * user_search.ANCHOR_CHAMPIONS_PER_WORD)
+        self.assertEqual(quality + anchors, 10_000)
+
     def test_balanced_budget_keeps_multiple_word_count_buckets(self) -> None:
         candidates = [
             generator.Candidate("ab", sig(1, 1), 2, 5.0),
