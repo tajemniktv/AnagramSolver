@@ -47,9 +47,11 @@ def main() -> int:
         set(),
         unigrams,
     )
+    bigrams = search._load_search_bigram_model(candidates)
 
     indices = tuple(sorted(_candidate_index(candidates, word) for word in EXPECTED))
     words = tuple(candidates[index].word for index in indices)
+    expected_bag = tuple(sorted(words))
     print("Shakira canonical candidate path:")
     print(
         "  "
@@ -122,16 +124,15 @@ def main() -> int:
         f"exact={final_ok}"
     )
 
-    # Determine whether two per-anchor champions are enough if the path reaches
-    # exact closure. Fix the rarest/final word and exhaust only the shorter
-    # residual prefix, which is cheap and directly tests final retention policy.
     anchor = candidates[final_index]
     prefix_remaining = generator.subtract_counts(target, anchor.sig)
     if prefix_remaining is None:
         raise SystemExit("Probe anchor does not fit target")
-    anchored: list[tuple[float, tuple[str, ...]]] = []
     prefix_candidates = candidates[: final_index + 1]
     word_to_index = {candidate.word: index for index, candidate in enumerate(candidates)}
+    anchored: list[
+        tuple[tuple[float, float, float], float, tuple[str, ...]]
+    ] = []
     for prefix in generator.solve(
         prefix_remaining,
         prefix_candidates,
@@ -145,23 +146,52 @@ def main() -> int:
             continue
         bag_indices = (*prefix_indices, final_index)
         anchored.append(
-            (search._lexical_score(bag_indices, candidates), (*prefix, anchor.word))
+            (
+                search._pair_priority(bag_indices, candidates, bigrams),
+                search._lexical_score(bag_indices, candidates),
+                (*prefix, anchor.word),
+            )
         )
-    anchored.sort(key=lambda item: (-item[0], item[1]))
-    expected_bag = tuple(words)
-    anchor_rank = next(
+
+    lexical_ranked = sorted(anchored, key=lambda item: (-item[1], item[2]))
+    pair_ranked = sorted(anchored, key=lambda item: (item[0], item[1]), reverse=True)
+    lexical_rank = next(
         (
             rank
-            for rank, (_, bag) in enumerate(anchored, 1)
-            if tuple(sorted(bag)) == tuple(sorted(expected_bag))
+            for rank, (_, _, bag) in enumerate(lexical_ranked, 1)
+            if tuple(sorted(bag)) == expected_bag
         ),
         0,
     )
-    target_score = search._lexical_score(indices, candidates)
+    pair_rank = next(
+        (
+            rank
+            for rank, (_, _, bag) in enumerate(pair_ranked, 1)
+            if tuple(sorted(bag)) == expected_bag
+        ),
+        0,
+    )
+    target_pair = search._pair_priority(indices, candidates, bigrams)
+    target_lexical = search._lexical_score(indices, candidates)
     print(
-        f"  final anchor={anchor.word}: target lexical score={target_score:.3f}; "
-        f"anchor rank={anchor_rank}/{len(anchored)}; "
-        f"champions_kept={search.ANCHOR_CHAMPIONS_PER_WORD}"
+        f"  final anchor={anchor.word}: lexical={target_lexical:.3f} "
+        f"rank={lexical_rank}/{len(anchored)}; pair={target_pair} "
+        f"rank={pair_rank}/{len(anchored)}"
+    )
+
+    bags, exact_examined, expansions = search._beam_bags_for_word_count(
+        target,
+        candidates,
+        WORD_COUNT,
+        10_000,
+        True,
+        bigrams,
+    )
+    present = any(tuple(sorted(bag)) == expected_bag for bag in bags)
+    print(
+        f"  actual 4-word multi-view beam: target_present={present}; "
+        f"retained={len(bags)}; exact_evaluated={exact_examined}; "
+        f"partial_expansions={expansions}"
     )
     return 0
 
