@@ -128,7 +128,7 @@ class PerformanceHotPathTests(unittest.TestCase):
         self.assertEqual(actual, [frame_map[word] for word in workload])
         self.assertLessEqual(len(lex._frames_cache), lex._frames_cache_limit)
 
-    def test_fast_phrase_index_matches_original_and_reuses_counts(self) -> None:
+    def test_fast_phrase_index_preserves_legacy_evidence_and_reuses_counts(self) -> None:
         baseline_connection = _phrase_connection()
         fast_connection = _phrase_connection()
         try:
@@ -136,7 +136,7 @@ class PerformanceHotPathTests(unittest.TestCase):
             fast = perf.FastPhraseIndex(fast_connection, 5)
             words = ("actions", "speak", "louder", "than", "words")
 
-            expected = baseline.score(words)
+            expected_score, expected_details = baseline.score(words)
             select_statements: list[str] = []
             fast_connection.set_trace_callback(
                 lambda statement: (
@@ -145,12 +145,15 @@ class PerformanceHotPathTests(unittest.TestCase):
                     else None
                 )
             )
-            actual = fast.score(words)
+            actual_score, actual_details = fast.score(words)
             queries_after_first = len(select_statements)
             repeated = fast.score(words)
 
-            self.assertEqual(actual, expected)
-            self.assertEqual(repeated, expected)
+            self.assertGreaterEqual(actual_score, expected_score)
+            for key, value in expected_details.items():
+                self.assertEqual(actual_details[key], value)
+            self.assertIn("cohesion", actual_details)
+            self.assertEqual(repeated, (actual_score, actual_details))
             self.assertGreater(queries_after_first, 0)
             self.assertEqual(len(select_statements), queries_after_first)
             self.assertIn("actions speak louder than words", fast._count_cache)
