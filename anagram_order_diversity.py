@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
+from dataclasses import dataclass
 from itertools import pairwise
 from typing import Protocol, TypeVar
 
@@ -26,6 +27,16 @@ class OrderLike(Protocol):
 
 
 CandidateT = TypeVar("CandidateT", bound=OrderLike)
+
+
+@dataclass(slots=True)
+class _OrderFingerprint:
+    """Precomputed structural facts reused by the greedy diversity pass."""
+
+    order: tuple[str, ...]
+    adjacency: Counter[tuple[str, str]]
+    adjacency_total: int
+    phrase_kind: str
 
 
 def raw_pool_size(
@@ -55,6 +66,16 @@ def raw_pool_size(
     return max(retained, min(max_pool, retained + pool_extra))
 
 
+def _fingerprint(candidate: OrderLike) -> _OrderFingerprint:
+    adjacency = Counter(pairwise(candidate.order))
+    return _OrderFingerprint(
+        order=candidate.order,
+        adjacency=adjacency,
+        adjacency_total=sum(adjacency.values()),
+        phrase_kind=candidate.phrase_kind,
+    )
+
+
 def _adjacency_similarity(left: Sequence[str], right: Sequence[str]) -> float:
     if len(left) <= 1 or len(right) <= 1:
         return 1.0 if tuple(left) == tuple(right) else 0.0
@@ -65,15 +86,10 @@ def _adjacency_similarity(left: Sequence[str], right: Sequence[str]) -> float:
     return overlap / max(sum(left_pairs.values()), sum(right_pairs.values()), 1)
 
 
-def order_similarity(left: OrderLike, right: OrderLike) -> float:
-    """Structural similarity in [0, 1] between two realized word orders.
-
-    Directed adjacency receives the most weight because local word relations
-    are precisely where near-duplicate permutations tend to cluster. Position,
-    sentence endpoints, and the hand-written parser's construction kind provide
-    progressively weaker signals. Counter-based adjacency keeps repeated words
-    well-defined instead of pretending every token is unique.
-    """
+def _fingerprint_similarity(
+    left: _OrderFingerprint,
+    right: _OrderFingerprint,
+) -> float:
     a = left.order
     b = right.order
     if a == b:
@@ -86,13 +102,35 @@ def order_similarity(left: OrderLike, right: OrderLike) -> float:
     endpoints = 0.5 * float(a[0] == b[0]) + 0.5 * float(a[-1] == b[-1])
     same_kind = float(left.phrase_kind == right.phrase_kind)
 
+    # Counter intersection was previously rebuilt for every greedy comparison.
+    # Iterate the smaller precomputed mapping instead; repeated-word semantics
+    # remain exactly the same because overlap still uses min(left, right) counts.
+    if len(left.adjacency) <= len(right.adjacency):
+        smaller, larger = left.adjacency, right.adjacency
+    else:
+        smaller, larger = right.adjacency, left.adjacency
+    overlap = sum(min(count, larger.get(edge, 0)) for edge, count in smaller.items())
+    adjacency = overlap / max(left.adjacency_total, right.adjacency_total, 1)
+
     similarity = (
-        0.55 * _adjacency_similarity(a, b)
+        0.55 * adjacency
         + 0.30 * position
         + 0.10 * endpoints
         + 0.05 * same_kind
     )
     return max(0.0, min(1.0, similarity))
+
+
+def order_similarity(left: OrderLike, right: OrderLike) -> float:
+    """Structural similarity in [0, 1] between two realized word orders.
+
+    Directed adjacency receives the most weight because local word relations
+    are precisely where near-duplicate permutations tend to cluster. Position,
+    sentence endpoints, and the hand-written parser's construction kind provide
+    progressively weaker signals. Counter-based adjacency keeps repeated words
+    well-defined instead of pretending every token is unique.
+    """
+    return _fingerprint_similarity(_fingerprint(left), _fingerprint(right))
 
 
 def select_diverse_orders(
@@ -106,10 +144,11 @@ def select_diverse_orders(
 
     ``candidates`` must already be in best-first grammar/structure order. The
     first ``quality_core`` candidates are preserved byte-for-byte. Remaining
-    slots use a small maximal-marginal-relevance penalty against the most
-    similar already-selected order. The final tuple is returned in the original
-    score order so downstream grammar ranking and deterministic tie behaviour do
-    not change merely because retention became more diverse.
+    slots use the same maximal-marginal-relevance objective as before, but cache
+    each candidate's current maximum similarity to the selected set. Adding one
+    winner therefore requires only one new comparison per remaining candidate
+    instead of rescanning the entire selected prefix. The final tuple remains in
+    original score order, preserving downstream ranking and deterministic ties.
     """
     if top_k < 1:
         raise ValueError("top_k must be >= 1")
@@ -124,6 +163,16 @@ def select_diverse_orders(
     core_count = min(quality_core, limit)
     selected_indices = list(range(core_count))
     remaining = set(range(core_count, len(candidates)))
+    if len(selected_indices) >= limit or not remaining:
+        return tuple(candidates[index] for index in selected_indices)
+
+    fingerprints = [_fingerprint(candidate) for candidate in candidates]
+    max_similarity: dict[int, float] = {}
+    for index in remaining:
+        max_similarity[index] = max(
+            _fingerprint_similarity(fingerprints[index], fingerprints[chosen])
+            for chosen in selected_indices
+        )
 
     while len(selected_indices) < limit and remaining:
         best_index: int | None = None
@@ -131,11 +180,7 @@ def select_diverse_orders(
 
         for index in remaining:
             candidate = candidates[index]
-            max_similarity = max(
-                order_similarity(candidate, candidates[chosen])
-                for chosen in selected_indices
-            )
-            utility = candidate.objective - diversity_strength * max_similarity
+            utility = candidate.objective - diversity_strength * max_similarity[index]
             # min() semantics encoded explicitly: highest utility/objective first,
             # lexical order as the deterministic final tie break.
             key = (-utility, -candidate.objective, candidate.order)
@@ -146,6 +191,16 @@ def select_diverse_orders(
         assert best_index is not None
         selected_indices.append(best_index)
         remaining.remove(best_index)
+        max_similarity.pop(best_index, None)
+
+        if len(selected_indices) >= limit:
+            break
+
+        winner = fingerprints[best_index]
+        for index in remaining:
+            similarity = _fingerprint_similarity(fingerprints[index], winner)
+            if similarity > max_similarity[index]:
+                max_similarity[index] = similarity
 
     selected_indices.sort()
     return tuple(candidates[index] for index in selected_indices)
