@@ -76,14 +76,22 @@ def _fingerprint(candidate: OrderLike) -> _OrderFingerprint:
     )
 
 
-def _adjacency_similarity(left: Sequence[str], right: Sequence[str]) -> float:
-    if len(left) <= 1 or len(right) <= 1:
-        return 1.0 if tuple(left) == tuple(right) else 0.0
+def _adjacency_overlap(
+    left: _OrderFingerprint,
+    right: _OrderFingerprint,
+) -> float:
+    """Directed-adjacency multiset overlap used by structural similarity."""
+    if len(left.order) <= 1 or len(right.order) <= 1:
+        return 1.0 if left.order == right.order else 0.0
 
-    left_pairs = Counter(pairwise(left))
-    right_pairs = Counter(pairwise(right))
-    overlap = sum((left_pairs & right_pairs).values())
-    return overlap / max(sum(left_pairs.values()), sum(right_pairs.values()), 1)
+    # Iterate the smaller precomputed mapping. This is equivalent to Counter
+    # intersection and preserves repeated-token multiplicity through min counts.
+    if len(left.adjacency) <= len(right.adjacency):
+        smaller, larger = left.adjacency, right.adjacency
+    else:
+        smaller, larger = right.adjacency, left.adjacency
+    overlap = sum(min(count, larger.get(edge, 0)) for edge, count in smaller.items())
+    return overlap / max(left.adjacency_total, right.adjacency_total, 1)
 
 
 def _fingerprint_similarity(
@@ -101,16 +109,7 @@ def _fingerprint_similarity(
     position = common_positions / max(len(a), len(b))
     endpoints = 0.5 * float(a[0] == b[0]) + 0.5 * float(a[-1] == b[-1])
     same_kind = float(left.phrase_kind == right.phrase_kind)
-
-    # Counter intersection was previously rebuilt for every greedy comparison.
-    # Iterate the smaller precomputed mapping instead; repeated-word semantics
-    # remain exactly the same because overlap still uses min(left, right) counts.
-    if len(left.adjacency) <= len(right.adjacency):
-        smaller, larger = left.adjacency, right.adjacency
-    else:
-        smaller, larger = right.adjacency, left.adjacency
-    overlap = sum(min(count, larger.get(edge, 0)) for edge, count in smaller.items())
-    adjacency = overlap / max(left.adjacency_total, right.adjacency_total, 1)
+    adjacency = _adjacency_overlap(left, right)
 
     similarity = (
         0.55 * adjacency
