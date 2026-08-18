@@ -75,8 +75,9 @@ class QualityGuidedGenerationTests(unittest.TestCase):
 
         # One result slot is reserved per requested bucket. The 3-word bucket is
         # empty, and bounded normal search deliberately does not rerun the 2-word
-        # beam merely to fill the global cap.
-        self.assertEqual(guided, [("ab", "ab")])
+        # beam merely to fill the global cap. The non-repeating aa+bb bag beats
+        # ab+ab because the existing lexical score penalizes duplicate words.
+        self.assertEqual(guided, [("aa", "bb")])
 
     def test_search_stats_report_exact_closures_not_just_retained_results(self) -> None:
         candidates = [
@@ -97,7 +98,7 @@ class QualityGuidedGenerationTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(guided, [("ab", "ab")])
+        self.assertEqual(guided, [("aa", "bb")])
         self.assertEqual(stats.accepted, 1)
         self.assertGreaterEqual(stats.exact_examined, 2)
 
