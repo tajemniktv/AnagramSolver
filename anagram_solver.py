@@ -29,7 +29,7 @@ DEFAULT_RUN_ROOT = SOLVER_RUNS_DIR
 BALANCED_MAX_RESULTS = 100_000
 QUICK_MAX_RESULTS = 20_000
 DEFAULT_ORDER_CANDIDATES = 56
-GENERATION_CACHE_SCHEMA = 3
+GENERATION_CACHE_SCHEMA = 4
 
 _RESULT_RE = re.compile(
     r"^\s*(?P<rank>\d+)\.\s+FINAL=\s*(?P<score>[\d.]+).*?"
@@ -123,14 +123,51 @@ def _run_key(args: argparse.Namespace) -> str:
     return hashlib.sha256(raw).hexdigest()[:20]
 
 
+def _residual_word_limits(args: argparse.Namespace) -> tuple[int, int]:
+    """Translate user-visible total word limits into generator residual limits.
+
+    ``anagram_generate.py`` subtracts required-word letters before it searches and
+    prepends the required words afterward. Its min/max values therefore describe
+    only the residual search. The one-command frontend exposes total answer word
+    counts, so account for required tokens here before forwarding those limits.
+    """
+    required_count = len(_normalized_required_words(args.require))
+    if required_count == 0:
+        return args.min_words, args.max_words
+
+    residual_max = args.max_words - required_count
+    if residual_max < 0:
+        raise SystemExit(
+            f"Required words already use {required_count} word(s), exceeding "
+            f"--max-words {args.max_words}."
+        )
+
+    target_letters = sorted(_normalized_target(args.text))
+    required_letters = sorted("".join(_normalized_required_words(args.require)))
+    if target_letters == required_letters:
+        raise SystemExit(
+            "Required words consume the entire target; zero-residual answers are "
+            "not supported by the ranked solver."
+        )
+    if residual_max == 0:
+        raise SystemExit(
+            "Required words leave target letters unused, but the requested total "
+            "word count leaves no residual word slots."
+        )
+
+    residual_min = max(0, args.min_words - required_count)
+    return residual_min, residual_max
+
+
 def build_generator_command(args: argparse.Namespace, output: Path) -> list[str]:
+    residual_min_words, residual_max_words = _residual_word_limits(args)
     cmd = [
         sys.executable,
         str(GENERATOR),
         args.text,
         "--min-word-len", str(args.min_word_len),
-        "--min-words", str(args.min_words),
-        "--max-words", str(args.max_words),
+        "--min-words", str(max(1, residual_min_words)),
+        "--max-words", str(max(1, residual_max_words)),
         "--min-zipf", str(args.min_zipf),
         "--short-word-policy", "common",
         # The reranker consumes the generator's component-rich PRE export.
@@ -329,6 +366,10 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("--json cannot be combined with --verbose; verbose child output would corrupt JSON stdout")
     if args.phrase_db is not None and not args.phrase_db.expanduser().is_file():
         raise SystemExit(f"--phrase-db not found: {args.phrase_db}")
+
+    # Validate the user-visible total word range against required-token count.
+    # This catches impossible requests before a child generator is launched.
+    _residual_word_limits(args)
 
 
 def _print_results(args: argparse.Namespace, results: Sequence[Result], run_dir: Path) -> None:
