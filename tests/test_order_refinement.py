@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import unittest
 
-from anagram_order_refinement import refine_order, refine_seed_pool, window_neighbors
+from anagram_order_refinement import (
+    augment_seed_pool,
+    refine_order,
+    refine_seed_pool,
+    window_neighbors,
+)
 
 
 class OrderRefinementTests(unittest.TestCase):
@@ -58,6 +63,23 @@ class OrderRefinementTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first[0].order, target)
         self.assertEqual(len({result.order for result in first}), len(first))
+
+    def test_augmentation_keeps_original_seeds_and_adds_improvements(self) -> None:
+        target = ("a", "b", "c", "d")
+        seeds = (
+            ("a", "c", "b", "d"),
+            ("d", "c", "b", "a"),
+        )
+
+        def scorer(order: tuple[str, ...]) -> float:
+            return sum(left == right for left, right in zip(order, target))
+
+        result = augment_seed_pool(seeds, scorer, max_window=4)
+        orders = {candidate.order for candidate in result.candidates}
+        self.assertTrue(set(seeds).issubset(orders))
+        self.assertIn(target, orders)
+        self.assertGreater(result.evaluated, len(seeds))
+        self.assertGreaterEqual(result.improved_seeds, 1)
 
 
 if __name__ == "__main__":
