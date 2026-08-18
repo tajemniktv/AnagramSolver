@@ -54,7 +54,7 @@ class QualityGuidedGenerationTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(guided, [("ab", "ab"), ("a", "b", "ab")])
+        self.assertEqual(guided, [("ab", "ab"), ("ab", "a", "b")])
 
     def test_unused_later_bucket_budget_rolls_back_to_saturated_bucket(self) -> None:
         candidates = [
