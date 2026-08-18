@@ -74,7 +74,7 @@ jobs:
             .anagram_data/wordnet31
             .anagram_data/dictionary
             .anagram_data/ngrams
-          key: normal-user-corpora-${{ runner.os }}-v1
+          key: normal-user-corpora-${{ runner.os }}-v2-${{ hashFiles('anagram_user_lexicon.py', 'anagram_generate.py') }}
       - name: Provision runtime corpora outside smoke timeouts
         run: |
           python - <<'PY'
