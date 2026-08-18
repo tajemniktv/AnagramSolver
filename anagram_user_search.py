@@ -22,6 +22,9 @@ from typing import Any
 import anagram_generate as generator
 
 SolveCallable = Callable[..., Iterator[tuple[str, ...]]]
+BeamState = tuple[tuple[int, ...], int, int, tuple[int, ...]]
+ScoredItem = tuple[float, int, tuple[Any, ...]]
+ANCHOR_CHAMPIONS_PER_WORD = 2
 
 
 def _sparse_signature(sig: tuple[int, ...]) -> tuple[tuple[int, int], ...]:
@@ -106,22 +109,62 @@ def _beam_width(word_count: int, result_limit: int) -> int:
 
 def _branch_width(word_count: int) -> int:
     if word_count <= 4:
-        return 160
+        return 192
     if word_count == 5:
-        return 96
-    return 64
+        return 112
+    return 72
 
 
 def _push_bounded(
-    heap: list[tuple[float, int, tuple[Any, ...]]],
-    item: tuple[float, int, tuple[Any, ...]],
+    heap: list[ScoredItem],
+    item: ScoredItem,
     limit: int,
 ) -> None:
+    if limit <= 0:
+        return
     if len(heap) < limit:
         heapq.heappush(heap, item)
         return
     if item[:2] > heap[0][:2]:
         heapq.heapreplace(heap, item)
+
+
+def _quality_anchor_limits(limit: int, candidate_count: int) -> tuple[int, int]:
+    """Split capacity between global quality and rare-word anchor champions."""
+    if limit <= 1:
+        return max(limit, 0), 0
+    possible_anchor_items = candidate_count * ANCHOR_CHAMPIONS_PER_WORD
+    anchor_capacity = min(limit // 4, possible_anchor_items)
+    return limit - anchor_capacity, anchor_capacity
+
+
+def _select_quality_with_anchors(
+    quality_heap: list[ScoredItem],
+    anchor_heaps: dict[int, list[ScoredItem]],
+    limit: int,
+) -> list[ScoredItem]:
+    """Combine the global score core with per-rarest-word champions.
+
+    Candidate indices are monotonic in a word bag, so the last chosen index is
+    also its least frequent chosen word. Keeping a couple of best states/bags per
+    such anchor prevents the entire bounded search from becoming thousands of
+    near-duplicates made only of the corpus's most frequent words.
+    """
+    selected = sorted(quality_heap, reverse=True)
+    seen = {item[2] for item in selected}
+    anchor_candidates = sorted(
+        (item for heap in anchor_heaps.values() for item in heap),
+        reverse=True,
+    )
+    for item in anchor_candidates:
+        if len(selected) >= limit:
+            break
+        if item[2] in seen:
+            continue
+        selected.append(item)
+        seen.add(item[2])
+    selected.sort(reverse=True)
+    return selected
 
 
 def _beam_bags_for_word_count(
@@ -131,7 +174,7 @@ def _beam_bags_for_word_count(
     limit: int,
     allow_repeat: bool,
 ) -> tuple[list[tuple[str, ...]], int, int]:
-    """Return a deterministic lexical beam shortlist for one fixed word count."""
+    """Return a deterministic quality-plus-anchor beam for one word count."""
     if limit <= 0 or not candidates:
         return [], 0, 0
 
@@ -148,11 +191,9 @@ def _beam_bags_for_word_count(
     for index, candidate in enumerate(candidates):
         by_signature[candidate.sig].append(index)
 
-    # State payload: (remaining signature, remaining letters, next candidate
-    # index, chosen indices). The heap priority lives outside the payload.
-    State = tuple[tuple[int, ...], int, int, tuple[int, ...]]
-    states: list[State] = [(remaining, remaining_len, 0, ())]
+    states: list[BeamState] = [(remaining, remaining_len, 0, ())]
     width = _beam_width(word_count, limit)
+    quality_width, _ = _quality_anchor_limits(width, len(candidates))
     branch_limit = _branch_width(word_count)
     partial_expansions = 0
     serial = 0
@@ -163,7 +204,8 @@ def _beam_bags_for_word_count(
     for depth in range(max(0, word_count - 1)):
         words_left_before = word_count - depth
         words_left_after = words_left_before - 1
-        next_heap: list[tuple[float, int, tuple[Any, ...]]] = []
+        quality_heap: list[ScoredItem] = []
+        anchor_heaps: dict[int, list[ScoredItem]] = defaultdict(list)
 
         for rem, rem_len, start, chosen in states:
             min_this_len = max(
@@ -210,34 +252,40 @@ def _beam_bags_for_word_count(
                 else:
                     priority = _lexical_score(new_chosen, candidates)
 
-                # Earlier discovery wins an exact priority tie, matching the
-                # deterministic frequency-first flavor of the source list.
-                item: tuple[float, int, tuple[Any, ...]] = (
+                item: ScoredItem = (
                     priority,
                     -serial,
                     (new_rem, new_rem_len, next_start, new_chosen),
                 )
                 serial += 1
                 partial_expansions += 1
-                _push_bounded(next_heap, item, width)
+                _push_bounded(quality_heap, item, quality_width)
+                _push_bounded(
+                    anchor_heaps[new_chosen[-1]],
+                    item,
+                    ANCHOR_CHAMPIONS_PER_WORD,
+                )
 
                 accepted_branches += 1
                 if accepted_branches >= branch_limit:
                     break
 
-        if not next_heap:
+        selected = _select_quality_with_anchors(
+            quality_heap,
+            anchor_heaps,
+            width,
+        )
+        if not selected:
             return [], 0, partial_expansions
         states = [
-            payload
-            for _, _, payload in sorted(
-                next_heap,
-                key=lambda item: (item[0], item[1]),
-                reverse=True,
-            )
+            (payload[0], payload[1], payload[2], payload[3])
+            for _, _, payload in selected
         ]
 
     exact_examined = 0
-    result_heap: list[tuple[float, int, tuple[Any, ...]]] = []
+    result_quality_width, _ = _quality_anchor_limits(limit, len(candidates))
+    result_quality_heap: list[ScoredItem] = []
+    result_anchor_heaps: dict[int, list[ScoredItem]] = defaultdict(list)
     result_serial = 0
 
     if word_count == 1:
@@ -250,14 +298,19 @@ def _beam_bags_for_word_count(
             indices = (*chosen, last_index)
             exact_examined += 1
             score = _lexical_score(indices, candidates)
-            item = (score, -result_serial, (indices,))
+            item: ScoredItem = (score, -result_serial, (indices,))
             result_serial += 1
-            _push_bounded(result_heap, item, limit)
+            _push_bounded(result_quality_heap, item, result_quality_width)
+            _push_bounded(
+                result_anchor_heaps[indices[-1]],
+                item,
+                ANCHOR_CHAMPIONS_PER_WORD,
+            )
 
-    ranked = sorted(
-        result_heap,
-        key=lambda item: (item[0], item[1], item[2]),
-        reverse=True,
+    ranked = _select_quality_with_anchors(
+        result_quality_heap,
+        result_anchor_heaps,
+        limit,
     )
     bags = [
         tuple(candidates[index].word for index in payload[0])
@@ -304,10 +357,6 @@ def quality_guided_bounded_solve(
         total_partial_expansions += expansions
 
     retained_total = sum(len(bags) for bags in bucket_results.values())
-    # Qodo correctly caught that the first implementation exposed retained bags
-    # as "examined" in the shared generator diagnostic. Preserve accepted as the
-    # retained shortlist while reporting every final exact closure actually
-    # scored by the beam. Partial-state expansions are reported separately.
     search_stats.exact_examined += total_examined
     search_stats.accepted += retained_total
 
