@@ -64,8 +64,14 @@ def _normalized_dictionary_source(source: str) -> str:
     return str(Path(source).expanduser().resolve())
 
 
+def _dictionary_source_token(dictionary_source: str) -> str:
+    """Return a stable namespace for dictionary-derived artifacts."""
+    normalized = _normalized_dictionary_source(dictionary_source).encode()
+    return hashlib.sha256(normalized).hexdigest()[:20]
+
+
 def _cache_source_token(dictionary_source: str, ngram_dir: Path | str) -> str:
-    """Return a stable namespace for one dictionary/ngram source combination."""
+    """Return a stable namespace for one dictionary/ngram policy combination."""
     payload = {
         "dictionary_source": _normalized_dictionary_source(dictionary_source),
         "ngram_dir": str(Path(ngram_dir).expanduser().resolve()),
@@ -78,16 +84,30 @@ def _derived_cache_paths(
     dictionary_source: str,
     ngram_dir: Path | str,
 ) -> tuple[Path, Path, str]:
-    """Choose source-isolated derived files so custom sources cannot race."""
-    source_token = _cache_source_token(dictionary_source, ngram_dir)
-    default_token = _cache_source_token(
+    """Choose dependency-scoped derived files so custom sources cannot race."""
+    dictionary_token = _dictionary_source_token(dictionary_source)
+    policy_token = _cache_source_token(dictionary_source, ngram_dir)
+    default_dictionary_token = _dictionary_source_token(generator.DEFAULT_DICT_URL)
+    default_policy_token = _cache_source_token(
         generator.DEFAULT_DICT_URL,
         generator.DEFAULT_NGRAM_DIR,
     )
-    if source_token == default_token:
-        return AUGMENTED_DICTIONARY, POLICY_CACHE, source_token
-    stem = f"normal_user_v{USER_LEXICON_SCHEMA}_{source_token}"
-    return DICTIONARY_DIR / f"{stem}.txt", DICTIONARY_DIR / f"{stem}.json", source_token
+
+    if dictionary_token == default_dictionary_token:
+        augmented_dictionary = AUGMENTED_DICTIONARY
+    else:
+        augmented_dictionary = DICTIONARY_DIR / (
+            f"normal_user_v{USER_LEXICON_SCHEMA}_dict_{dictionary_token}.txt"
+        )
+
+    if policy_token == default_policy_token:
+        policy_cache = POLICY_CACHE
+    else:
+        policy_cache = DICTIONARY_DIR / (
+            f"normal_user_v{USER_LEXICON_SCHEMA}_policy_{policy_token}.json"
+        )
+
+    return augmented_dictionary, policy_cache, policy_token
 
 
 def _policy_token(
@@ -149,15 +169,23 @@ def build_augmented_dictionary(
         }
     )
 
+    chunks = [original]
+    if original and not original.endswith("\n"):
+        chunks.append("\n")
+    chunks.extend(word + "\n" for word in additions)
+    desired = "".join(chunks)
+
+    if output.is_file():
+        try:
+            if output.read_text(encoding="utf-8", errors="ignore") == desired:
+                return output
+        except OSError:
+            pass
+
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(f".{output.name}.{uuid.uuid4().hex}.tmp")
     try:
-        with temporary.open("w", encoding="utf-8", newline="\n") as handle:
-            handle.write(original)
-            if original and not original.endswith("\n"):
-                handle.write("\n")
-            for word in additions:
-                handle.write(word + "\n")
+        temporary.write_text(desired, encoding="utf-8", newline="\n")
         os.replace(temporary, output)
     finally:
         temporary.unlink(missing_ok=True)
