@@ -289,6 +289,14 @@ class Candidate:
     zipf: float
 
 
+@dataclass(slots=True)
+class SearchStats:
+    """Mutable diagnostics for exact-search/clue admission work."""
+
+    exact_examined: int = 0
+    accepted: int = 0
+
+
 def load_words(
     path: Path,
     target_counts: tuple[int, ...],
@@ -375,7 +383,30 @@ def solve(
     max_words: int,
     max_results: int,
     allow_repeat: bool,
+    *,
+    clue_words: set[str] | None = None,
+    hint_mode: str = "any",
+    initial_clue_words: set[str] | None = None,
+    stats: SearchStats | None = None,
 ) -> Iterator[tuple[str, ...]]:
+    """Yield exact word bags, optionally admitting only clue-valid bags.
+
+    The historical uncued search order is preserved. When clues are supplied,
+    rejected exact decompositions do not consume ``max_results``. A small clue
+    state is carried through memoized DFS states so pruning cannot conflate
+    branches that have matched different clue words.
+    """
+    if hint_mode not in {"any", "exactly-one"}:
+        raise ValueError("hint_mode must be 'any' or 'exactly-one'")
+
+    clues = tuple(sorted(clue_words or ()))
+    clue_bits = {word: 1 << index for index, word in enumerate(clues)}
+    initial_mask = 0
+    for word in initial_clue_words or ():
+        initial_mask |= clue_bits.get(word, 0)
+    if hint_mode == "exactly-one" and initial_mask.bit_count() > 1:
+        return
+
     by_signature: dict[tuple[int, ...], list[int]] = defaultdict(list)
     for i, c in enumerate(candidates):
         by_signature[c.sig].append(i)
@@ -383,14 +414,49 @@ def solve(
     if not candidates:
         return
 
+    search_stats = stats if stats is not None else SearchStats()
     results_found = 0
-    dead: set[tuple[tuple[int, ...], int, int]] = set()
+    dead: set[tuple[tuple[int, ...], int, int, int]] = set()
     min_candidate_len = min(c.length for c in candidates)
     max_candidate_len = max(c.length for c in candidates)
     sparse_signatures = [
         tuple((letter, amount) for letter, amount in enumerate(c.sig) if amount)
         for c in candidates
     ]
+    candidate_clue_bits = [clue_bits.get(c.word, 0) for c in candidates]
+    clue_candidate_indices = [
+        index for index, bit in enumerate(candidate_clue_bits) if bit
+    ]
+
+    def clue_state_accepts(mask: int) -> bool:
+        if not clues:
+            return True
+        matched_count = mask.bit_count()
+        if hint_mode == "any":
+            return matched_count >= 1
+        return matched_count == 1
+
+    def can_still_match_clue(
+        mask: int,
+        rem: tuple[int, ...],
+        start: int,
+    ) -> bool:
+        if not clues:
+            return True
+        matched_count = mask.bit_count()
+        if hint_mode == "exactly-one" and matched_count > 1:
+            return False
+        if matched_count >= 1:
+            return True
+
+        # Candidate indices are monotonic within a word bag. If every remaining
+        # clue candidate is either behind ``start`` or cannot fit the residual
+        # letters, this branch can never satisfy the clue and need not be fully
+        # decomposed merely to reject it at the leaf.
+        for index in clue_candidate_indices:
+            if index >= start and fits(candidates[index].sig, rem):
+                return True
+        return False
 
     def dfs(
         rem: tuple[int, ...],
@@ -398,6 +464,7 @@ def solve(
         start: int,
         words_left: int,
         chosen: list[str],
+        clue_mask: int,
     ) -> Iterator[tuple[str, ...]]:
         nonlocal results_found
 
@@ -406,8 +473,11 @@ def solve(
 
         if words_left == 0:
             if rem_len == 0:
-                results_found += 1
-                yield tuple(chosen)
+                search_stats.exact_examined += 1
+                if clue_state_accepts(clue_mask):
+                    results_found += 1
+                    search_stats.accepted += 1
+                    yield tuple(chosen)
             return
         if rem_len == 0:
             return
@@ -415,8 +485,10 @@ def solve(
             return
         if rem_len > words_left * max_candidate_len:
             return
+        if not can_still_match_clue(clue_mask, rem, start):
+            return
 
-        state = (rem, start, words_left)
+        state = (rem, start, words_left, clue_mask)
         if state in dead:
             return
 
@@ -426,8 +498,15 @@ def solve(
             for i in by_signature.get(rem, []):
                 if i < start:
                     continue
+                new_mask = clue_mask | candidate_clue_bits[i]
+                search_stats.exact_examined += 1
+                if hint_mode == "exactly-one" and new_mask.bit_count() > 1:
+                    continue
+                if not clue_state_accepts(new_mask):
+                    continue
                 word = candidates[i].word
                 results_found += 1
+                search_stats.accepted += 1
                 yield tuple(chosen + [word])
                 if max_results > 0 and results_found >= max_results:
                     return
@@ -456,6 +535,9 @@ def solve(
                     break
             if not candidate_fits:
                 continue
+            new_mask = clue_mask | candidate_clue_bits[i]
+            if hint_mode == "exactly-one" and new_mask.bit_count() > 1:
+                continue
             mutable_rem = list(rem)
             for letter, amount in sparse:
                 mutable_rem[letter] -= amount
@@ -467,6 +549,7 @@ def solve(
                 next_start,
                 words_left - 1,
                 chosen + [c.word],
+                new_mask,
             )
             if max_results > 0 and results_found >= max_results:
                 return
@@ -476,7 +559,14 @@ def solve(
 
     initial_remaining_len = sum(remaining)
     for nwords in range(min_words, max_words + 1):
-        yield from dfs(remaining, initial_remaining_len, 0, nwords, [])
+        yield from dfs(
+            remaining,
+            initial_remaining_len,
+            0,
+            nwords,
+            [],
+            initial_mask,
+        )
         if max_results > 0 and results_found >= max_results:
             break
 
@@ -1002,7 +1092,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-words", type=int, default=6)
     p.add_argument(
         "--max-results", type=int, default=1000, metavar="N",
-        help="Stop after N unique generated word sets; 0 means unlimited",
+        help=(
+            "Stop after N accepted word sets; clue-rejected exact decompositions "
+            "do not consume the budget. 0 means unlimited"
+        ),
     )
     p.add_argument(
         "--all-results", action="store_true",
@@ -1163,8 +1256,11 @@ def main() -> int:
     }
     contains_any.difference_update(excluded_words)
 
+    required_word_set = set(required_words)
     impossible_hints = sorted(
-        h for h in contains_any if not fits(counts(h), remaining)
+        h
+        for h in contains_any
+        if h not in required_word_set and not fits(counts(h), remaining)
     )
     if impossible_hints:
         print(
@@ -1289,8 +1385,7 @@ def main() -> int:
         stream = stream_path.open("w", encoding="utf-8", newline="\n")
 
     solutions: list[tuple[str, ...]] = []
-    generated = 0
-    accepted = 0
+    search_stats = SearchStats()
     search_started = time.perf_counter()
     try:
         for solution in solve(
@@ -1300,18 +1395,12 @@ def main() -> int:
             args.max_words,
             args.max_results,
             allow_repeat=not args.no_repeat,
+            clue_words=contains_any,
+            hint_mode=args.hint_mode,
+            initial_clue_words=contains_any.intersection(required_words),
+            stats=search_stats,
         ):
-            generated += 1
             all_words = (*required_words, *solution)
-            matched = contains_any.intersection(all_words)
-
-            if contains_any:
-                if args.hint_mode == "any" and not matched:
-                    continue
-                if args.hint_mode == "exactly-one" and len(matched) != 1:
-                    continue
-
-            accepted += 1
             solutions.append(solution)
             if stream is not None:
                 stream.write(" ".join(all_words) + "\n")
@@ -1319,10 +1408,12 @@ def main() -> int:
         if stream is not None:
             stream.close()
 
+    generated = search_stats.exact_examined
+    accepted = search_stats.accepted
     search_seconds = time.perf_counter() - search_started
     print(
-        f"Generated {generated:,} exact word set(s); "
-        f"{accepted:,} survived clue constraints. "
+        f"Examined {generated:,} clue-relevant exact word set(s); "
+        f"{accepted:,} satisfied clue constraints. "
         f"Exact search: {search_seconds:.2f}s.",
         file=sys.stderr,
     )
@@ -1422,9 +1513,9 @@ def main() -> int:
             f"Exhaustive search completed: {len(records):,} accepted result set(s).",
             file=sys.stderr,
         )
-    elif generated >= args.max_results:
+    elif accepted >= args.max_results:
         print(
-            f"Search stopped at --max-results {args.max_results:,}.",
+            f"Search stopped at --max-results {args.max_results:,} accepted result set(s).",
             file=sys.stderr,
         )
     else:
