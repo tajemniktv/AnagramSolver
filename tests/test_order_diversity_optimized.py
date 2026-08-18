@@ -120,6 +120,22 @@ class OptimizedOrderDiversityTests(unittest.TestCase):
             reference_select(pool, 64),
         )
 
+    def test_selector_equivalence_with_repeated_tokens_and_ties(self) -> None:
+        orders = sorted(set(itertools.permutations(("a", "a", "b", "c"))))
+        pool = tuple(
+            Candidate(
+                order=tuple(order),
+                objective=1.0 - (index // 2) * 0.01,
+                phrase_kind=("clause" if index % 2 else "fragment"),
+            )
+            for index, order in enumerate(orders)
+        )
+        kwargs = {"quality_core": 3, "diversity_strength": 0.27}
+        self.assertEqual(
+            diversity.select_diverse_orders(pool, 8, **kwargs),
+            reference_select(pool, 8, **kwargs),
+        )
+
     def test_default_72_to_64_pool_uses_incremental_comparisons(self) -> None:
         pool = self._pool()
         calls = 0
