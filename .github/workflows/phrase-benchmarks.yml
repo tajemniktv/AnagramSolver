@@ -44,12 +44,6 @@ jobs:
           restore-keys: |
             phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-
 
-      # Cache versions include their path list. During the migration away from
-      # ~/.multi_anagram, a new-layout restore cannot see the existing ~1 GB
-      # default-branch corpus cache even when the key prefix matches. On a new-
-      # layout miss, restore that legacy cache with its historical path list,
-      # copy its reusable data into .anagram_data, then remove the temporary
-      # home-directory copy. The save step below publishes the new layout.
       - name: Restore legacy corpus cache for path migration
         id: legacy-corpus-cache
         if: steps.corpus-cache.outputs.cache-matched-key == ''
@@ -72,11 +66,6 @@ jobs:
             rm -rf "$HOME/.multi_anagram"
           fi
 
-      # Prepared rows depend on reranker feature code, while their on-disk key
-      # intentionally uses an explicit schema rather than hashing source files.
-      # Never inherit them across branches/PRs. Rebuilding them is cheap compared
-      # with rebuilding the Wikimedia phrase indexes, and later scenarios in this
-      # same job can still reuse the freshly prepared rows.
       - name: Drop code-sensitive prepared-feature cache
         shell: bash
         run: rm -rf .anagram_data/prepared_cache
@@ -105,8 +94,6 @@ jobs:
             echo "Using cached Wiktionary + Wikipedia phrase index"
           fi
 
-      # Pull requests keep only the cheap ordering A/B. This provides ranking
-      # regression signal without repeatedly running exact-anagram generation.
       - name: Run fast PR phrase-order matrix
         if: github.event_name == 'pull_request'
         run: |
@@ -116,9 +103,17 @@ jobs:
             --workers 8 \
             --order-only
 
-      # Full generation + reranking is intentionally explicit. A normal merge to
-      # main does not launch it; use the Run workflow button when an end-to-end
-      # corpus comparison is actually useful.
+      # Informational by design: this is held-out model research, not a hard
+      # regression threshold. A losing experiment should report honestly rather
+      # than turn an otherwise-correct solver build red.
+      - name: Evaluate explicit-feature ranker with grouped held-out folds
+        if: github.event_name == 'pull_request' && hashFiles('train_feature_ranker.py') != ''
+        run: |
+          python train_feature_ranker.py \
+            --phrase-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --order-candidates 56 \
+            --folds 5
+
       - name: Run manual full corpus benchmark matrix
         if: github.event_name == 'workflow_dispatch'
         run: |
@@ -127,8 +122,6 @@ jobs:
             --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
             --workers 8
 
-      # Scheduled runs exist only to seed the new monthly corpus cache on the
-      # default branch so future PRs can restore it. No benchmark is run here.
       - name: Monthly corpus cache refresh only
         if: github.event_name == 'schedule'
         run: |
