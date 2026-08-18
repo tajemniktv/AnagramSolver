@@ -34,14 +34,13 @@ def _load_cases() -> list[dict[str, object]]:
     return [dict(item) for item in payload["cases"] if isinstance(item, dict)]
 
 
-def _acceptable(case: dict[str, object], answer: str) -> set[str]:
+def _acceptable(case: dict[str, object], answer: str) -> set[tuple[str, ...]]:
     raw: object = case.get("acceptable_orders", [answer])
     values: Sequence[object] = raw if isinstance(raw, list) else [answer]
     return {
-        benchmark.phrase_key(value)
+        benchmark.phrase_key(item)
         for item in values
         if isinstance(item, str)
-        for value in (item,)
     }
 
 
