@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply the normal-user lexicon policy, then run the research generator."""
+"""Apply normal-user lexicon/search policy, then run the research generator."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 
 import anagram_generate as generator
 from anagram_user_lexicon import ensure_user_lexicon
+from anagram_user_search import make_quality_guided_solve
 
 
 def _pre_separator_args(argv: list[str]) -> tuple[list[str], int]:
@@ -48,12 +49,17 @@ def main() -> int:
     argv = original_args
     argv[separator:separator] = policy
 
-    previous = sys.argv
+    previous_argv = sys.argv
+    previous_solve = generator.solve
     try:
-        sys.argv = [str(previous[0]), *argv]
+        # This is scoped to the dedicated child process. Direct research calls
+        # to anagram_generate.py keep the historical DFS unchanged.
+        generator.solve = make_quality_guided_solve(previous_solve)
+        sys.argv = [str(previous_argv[0]), *argv]
         return generator.main()
     finally:
-        sys.argv = previous
+        sys.argv = previous_argv
+        generator.solve = previous_solve
 
 
 if __name__ == "__main__":
