@@ -3,9 +3,11 @@
 The low-level generator keeps its historical DFS for research, clues, and true
 exhaustive enumeration. Normal bounded searches need a different contract: the
 candidate cap should retain plausible word bags rather than whichever exact
-covers happen to occur first in DFS order. This module keeps the best exact bags
-per word-count bucket using an admissible lexical upper bound and bounded result
-heaps, so memory grows with the requested shortlist rather than the search tree.
+covers happen to occur first in DFS order.
+
+This module uses a bounded lexical beam over partial word bags. It is explicitly
+approximate: generation only needs to preserve a strong, varied shortlist for
+the deeper linguistic reranker, not prove the globally exact lexical top-K.
 """
 
 from __future__ import annotations
@@ -63,12 +65,14 @@ def _optimistic_score(
     best_future_zipf: float,
     candidates: list[generator.Candidate],
 ) -> float:
-    """Admissible lexical upper bound for a partial bag.
+    """Return an optimistic lexical score for a partial bag.
 
-    The lexical average and low-tail terms are monotone in each Zipf value. By
-    filling every unknown slot with the best currently feasible Zipf score and
-    omitting non-positive duplicate/junk penalties, this can overestimate but
-    cannot underestimate any completion beneath the state.
+    Candidate indices are monotonic and the source list is descending by Zipf.
+    Filling every unknown slot with the best Zipf still available at ``start``
+    therefore cannot undershoot a real completion. Non-positive duplicate/junk
+    penalties are omitted as well. The beam uses this as a ranking heuristic;
+    unlike the previous exact branch-and-bound experiment, no correctness claim
+    depends on keeping every state whose bound is competitive.
     """
     values = [candidates[index].zipf for index in chosen_indices]
     values.extend([best_future_zipf] * words_left)
@@ -80,143 +84,188 @@ def _optimistic_score(
     return 0.78 * average + 0.22 * low_tail
 
 
-def _top_bags_for_word_count(
+def _bucket_result_cap(word_count: int, requested: int) -> int:
+    """Bound how much lexical-only material a bucket sends to deep reranking."""
+    if word_count <= 4:
+        ceiling = 10_000
+    elif word_count == 5:
+        ceiling = 6_000
+    else:
+        ceiling = 4_000
+    return max(1, min(requested, ceiling))
+
+
+def _beam_width(word_count: int, result_limit: int) -> int:
+    if word_count <= 4:
+        floor = 8_000
+    elif word_count == 5:
+        floor = 5_000
+    else:
+        floor = 3_000
+    return max(result_limit, floor)
+
+
+def _branch_width(word_count: int) -> int:
+    if word_count <= 4:
+        return 160
+    if word_count == 5:
+        return 96
+    return 64
+
+
+def _push_bounded(
+    heap: list[tuple[float, int, tuple[Any, ...]]],
+    item: tuple[float, int, tuple[Any, ...]],
+    limit: int,
+) -> None:
+    if len(heap) < limit:
+        heapq.heappush(heap, item)
+        return
+    if item[:2] > heap[0][:2]:
+        heapq.heapreplace(heap, item)
+
+
+def _beam_bags_for_word_count(
     remaining: tuple[int, ...],
     candidates: list[generator.Candidate],
     word_count: int,
     limit: int,
     allow_repeat: bool,
-) -> tuple[list[tuple[str, ...]], int]:
+) -> tuple[list[tuple[str, ...]], int, int]:
+    """Return a deterministic lexical beam shortlist for one fixed word count."""
     if limit <= 0 or not candidates:
-        return [], 0
+        return [], 0, 0
 
     min_candidate_len = min(candidate.length for candidate in candidates)
     max_candidate_len = max(candidate.length for candidate in candidates)
     remaining_len = sum(remaining)
     if remaining_len < word_count * min_candidate_len:
-        return [], 0
+        return [], 0, 0
     if remaining_len > word_count * max_candidate_len:
-        return [], 0
+        return [], 0, 0
 
     sparse_signatures = [_sparse_signature(candidate.sig) for candidate in candidates]
     by_signature: dict[tuple[int, ...], list[int]] = defaultdict(list)
     for index, candidate in enumerate(candidates):
         by_signature[candidate.sig].append(index)
 
-    # Min-heap of retained complete bags. The score is the pruning authority;
-    # serial keeps equal-score retention deterministic in DFS discovery order.
-    best: list[tuple[float, int, tuple[int, ...]]] = []
+    # State payload: (remaining signature, remaining letters, next candidate
+    # index, chosen indices). The heap priority lives outside the payload.
+    State = tuple[tuple[int, ...], int, int, tuple[int, ...]]
+    states: list[State] = [(remaining, remaining_len, 0, ())]
+    width = _beam_width(word_count, limit)
+    branch_limit = _branch_width(word_count)
+    partial_expansions = 0
     serial = 0
-    exact_examined = 0
 
-    def retain(indices: tuple[int, ...]) -> None:
-        nonlocal serial, exact_examined
-        exact_examined += 1
-        score = _lexical_score(indices, candidates)
-        item = (score, -serial, indices)
-        serial += 1
-        if len(best) < limit:
-            heapq.heappush(best, item)
-            return
-        if score > best[0][0] + _EPSILON:
-            heapq.heapreplace(best, item)
+    # Choose every word except the final exact signature closure. The final step
+    # is handled through by_signature so rare-but-required last words are never
+    # lost merely because they fall outside the local branch width.
+    for depth in range(max(0, word_count - 1)):
+        words_left_before = word_count - depth
+        words_left_after = words_left_before - 1
+        next_heap: list[tuple[float, int, tuple[Any, ...]]] = []
 
-    def best_feasible_zipf(
-        rem: tuple[int, ...],
-        rem_len: int,
-        start: int,
-        words_left: int,
-    ) -> float | None:
-        if words_left <= 0:
-            return 0.0 if rem_len == 0 else None
-        min_this_len = max(
-            min_candidate_len,
-            rem_len - (words_left - 1) * max_candidate_len,
-        )
-        max_this_len = min(
-            max_candidate_len,
-            rem_len - (words_left - 1) * min_candidate_len,
-        )
-        for index in range(start, len(candidates)):
-            candidate = candidates[index]
-            if candidate.length < min_this_len or candidate.length > max_this_len:
-                continue
-            if _fits_sparse(sparse_signatures[index], rem):
-                return candidate.zipf
-        return None
-
-    def dfs(
-        rem: tuple[int, ...],
-        rem_len: int,
-        start: int,
-        words_left: int,
-        chosen_indices: tuple[int, ...],
-    ) -> None:
-        if words_left == 0:
-            if rem_len == 0:
-                retain(chosen_indices)
-            return
-        if rem_len == 0:
-            return
-        if rem_len < words_left * min_candidate_len:
-            return
-        if rem_len > words_left * max_candidate_len:
-            return
-
-        future_zipf = best_feasible_zipf(rem, rem_len, start, words_left)
-        if future_zipf is None:
-            return
-        if len(best) >= limit:
-            upper = _optimistic_score(
-                chosen_indices,
-                words_left,
-                future_zipf,
-                candidates,
+        for rem, rem_len, start, chosen in states:
+            min_this_len = max(
+                min_candidate_len,
+                rem_len - words_left_after * max_candidate_len,
             )
-            if upper <= best[0][0] + _EPSILON:
-                return
+            max_this_len = min(
+                max_candidate_len,
+                rem_len - words_left_after * min_candidate_len,
+            )
+            accepted_branches = 0
 
-        if words_left == 1:
-            for index in by_signature.get(rem, []):
-                if index < start:
+            for index in range(start, len(candidates)):
+                candidate = candidates[index]
+                if candidate.length < min_this_len or candidate.length > max_this_len:
                     continue
-                retain((*chosen_indices, index))
-            return
+                sparse = sparse_signatures[index]
+                if not _fits_sparse(sparse, rem):
+                    continue
 
-        min_this_len = max(
-            min_candidate_len,
-            rem_len - (words_left - 1) * max_candidate_len,
-        )
-        max_this_len = min(
-            max_candidate_len,
-            rem_len - (words_left - 1) * min_candidate_len,
-        )
-        for index in range(start, len(candidates)):
-            candidate = candidates[index]
-            if candidate.length < min_this_len or candidate.length > max_this_len:
-                continue
-            sparse = sparse_signatures[index]
-            if not _fits_sparse(sparse, rem):
-                continue
-            new_rem = _subtract_sparse(rem, sparse)
-            next_start = index if allow_repeat else index + 1
-            dfs(
-                new_rem,
-                rem_len - candidate.length,
-                next_start,
-                words_left - 1,
-                (*chosen_indices, index),
+                new_rem = _subtract_sparse(rem, sparse)
+                new_rem_len = rem_len - candidate.length
+                next_start = index if allow_repeat else index + 1
+                if words_left_after > 0 and next_start >= len(candidates):
+                    continue
+
+                # At the penultimate depth, avoid filling the beam with partial
+                # states whose residual signature has no legal exact closure.
+                if words_left_after == 1:
+                    if not any(
+                        last_index >= next_start
+                        for last_index in by_signature.get(new_rem, ())
+                    ):
+                        continue
+
+                new_chosen = (*chosen, index)
+                if words_left_after:
+                    best_future_zipf = candidates[next_start].zipf
+                    priority = _optimistic_score(
+                        new_chosen,
+                        words_left_after,
+                        best_future_zipf,
+                        candidates,
+                    )
+                else:
+                    priority = _lexical_score(new_chosen, candidates)
+
+                # Earlier discovery wins an exact priority tie, matching the
+                # deterministic frequency-first flavor of the source list.
+                item: tuple[float, int, tuple[Any, ...]] = (
+                    priority,
+                    -serial,
+                    (new_rem, new_rem_len, next_start, new_chosen),
+                )
+                serial += 1
+                partial_expansions += 1
+                _push_bounded(next_heap, item, width)
+
+                accepted_branches += 1
+                if accepted_branches >= branch_limit:
+                    break
+
+        if not next_heap:
+            return [], 0, partial_expansions
+        states = [
+            payload
+            for _, _, payload in sorted(
+                next_heap,
+                key=lambda item: (item[0], item[1]),
+                reverse=True,
             )
+        ]
 
-    dfs(remaining, remaining_len, 0, word_count, ())
+    exact_examined = 0
+    result_heap: list[tuple[float, int, tuple[Any, ...]]] = []
+    result_serial = 0
+
+    if word_count == 1:
+        states = [(remaining, remaining_len, 0, ())]
+
+    for rem, _rem_len, start, chosen in states:
+        for last_index in by_signature.get(rem, ()):
+            if last_index < start:
+                continue
+            indices = (*chosen, last_index)
+            exact_examined += 1
+            score = _lexical_score(indices, candidates)
+            item = (score, -result_serial, (indices,))
+            result_serial += 1
+            _push_bounded(result_heap, item, limit)
+
     ranked = sorted(
-        best,
-        key=lambda item: (-item[0], item[2]),
+        result_heap,
+        key=lambda item: (item[0], item[1], item[2]),
+        reverse=True,
     )
-    return [
-        tuple(candidates[index].word for index in indices)
-        for _, _, indices in ranked
-    ], exact_examined
+    bags = [
+        tuple(candidates[index].word for index in payload[0])
+        for _, _, payload in ranked
+    ]
+    return bags, exact_examined, partial_expansions
 
 
 def quality_guided_bounded_solve(
@@ -229,78 +278,48 @@ def quality_guided_bounded_solve(
     *,
     stats: generator.SearchStats | None = None,
 ) -> Iterator[tuple[str, ...]]:
-    """Yield a balanced lexical shortlist across requested word-count buckets."""
+    """Yield a bounded lexical shortlist spread across requested word counts."""
     if max_results <= 0:
         return
 
     search_stats = stats if stats is not None else generator.SearchStats()
-    remaining_budget = max_results
     word_counts = tuple(range(min_words, max_words + 1))
-    total_examined = 0
-    bucket_results: dict[int, list[tuple[str, ...]]] = {}
-    bucket_limits: dict[int, int] = {}
+    if not word_counts:
+        return
 
-    # First pass rolls sparse early buckets forward immediately. This is cheap
-    # for common 2/3-word cases and reserves meaningful space for longer bags.
-    for position, word_count in enumerate(word_counts):
-        if remaining_budget <= 0:
-            bucket_results[word_count] = []
-            bucket_limits[word_count] = 0
-            continue
-        buckets_left = len(word_counts) - position
-        quota = max(1, math.ceil(remaining_budget / buckets_left))
-        bags, examined = _top_bags_for_word_count(
+    nominal_quota = max(1, math.ceil(max_results / len(word_counts)))
+    bucket_results: dict[int, list[tuple[str, ...]]] = {}
+    total_examined = 0
+    total_partial_expansions = 0
+
+    for word_count in word_counts:
+        result_limit = _bucket_result_cap(word_count, nominal_quota)
+        bags, examined, expansions = _beam_bags_for_word_count(
             remaining,
             candidates,
             word_count,
-            quota,
+            result_limit,
             allow_repeat,
         )
-        total_examined += examined
         bucket_results[word_count] = bags
-        bucket_limits[word_count] = quota
-        remaining_budget -= len(bags)
+        total_examined += examined
+        total_partial_expansions += expansions
 
-    # If later buckets were sparse, spend their unused reservation on an earlier
-    # bucket that proved it had at least its full quota. Re-running only happens
-    # in this spillover case and keeps the final total at the requested cap when
-    # enough exact bags exist anywhere in the requested range.
-    if remaining_budget > 0:
-        for word_count in word_counts:
-            if remaining_budget <= 0:
-                break
-            previous = bucket_results.get(word_count, [])
-            previous_limit = bucket_limits.get(word_count, 0)
-            if previous_limit <= 0 or len(previous) < previous_limit:
-                continue
-            expanded_limit = previous_limit + remaining_budget
-            expanded, examined = _top_bags_for_word_count(
-                remaining,
-                candidates,
-                word_count,
-                expanded_limit,
-                allow_repeat,
-            )
-            total_examined += examined
-            added = max(0, len(expanded) - len(previous))
-            if added <= 0:
-                continue
-            take = min(added, remaining_budget)
-            bucket_results[word_count] = expanded[: len(previous) + take]
-            bucket_limits[word_count] = expanded_limit
-            remaining_budget -= take
+    retained_total = sum(len(bags) for bags in bucket_results.values())
+    # Qodo correctly caught that the first implementation exposed retained bags
+    # as "examined" in the shared generator diagnostic. Preserve accepted as the
+    # retained shortlist while reporting every final exact closure actually
+    # scored by the beam. Partial-state expansions are reported separately.
+    search_stats.exact_examined += total_examined
+    search_stats.accepted += retained_total
 
-    retained_total = 0
     for word_count in word_counts:
-        for bag in bucket_results.get(word_count, ()):
-            search_stats.exact_examined += 1
-            search_stats.accepted += 1
-            retained_total += 1
-            yield bag
+        yield from bucket_results.get(word_count, ())
 
     print(
-        f"Quality-guided bounded search examined {total_examined:,} exact bag(s); "
-        f"retained {retained_total:,} across {min_words}-{max_words} words.",
+        f"Quality-guided bounded search evaluated {total_examined:,} exact bag(s), "
+        f"expanded {total_partial_expansions:,} partial state(s), and retained "
+        f"{retained_total:,} across {min_words}-{max_words} words.",
         file=sys.stderr,
     )
 
