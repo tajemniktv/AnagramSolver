@@ -1281,6 +1281,15 @@ def main() -> int:
     short_whitelist.difference_update(excluded_words)
 
     if sum(remaining) == 0:
+        required_clues = contains_any.intersection(required_word_set)
+        clue_constraints_satisfied = (
+            not contains_any
+            or (args.hint_mode == "any" and bool(required_clues))
+            or (args.hint_mode == "exactly-one" and len(required_clues) == 1)
+        )
+        if not clue_constraints_satisfied:
+            print("Required words do not satisfy clue constraints.", file=sys.stderr)
+            return 1
         print(" ".join(required_words))
         return 0
 
