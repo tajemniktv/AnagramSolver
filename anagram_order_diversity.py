@@ -12,7 +12,7 @@ from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
-from typing import Protocol, TypeVar, overload
+from typing import Protocol, SupportsIndex, TypeVar, overload
 
 DEFAULT_QUALITY_CORE = 48
 DEFAULT_POOL_EXTRA = 8
@@ -204,6 +204,11 @@ class _DeferredDiverseOrders(tuple[CandidateT, ...]):
     previous whole-phrase rescue semantics.
     """
 
+    _top_k: int
+    _quality_core: int
+    _diversity_strength: float
+    _materialized: tuple[CandidateT, ...] | None
+
     def __new__(
         cls,
         candidates: Sequence[CandidateT],
@@ -215,7 +220,7 @@ class _DeferredDiverseOrders(tuple[CandidateT, ...]):
         obj._top_k = top_k
         obj._quality_core = quality_core
         obj._diversity_strength = diversity_strength
-        obj._materialized: tuple[CandidateT, ...] | None = None
+        obj._materialized = None
         return obj
 
     def _raw(self) -> tuple[CandidateT, ...]:
@@ -246,16 +251,20 @@ class _DeferredDiverseOrders(tuple[CandidateT, ...]):
         return iter(self._resolved())
 
     @overload
-    def __getitem__(self, key: int) -> CandidateT: ...
+    def __getitem__(self, key: SupportsIndex, /) -> CandidateT: ...
 
     @overload
-    def __getitem__(self, key: slice) -> tuple[CandidateT, ...]: ...
+    def __getitem__(self, key: slice, /) -> tuple[CandidateT, ...]: ...
 
-    def __getitem__(self, key: int | slice) -> CandidateT | tuple[CandidateT, ...]:
+    def __getitem__(
+        self,
+        key: SupportsIndex | slice,
+        /,
+    ) -> CandidateT | tuple[CandidateT, ...]:
         # Candidate zero is guaranteed to survive because quality_core >= 1.
         # The corpus-admission fast path relies on reading it without triggering
         # the expensive diversity pass for every deep row.
-        if key == 0 and tuple.__len__(self) > 0:
+        if not isinstance(key, slice) and key.__index__() == 0 and tuple.__len__(self) > 0:
             return tuple.__getitem__(self, 0)
         return self._resolved()[key]
 
