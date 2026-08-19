@@ -9,10 +9,10 @@ turning the retained set into a novelty contest with English as collateral.
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
-from typing import Protocol, TypeVar
+from typing import Protocol, TypeVar, overload
 
 DEFAULT_QUALITY_CORE = 48
 DEFAULT_POOL_EXTRA = 8
@@ -137,32 +137,14 @@ def order_similarity(left: OrderLike, right: OrderLike) -> float:
     return _fingerprint_similarity(_fingerprint(left), _fingerprint(right))
 
 
-def select_diverse_orders(
+def _select_diverse_orders_eager(
     candidates: Sequence[CandidateT],
     top_k: int,
     *,
-    quality_core: int = DEFAULT_QUALITY_CORE,
-    diversity_strength: float = DEFAULT_DIVERSITY_STRENGTH,
+    quality_core: int,
+    diversity_strength: float,
 ) -> tuple[CandidateT, ...]:
-    """Keep the score head, then greedily spend remaining slots on novelty.
-
-    ``candidates`` must already be in best-first grammar/structure order. The
-    first ``quality_core`` candidates are preserved byte-for-byte. Remaining
-    slots use the same maximal-marginal-relevance objective as before, but cache
-    each candidate's current maximum similarity to the selected set. Adding one
-    winner therefore requires only one new comparison per remaining candidate
-    instead of rescanning the entire selected prefix. The final tuple remains in
-    original score order, preserving downstream ranking and deterministic ties.
-    """
-    if top_k < 1:
-        raise ValueError("top_k must be >= 1")
-    if quality_core < 1:
-        raise ValueError("quality_core must be >= 1")
-    if not 0.0 <= diversity_strength <= 1.0:
-        raise ValueError("diversity_strength must be between 0 and 1")
-    if not candidates:
-        return ()
-
+    """Materialize the historical greedy diversity decision exactly once."""
     limit = min(top_k, len(candidates))
     core_count = min(quality_core, limit)
     selected_indices = list(range(core_count))
@@ -206,3 +188,131 @@ def select_diverse_orders(
 
     selected_indices.sort()
     return tuple(candidates[index] for index in selected_indices)
+
+
+class _DeferredDiverseOrders(tuple[CandidateT, ...]):
+    """Tuple-compatible lazy view over a widened score-ranked order pool.
+
+    The deep-analysis facade installs these objects in its side table immediately
+    after workers return. Truth checks and access to candidate zero stay O(1),
+    because diversity always preserves the score winner. Iterating, slicing, or
+    asking for the retained length materializes the exact historical greedy
+    selection once and caches it. This lets the broad collocation admission pass
+    inspect only grammar winners, while rows that reach late rescoring pay the
+    diversity cost on demand. Phrase-database admission iterates alternatives and
+    therefore intentionally materializes every inspected row, preserving its
+    previous whole-phrase rescue semantics.
+    """
+
+    def __new__(
+        cls,
+        candidates: Sequence[CandidateT],
+        top_k: int,
+        quality_core: int,
+        diversity_strength: float,
+    ) -> _DeferredDiverseOrders[CandidateT]:
+        obj = super().__new__(cls, candidates)
+        obj._top_k = top_k
+        obj._quality_core = quality_core
+        obj._diversity_strength = diversity_strength
+        obj._materialized: tuple[CandidateT, ...] | None = None
+        return obj
+
+    def _raw(self) -> tuple[CandidateT, ...]:
+        return tuple(tuple.__iter__(self))
+
+    def _resolved(self) -> tuple[CandidateT, ...]:
+        if self._materialized is None:
+            self._materialized = _select_diverse_orders_eager(
+                self._raw(),
+                self._top_k,
+                quality_core=self._quality_core,
+                diversity_strength=self._diversity_strength,
+            )
+        return self._materialized
+
+    @property
+    def is_materialized(self) -> bool:
+        """Expose lazy state for focused regression and performance tests."""
+        return self._materialized is not None
+
+    def __bool__(self) -> bool:
+        return tuple.__len__(self) > 0
+
+    def __len__(self) -> int:
+        return len(self._resolved())
+
+    def __iter__(self) -> Iterator[CandidateT]:
+        return iter(self._resolved())
+
+    @overload
+    def __getitem__(self, key: int) -> CandidateT: ...
+
+    @overload
+    def __getitem__(self, key: slice) -> tuple[CandidateT, ...]: ...
+
+    def __getitem__(self, key: int | slice) -> CandidateT | tuple[CandidateT, ...]:
+        # Candidate zero is guaranteed to survive because quality_core >= 1.
+        # The corpus-admission fast path relies on reading it without triggering
+        # the expensive diversity pass for every deep row.
+        if key == 0 and tuple.__len__(self) > 0:
+            return tuple.__getitem__(self, 0)
+        return self._resolved()[key]
+
+    def __contains__(self, item: object) -> bool:
+        return item in self._resolved()
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Sequence):
+            return self._resolved() == tuple(other)
+        return False
+
+    def __repr__(self) -> str:
+        return repr(self._resolved())
+
+
+def select_diverse_orders(
+    candidates: Sequence[CandidateT],
+    top_k: int,
+    *,
+    quality_core: int = DEFAULT_QUALITY_CORE,
+    diversity_strength: float = DEFAULT_DIVERSITY_STRENGTH,
+) -> tuple[CandidateT, ...]:
+    """Keep the score head, then greedily spend remaining slots on novelty.
+
+    ``candidates`` must already be in best-first grammar/structure order. The
+    first ``quality_core`` candidates are preserved byte-for-byte. Remaining
+    slots use the same maximal-marginal-relevance objective as before, but cache
+    each candidate's current maximum similarity to the selected set. Adding one
+    winner therefore requires only one new comparison per remaining candidate
+    instead of rescanning the entire selected prefix. The final retained order
+    remains identical to the eager algorithm.
+
+    When a widened pool actually needs diversity, the returned value is a
+    tuple-compatible deferred view. Ordinary score-prefix cases stay eager.
+    This moves parent-side diversity work out of the deep-worker stage and into
+    the point where alternative orders are genuinely consumed.
+    """
+    if top_k < 1:
+        raise ValueError("top_k must be >= 1")
+    if quality_core < 1:
+        raise ValueError("quality_core must be >= 1")
+    if not 0.0 <= diversity_strength <= 1.0:
+        raise ValueError("diversity_strength must be between 0 and 1")
+    if not candidates:
+        return ()
+
+    limit = min(top_k, len(candidates))
+    core_count = min(quality_core, limit)
+    if core_count >= limit or len(candidates) <= limit:
+        return tuple(candidates[index] for index in range(limit))
+
+    # The facade widens only the runner-up tail. Deferring this exact selection
+    # means its post-worker table rewrite is constant-time; consumers still see
+    # precisely the same retained tuple once they need more than the winner.
+    return _DeferredDiverseOrders(
+        candidates,
+        top_k,
+        quality_core,
+        diversity_strength,
+    )
