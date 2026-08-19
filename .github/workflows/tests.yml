@@ -90,16 +90,46 @@ jobs:
           print(r.ensure_wordnet(r.DEFAULT_WORDNET_DIR))
           print(u.ensure_user_lexicon())
           PY
-      - name: Probe known holdout beam path
-        continue-on-error: true
-        run: python ci_user_search_probe.py
-      - name: Compare contextual search on unrelated holdouts
-        continue-on-error: true
-        run: python ci_user_search_matrix.py
       - name: Clear puzzle-specific caches
         run: rm -rf .anagram_data/prepared_cache .anagram_data/solver_runs
       - name: Run ordinary verbose user invocations
         run: python ci_user_runs.py
+
+  bounded-search-research:
+    name: bounded search research (informational)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .anagram_data/dictionary
+            .anagram_data/ngrams
+          key: normal-user-corpora-${{ runner.os }}-v2-${{ hashFiles('anagram_user_lexicon.py', 'anagram_generate.py') }}
+      - name: Provision search corpora
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import anagram_generate as g
+          import anagram_user_lexicon as u
+
+          print(g.get_dictionary(g.DEFAULT_DICT_URL))
+          one, two = g.ensure_ngram_data(Path(g.DEFAULT_NGRAM_DIR), refresh=False, need_bigrams=True)
+          print(one)
+          print(two)
+          print(u.ensure_user_lexicon())
+          PY
+      - name: Probe known holdout beam path
+        run: python ci_user_search_probe.py
+      - name: Compare contextual search on unrelated holdouts
+        run: python ci_user_search_matrix.py
 
   ordering-regression:
     name: ordering regression
