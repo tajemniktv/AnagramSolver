@@ -7,17 +7,17 @@ covers happen to occur first in DFS order.
 
 Normal bounded search therefore keeps several cheap views of the same partial
 and completed bags: unigram lexical quality, observed pair/collocation evidence,
-and a small rare-word-anchor reserve. The deeper linguistic reranker remains the
-final authority.
+rare-word anchors, and bounded rare-pair context champions. The deeper linguistic
+reranker remains the final authority.
 """
 
 from __future__ import annotations
 
 import heapq
 import math
-import sys
 from collections import defaultdict
 from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -28,8 +28,21 @@ BeamState = tuple[tuple[int, ...], int, int, tuple[int, ...]]
 ScoredItem = tuple[float, int, tuple[Any, ...]]
 PairItem = tuple[float, float, float, int, tuple[Any, ...]]
 ANCHOR_CHAMPIONS_PER_WORD = 2
+CONTEXT_CHAMPIONS_PER_GROUP = 1
 LEXICAL_SHARE = 0.55
 PAIR_SHARE = 0.35
+CONTEXT_DIVERSITY_SHARE = 0.60
+
+
+@dataclass(frozen=True, slots=True)
+class BeamExpansion:
+    """One valid branch from a partial beam state."""
+
+    index: int
+    remaining: tuple[int, ...]
+    remaining_len: int
+    next_start: int
+    chosen: tuple[int, ...]
 
 
 def _sparse_signature(sig: tuple[int, ...]) -> tuple[tuple[int, int], ...]:
@@ -100,20 +113,50 @@ def _pair_priority(
     return coverage, pair_raw, lexical
 
 
+def _rare_context_key(
+    indices: tuple[int, ...],
+    candidates: list[generator.Candidate],
+) -> tuple[int, ...]:
+    """Group partial bags by their one/two least-common selected words.
+
+    This is deliberately generic context diversity rather than a phrase-specific
+    rule. A global beam can otherwise fill with many variants sharing common
+    words and erase a useful low-frequency pair before exact closure. Keeping one
+    champion for each rare-word context gives structurally different partial bags
+    a bounded route forward without widening the global beam.
+    """
+    if not indices:
+        return ()
+    rarest = sorted(
+        indices,
+        key=lambda index: (
+            candidates[index].zipf,
+            candidates[index].word,
+            index,
+        ),
+    )[:2]
+    return tuple(sorted(rarest))
+
+
 def _load_search_bigram_model(
     candidates: list[generator.Candidate],
+    *,
+    unigrams: generator.UnigramModel | None = None,
+    ngram_dir: Path | str = generator.DEFAULT_NGRAM_DIR,
+    refresh: bool = False,
 ) -> generator.BigramModel:
     """Load only pair rows relevant to this puzzle's candidate vocabulary."""
     one_path, two_path = generator.ensure_ngram_data(
-        Path(generator.DEFAULT_NGRAM_DIR),
-        refresh=False,
+        Path(ngram_dir).expanduser(),
+        refresh=refresh,
         need_bigrams=True,
     )
-    assert two_path is not None
-    unigrams = generator.load_unigram_model(one_path)
+    if two_path is None:
+        raise RuntimeError("Bigram n-gram data unavailable for quality-guided search")
+    active_unigrams = unigrams if unigrams is not None else generator.load_unigram_model(one_path)
     return generator.load_bigram_model(
         two_path,
-        unigrams,
+        active_unigrams,
         {candidate.word for candidate in candidates},
     )
 
@@ -190,12 +233,22 @@ def _select_multi_view(
     pair_heap: list[PairItem],
     anchor_heaps: dict[int, list[ScoredItem]],
     limit: int,
+    *,
+    context_heaps: dict[tuple[int, ...], list[PairItem]] | None = None,
 ) -> list[tuple[Any, ...]]:
-    """Combine lexical, pair, and rare-word views without wasting duplicate slots."""
+    """Combine quality and bounded structural-context views without duplicates."""
     lexical = sorted(lexical_heap, reverse=True)
     pair = sorted(pair_heap, reverse=True)
     anchors = sorted(
         (item for heap in anchor_heaps.values() for item in heap),
+        reverse=True,
+    )
+    contexts = sorted(
+        (
+            item
+            for heap in (context_heaps or {}).values()
+            for item in heap
+        ),
         reverse=True,
     )
     lexical_quota, pair_quota = _view_quotas(limit)
@@ -224,13 +277,40 @@ def _select_multi_view(
         if add_payload(payload):
             pair_added += 1
 
-    for _, _, payload in anchors:
-        if len(selected) >= limit:
-            break
-        add_payload(payload)
+    diversity_slots = max(0, limit - lexical_quota - pair_quota)
+    if contexts:
+        context_quota = max(1, math.ceil(diversity_slots * CONTEXT_DIVERSITY_SHARE))
+        context_quota = min(context_quota, diversity_slots)
+    else:
+        context_quota = 0
+    anchor_quota = diversity_slots - context_quota
 
-    # Anchor champions often overlap the quality cores. Fill any resulting holes
-    # instead of silently returning fewer candidates than the bounded budget.
+    context_added = 0
+    for _, _, _, _, payload in contexts:
+        if context_added >= context_quota:
+            break
+        if add_payload(payload):
+            context_added += 1
+
+    anchor_added = 0
+    for _, _, payload in anchors:
+        if anchor_added >= anchor_quota:
+            break
+        if add_payload(payload):
+            anchor_added += 1
+
+    # Diversity champions often overlap the quality cores. Fill resulting holes
+    # from every view instead of silently returning fewer states than budgeted.
+    if len(selected) < limit:
+        for _, _, _, _, payload in contexts:
+            if len(selected) >= limit:
+                break
+            add_payload(payload)
+    if len(selected) < limit:
+        for _, _, payload in anchors:
+            if len(selected) >= limit:
+                break
+            add_payload(payload)
     if len(selected) < limit:
         for _, _, payload in lexical:
             if len(selected) >= limit:
@@ -243,6 +323,70 @@ def _select_multi_view(
             add_payload(payload)
 
     return selected
+
+
+def _iter_state_expansions(
+    rem: tuple[int, ...],
+    rem_len: int,
+    start: int,
+    chosen: tuple[int, ...],
+    *,
+    candidates: list[generator.Candidate],
+    sparse_signatures: list[tuple[tuple[int, int], ...]],
+    by_signature: dict[tuple[int, ...], list[int]],
+    min_candidate_len: int,
+    max_candidate_len: int,
+    words_left_after: int,
+    allow_repeat: bool,
+    branch_limit: int,
+) -> Iterator[BeamExpansion]:
+    """Yield exactly the branches considered by one beam state.
+
+    ``generator.load_words`` orders candidates by descending Zipf score, then
+    descending length and lexical word order. The beam relies on that contract:
+    ``candidates[next_start].zipf`` is an optimistic frequency bound for the
+    monotonic candidate suffix, and the branch limit keeps its best-frequency
+    feasible prefix.
+    """
+    min_this_len = max(
+        min_candidate_len,
+        rem_len - words_left_after * max_candidate_len,
+    )
+    max_this_len = min(
+        max_candidate_len,
+        rem_len - words_left_after * min_candidate_len,
+    )
+    accepted_branches = 0
+
+    for index in range(start, len(candidates)):
+        candidate = candidates[index]
+        if candidate.length < min_this_len or candidate.length > max_this_len:
+            continue
+        sparse = sparse_signatures[index]
+        if not _fits_sparse(sparse, rem):
+            continue
+
+        new_rem = _subtract_sparse(rem, sparse)
+        new_rem_len = rem_len - candidate.length
+        next_start = index if allow_repeat else index + 1
+        if words_left_after > 0 and next_start >= len(candidates):
+            continue
+        if words_left_after == 1 and not any(
+            last_index >= next_start
+            for last_index in by_signature.get(new_rem, ())
+        ):
+            continue
+
+        yield BeamExpansion(
+            index=index,
+            remaining=new_rem,
+            remaining_len=new_rem_len,
+            next_start=next_start,
+            chosen=(*chosen, index),
+        )
+        accepted_branches += 1
+        if accepted_branches >= branch_limit:
+            return
 
 
 def _beam_bags_for_word_count(
@@ -285,40 +429,26 @@ def _beam_bags_for_word_count(
         lexical_heap: list[ScoredItem] = []
         pair_heap: list[PairItem] = []
         anchor_heaps: dict[int, list[ScoredItem]] = defaultdict(list)
+        context_heaps: dict[tuple[int, ...], list[PairItem]] = defaultdict(list)
 
         for rem, rem_len, start, chosen in states:
-            min_this_len = max(
-                min_candidate_len,
-                rem_len - words_left_after * max_candidate_len,
-            )
-            max_this_len = min(
-                max_candidate_len,
-                rem_len - words_left_after * min_candidate_len,
-            )
-            accepted_branches = 0
-
-            for index in range(start, len(candidates)):
-                candidate = candidates[index]
-                if candidate.length < min_this_len or candidate.length > max_this_len:
-                    continue
-                sparse = sparse_signatures[index]
-                if not _fits_sparse(sparse, rem):
-                    continue
-
-                new_rem = _subtract_sparse(rem, sparse)
-                new_rem_len = rem_len - candidate.length
-                next_start = index if allow_repeat else index + 1
-                if words_left_after > 0 and next_start >= len(candidates):
-                    continue
-                if words_left_after == 1 and not any(
-                    last_index >= next_start
-                    for last_index in by_signature.get(new_rem, ())
-                ):
-                    continue
-
-                new_chosen = (*chosen, index)
+            for expansion in _iter_state_expansions(
+                rem,
+                rem_len,
+                start,
+                chosen,
+                candidates=candidates,
+                sparse_signatures=sparse_signatures,
+                by_signature=by_signature,
+                min_candidate_len=min_candidate_len,
+                max_candidate_len=max_candidate_len,
+                words_left_after=words_left_after,
+                allow_repeat=allow_repeat,
+                branch_limit=branch_limit,
+            ):
+                new_chosen = expansion.chosen
                 if words_left_after:
-                    best_future_zipf = candidates[next_start].zipf
+                    best_future_zipf = candidates[expansion.next_start].zipf
                     lexical_priority = _optimistic_score(
                         new_chosen,
                         words_left_after,
@@ -329,9 +459,9 @@ def _beam_bags_for_word_count(
                     lexical_priority = _lexical_score(new_chosen, candidates)
 
                 payload: tuple[Any, ...] = (
-                    new_rem,
-                    new_rem_len,
-                    next_start,
+                    expansion.remaining,
+                    expansion.remaining_len,
+                    expansion.next_start,
                     new_chosen,
                 )
                 lexical_item: ScoredItem = (lexical_priority, -serial, payload)
@@ -346,16 +476,18 @@ def _beam_bags_for_word_count(
                     lexical_item,
                     ANCHOR_CHAMPIONS_PER_WORD,
                 )
-
-                accepted_branches += 1
-                if accepted_branches >= branch_limit:
-                    break
+                _push_pair_bounded(
+                    context_heaps[_rare_context_key(new_chosen, candidates)],
+                    pair_item,
+                    CONTEXT_CHAMPIONS_PER_GROUP,
+                )
 
         selected = _select_multi_view(
             lexical_heap,
             pair_heap,
             anchor_heaps,
             width,
+            context_heaps=context_heaps,
         )
         if not selected:
             return [], 0, partial_expansions
@@ -368,6 +500,7 @@ def _beam_bags_for_word_count(
     result_lexical_heap: list[ScoredItem] = []
     result_pair_heap: list[PairItem] = []
     result_anchor_heaps: dict[int, list[ScoredItem]] = defaultdict(list)
+    result_context_heaps: dict[tuple[int, ...], list[PairItem]] = defaultdict(list)
     result_serial = 0
 
     if word_count == 1:
@@ -392,12 +525,18 @@ def _beam_bags_for_word_count(
                 lexical_item,
                 ANCHOR_CHAMPIONS_PER_WORD,
             )
+            _push_pair_bounded(
+                result_context_heaps[_rare_context_key(indices, candidates)],
+                pair_item,
+                CONTEXT_CHAMPIONS_PER_GROUP,
+            )
 
     selected_results = _select_multi_view(
         result_lexical_heap,
         result_pair_heap,
         result_anchor_heaps,
         limit,
+        context_heaps=result_context_heaps,
     )
     bags = [
         tuple(candidates[index].word for index in payload[0])
@@ -417,7 +556,7 @@ def quality_guided_bounded_solve(
     stats: generator.SearchStats | None = None,
     bigrams: generator.BigramModel | None = None,
 ) -> Iterator[tuple[str, ...]]:
-    """Yield a bounded multi-view shortlist spread across requested word counts."""
+    """Yield a globally capped multi-view shortlist across requested word counts."""
     if max_results <= 0:
         return
 
@@ -426,14 +565,20 @@ def quality_guided_bounded_solve(
     if not word_counts:
         return
 
-    nominal_quota = max(1, math.ceil(max_results / len(word_counts)))
     bucket_results: dict[int, list[tuple[str, ...]]] = {}
     total_examined = 0
-    total_partial_expansions = 0
+    remaining_budget = max_results
 
-    for word_count in word_counts:
-        result_limit = _bucket_result_cap(word_count, nominal_quota)
-        bags, examined, expansions = _beam_bags_for_word_count(
+    for position, word_count in enumerate(word_counts):
+        if remaining_budget <= 0:
+            break
+        buckets_left = len(word_counts) - position
+        fair_share = max(1, math.ceil(remaining_budget / buckets_left))
+        result_limit = min(
+            remaining_budget,
+            _bucket_result_cap(word_count, fair_share),
+        )
+        bags, examined, _expansions = _beam_bags_for_word_count(
             remaining,
             candidates,
             word_count,
@@ -441,9 +586,10 @@ def quality_guided_bounded_solve(
             allow_repeat,
             bigrams,
         )
-        bucket_results[word_count] = bags
+        accepted = bags[:remaining_budget]
+        bucket_results[word_count] = accepted
         total_examined += examined
-        total_partial_expansions += expansions
+        remaining_budget -= len(accepted)
 
     retained_total = sum(len(bags) for bags in bucket_results.values())
     search_stats.exact_examined += total_examined
@@ -451,13 +597,6 @@ def quality_guided_bounded_solve(
 
     for word_count in word_counts:
         yield from bucket_results.get(word_count, ())
-
-    print(
-        f"Quality-guided bounded search evaluated {total_examined:,} exact bag(s), "
-        f"expanded {total_partial_expansions:,} partial state(s), and retained "
-        f"{retained_total:,} across {min_words}-{max_words} words.",
-        file=sys.stderr,
-    )
 
 
 def make_quality_guided_solve(fallback: SolveCallable) -> SolveCallable:
@@ -475,6 +614,9 @@ def make_quality_guided_solve(fallback: SolveCallable) -> SolveCallable:
         hint_mode: str = "any",
         initial_clue_words: set[str] | None = None,
         stats: generator.SearchStats | None = None,
+        unigrams: generator.UnigramModel | None = None,
+        ngram_dir: Path | str = generator.DEFAULT_NGRAM_DIR,
+        refresh: bool = False,
         **kwargs: Any,
     ) -> Iterator[tuple[str, ...]]:
         clues = clue_words or set()
@@ -496,11 +638,19 @@ def make_quality_guided_solve(fallback: SolveCallable) -> SolveCallable:
                 hint_mode=hint_mode,
                 initial_clue_words=initial_clue_words,
                 stats=stats,
+                unigrams=unigrams,
+                ngram_dir=ngram_dir,
+                refresh=refresh,
                 **kwargs,
             )
             return
 
-        bigrams = _load_search_bigram_model(candidates)
+        bigrams = _load_search_bigram_model(
+            candidates,
+            unigrams=unigrams,
+            ngram_dir=ngram_dir,
+            refresh=refresh,
+        )
         yield from quality_guided_bounded_solve(
             remaining,
             candidates,
