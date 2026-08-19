@@ -67,10 +67,18 @@ def main() -> int:
 
     def load_active_search_bigrams(
         candidates: list[generator.Candidate],
+        *,
+        unigrams: generator.UnigramModel | None = None,
+        ngram_dir: Path | str = generator.DEFAULT_NGRAM_DIR,
+        refresh: bool = False,
     ) -> generator.BigramModel:
+        # The wrapper's parsed settings are authoritative. The keyword parameters
+        # keep this scoped replacement compatible with the search helper API.
+        del ngram_dir, refresh
         return previous_search_bigram_loader(
             candidates,
-            ngram_dir=ngram_dir,
+            unigrams=unigrams,
+            ngram_dir=Path(settings.ngram_dir).expanduser(),
             refresh=settings.refresh,
         )
 
