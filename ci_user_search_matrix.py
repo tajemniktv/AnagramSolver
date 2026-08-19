@@ -155,7 +155,7 @@ def main() -> int:
         comparable += 1
         print(
             f"{holdout.name:<23} {word_count:>5} {len(candidates):>5} {result_limit:>5}  "
-            f"{str(base_hit):>6} {str(ctx_hit):>7}  "
+            f"{base_hit!s:>6} {ctx_hit!s:>7}  "
             f"{base_exact:>7}/{ctx_exact:<7}  {base_exp:>9}/{ctx_exp:<9}  "
             f"{base_seconds:>7.3f}/{ctx_seconds:<7.3f}"
         )
