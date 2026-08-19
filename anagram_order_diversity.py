@@ -284,10 +284,18 @@ class _DeferredDiverseOrders(tuple[CandidateT, ...]):
             )
         raise TypeError(f"index expected at most 3 arguments, got {len(args) + 1}")
 
-    def __add__(self, value: tuple[object, ...], /) -> tuple[object, ...]:
+    def __add__(
+        self,
+        value: tuple[CandidateT, ...],
+        /,
+    ) -> tuple[CandidateT, ...]:
         return self._resolved() + value
 
-    def __radd__(self, value: tuple[object, ...], /) -> tuple[object, ...]:
+    def __radd__(
+        self,
+        value: tuple[CandidateT, ...],
+        /,
+    ) -> tuple[CandidateT, ...]:
         return value + self._resolved()
 
     def __mul__(self, value: SupportsIndex, /) -> tuple[CandidateT, ...]:
@@ -323,7 +331,7 @@ class _DeferredDiverseOrders(tuple[CandidateT, ...]):
 
     def __reduce_ex__(
         self,
-        protocol: int,
+        protocol: SupportsIndex,
     ) -> tuple[object, tuple[tuple[CandidateT, ...]]]:
         del protocol
         return tuple, (self._resolved(),)
