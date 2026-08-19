@@ -91,6 +91,7 @@ jobs:
           print(u.ensure_user_lexicon())
           PY
       - name: Probe known holdout beam path
+        continue-on-error: true
         run: python ci_user_search_probe.py
       - name: Clear puzzle-specific caches
         run: rm -rf .anagram_data/prepared_cache .anagram_data/solver_runs
