@@ -195,13 +195,10 @@ class _DeferredDiverseOrders(tuple[CandidateT, ...]):
 
     The deep-analysis facade installs these objects in its side table immediately
     after workers return. Truth checks and access to candidate zero stay O(1),
-    because diversity always preserves the score winner. Iterating, slicing, or
-    asking for the retained length materializes the exact historical greedy
-    selection once and caches it. This lets the broad collocation admission pass
-    inspect only grammar winners, while rows that reach late rescoring pay the
-    diversity cost on demand. Phrase-database admission iterates alternatives and
-    therefore intentionally materializes every inspected row, preserving its
-    previous whole-phrase rescue semantics.
+    because diversity always preserves the score winner. All other tuple-visible
+    operations resolve the retained set first, so callers can never observe the
+    hidden widened pool through inherited tuple behavior. Serialization resolves
+    to a plain tuple, preserving the historical public value contract.
     """
 
     _top_k: int
@@ -271,10 +268,65 @@ class _DeferredDiverseOrders(tuple[CandidateT, ...]):
     def __contains__(self, item: object) -> bool:
         return item in self._resolved()
 
+    def count(self, value: object, /) -> int:
+        return self._resolved().count(value)
+
+    def index(self, value: object, *args: SupportsIndex) -> int:
+        if not args:
+            return self._resolved().index(value)
+        if len(args) == 1:
+            return self._resolved().index(value, args[0].__index__())
+        if len(args) == 2:
+            return self._resolved().index(
+                value,
+                args[0].__index__(),
+                args[1].__index__(),
+            )
+        raise TypeError(f"index expected at most 3 arguments, got {len(args) + 1}")
+
+    def __add__(self, value: tuple[object, ...], /) -> tuple[object, ...]:
+        return self._resolved() + value
+
+    def __radd__(self, value: tuple[object, ...], /) -> tuple[object, ...]:
+        return value + self._resolved()
+
+    def __mul__(self, value: SupportsIndex, /) -> tuple[CandidateT, ...]:
+        return self._resolved() * value.__index__()
+
+    def __rmul__(self, value: SupportsIndex, /) -> tuple[CandidateT, ...]:
+        return self._resolved() * value.__index__()
+
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, Sequence):
+        if isinstance(other, tuple):
             return self._resolved() == tuple(other)
         return False
+
+    def __ne__(self, other: object) -> bool:
+        if isinstance(other, tuple):
+            return self._resolved() != tuple(other)
+        return True
+
+    def __lt__(self, other: tuple[object, ...], /) -> bool:
+        return self._resolved() < other
+
+    def __le__(self, other: tuple[object, ...], /) -> bool:
+        return self._resolved() <= other
+
+    def __gt__(self, other: tuple[object, ...], /) -> bool:
+        return self._resolved() > other
+
+    def __ge__(self, other: tuple[object, ...], /) -> bool:
+        return self._resolved() >= other
+
+    def __hash__(self) -> int:
+        return hash(self._resolved())
+
+    def __reduce_ex__(
+        self,
+        protocol: int,
+    ) -> tuple[object, tuple[tuple[CandidateT, ...]]]:
+        del protocol
+        return tuple, (self._resolved(),)
 
     def __repr__(self) -> str:
         return repr(self._resolved())
