@@ -27,6 +27,7 @@ class OrderLike(Protocol):
 
 
 CandidateT = TypeVar("CandidateT", bound=OrderLike)
+ConcatT = TypeVar("ConcatT")
 
 
 @dataclass(slots=True)
@@ -286,16 +287,16 @@ class _DeferredDiverseOrders(tuple[CandidateT, ...]):
 
     def __add__(
         self,
-        value: tuple[CandidateT, ...],
+        value: tuple[ConcatT, ...],
         /,
-    ) -> tuple[CandidateT, ...]:
+    ) -> tuple[CandidateT | ConcatT, ...]:
         return self._resolved() + value
 
     def __radd__(
         self,
-        value: tuple[CandidateT, ...],
+        value: tuple[ConcatT, ...],
         /,
-    ) -> tuple[CandidateT, ...]:
+    ) -> tuple[CandidateT | ConcatT, ...]:
         return value + self._resolved()
 
     def __mul__(self, value: SupportsIndex, /) -> tuple[CandidateT, ...]:
