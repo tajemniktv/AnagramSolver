@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import heapq
 import time
 from collections import defaultdict
 from dataclasses import dataclass
@@ -54,6 +53,8 @@ def _best_feasible_future_zipf(
     words_left: int,
     candidates: list[generator.Candidate],
     sparse_signatures: list[tuple[tuple[int, int], ...]],
+    min_candidate_len: int,
+    max_candidate_len: int,
 ) -> float:
     """Return the best suffix Zipf that can actually participate in completion.
 
@@ -66,11 +67,15 @@ def _best_feasible_future_zipf(
     """
     if words_left <= 0:
         return 0.0
-    min_len = min(candidate.length for candidate in candidates)
-    max_len = max(candidate.length for candidate in candidates)
     after_words = words_left - 1
-    min_this_len = max(min_len, remaining_len - after_words * max_len)
-    max_this_len = min(max_len, remaining_len - after_words * min_len)
+    min_this_len = max(
+        min_candidate_len,
+        remaining_len - after_words * max_candidate_len,
+    )
+    max_this_len = min(
+        max_candidate_len,
+        remaining_len - after_words * min_candidate_len,
+    )
 
     for index in range(next_start, len(candidates)):
         candidate = candidates[index]
@@ -145,6 +150,8 @@ def _trace_target_path(
                             words_left_after,
                             candidates,
                             sparse_signatures,
+                            min_candidate_len,
+                            max_candidate_len,
                         )
                     else:
                         best_future_zipf = candidates[expansion.next_start].zipf
