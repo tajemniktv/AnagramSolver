@@ -40,15 +40,15 @@ class LazyOrderDiversityTests(unittest.TestCase):
             retained = table[123]
 
             self.assertIsInstance(retained, tuple)
-            self.assertFalse(retained.is_materialized)
+            self.assertFalse(getattr(retained, "is_materialized"))
             self.assertTrue(retained)
             self.assertEqual(retained[0], candidates[0])
-            self.assertFalse(retained.is_materialized)
+            self.assertFalse(getattr(retained, "is_materialized"))
             self.assertEqual(similarity.call_count, 0)
 
             realized = tuple(retained)
 
-        self.assertTrue(retained.is_materialized)
+        self.assertTrue(getattr(retained, "is_materialized"))
         self.assertEqual(len(realized), 56)
         self.assertEqual(realized[:48], candidates[:48])
         self.assertGreater(similarity.call_count, 0)
@@ -63,9 +63,9 @@ class LazyOrderDiversityTests(unittest.TestCase):
             diversity_strength=diversity.DEFAULT_DIVERSITY_STRENGTH,
         )
 
-        self.assertFalse(deferred.is_materialized)
+        self.assertFalse(getattr(deferred, "is_materialized"))
         self.assertEqual(tuple(deferred), expected)
-        self.assertTrue(deferred.is_materialized)
+        self.assertTrue(getattr(deferred, "is_materialized"))
 
     def test_score_prefix_paths_remain_eager_plain_tuples(self) -> None:
         candidates = self._order_candidates()
