@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import pickle
 import unittest
 from unittest.mock import patch
 
@@ -66,6 +68,51 @@ class LazyOrderDiversityTests(unittest.TestCase):
         self.assertFalse(getattr(deferred, "is_materialized"))
         self.assertEqual(tuple(deferred), expected)
         self.assertTrue(getattr(deferred, "is_materialized"))
+
+    def test_deferred_tuple_operations_never_expose_rejected_pool_entries(self) -> None:
+        candidates = self._order_candidates()
+        deferred = diversity.select_diverse_orders(candidates, 56)
+        expected = diversity._select_diverse_orders_eager(
+            candidates,
+            56,
+            quality_core=diversity.DEFAULT_QUALITY_CORE,
+            diversity_strength=diversity.DEFAULT_DIVERSITY_STRENGTH,
+        )
+        rejected = next(candidate for candidate in candidates if candidate not in expected)
+
+        self.assertEqual(deferred.count(rejected), 0)
+        with self.assertRaises(ValueError):
+            deferred.index(rejected)
+        self.assertEqual(deferred + (), expected)
+        self.assertEqual(() + deferred, expected)
+        self.assertEqual(deferred * 1, expected)
+        self.assertEqual(1 * deferred, expected)
+        self.assertEqual(deferred, expected)
+        self.assertNotEqual(deferred, list(expected))
+        self.assertFalse(deferred != expected)
+        self.assertFalse(deferred < expected)
+        self.assertTrue(deferred <= expected)
+        self.assertFalse(deferred > expected)
+        self.assertTrue(deferred >= expected)
+        self.assertEqual(hash(deferred), hash(expected))
+
+    def test_deferred_copy_and_pickle_materialize_to_plain_tuple(self) -> None:
+        candidates = self._order_candidates()
+        deferred = diversity.select_diverse_orders(candidates, 56)
+        expected = diversity._select_diverse_orders_eager(
+            candidates,
+            56,
+            quality_core=diversity.DEFAULT_QUALITY_CORE,
+            diversity_strength=diversity.DEFAULT_DIVERSITY_STRENGTH,
+        )
+
+        copied = copy.copy(deferred)
+        restored = pickle.loads(pickle.dumps(deferred))
+
+        self.assertIs(type(copied), tuple)
+        self.assertIs(type(restored), tuple)
+        self.assertEqual(copied, expected)
+        self.assertEqual(restored, expected)
 
     def test_score_prefix_paths_remain_eager_plain_tuples(self) -> None:
         candidates = self._order_candidates()
