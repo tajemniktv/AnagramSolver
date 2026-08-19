@@ -89,6 +89,7 @@ _BASE_DEEP_ANALYZE = impl.deep_analyze
 
 ENGINE_LAYER = "diverse-top-k-order-reranking"
 PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
+PREPARED_CACHE_COMPRESSLEVEL = 1
 DEFAULT_ORDER_CANDIDATES = 56
 # Direct facade callers should see the facade default too; ``main`` may still
 # override this for an explicit --order-candidates value and restores it after.
@@ -321,7 +322,9 @@ def load_prepared_cache(cache_path: Path) -> list[Row] | None:
 def save_prepared_cache(cache_path: Path, rows: list[Row]) -> None:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = cache_path.with_suffix(cache_path.suffix + ".tmp")
-    with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=6) as handle:
+    with gzip.open(
+        tmp, "wt", encoding="utf-8", compresslevel=PREPARED_CACHE_COMPRESSLEVEL
+    ) as handle:
         json.dump(
             {
                 "schema": PREPARED_CACHE_SCHEMA,
@@ -335,13 +338,62 @@ def save_prepared_cache(cache_path: Path, rows: list[Row]) -> None:
     tmp.replace(cache_path)
 
 
+def _cached_grammar_potential(
+    words: Sequence[str],
+    lex: WordNetLexicon,
+    pair_scores: dict[tuple[str, str], float],
+) -> float:
+    """Match core.grammar_potential while memoizing directed word-pair evidence."""
+    n = len(words)
+    if n <= 1:
+        return 0.0
+
+    positives: list[float] = []
+    for i, left in enumerate(words):
+        for j, right in enumerate(words):
+            if i == j:
+                continue
+            key = (left, right)
+            if key not in pair_scores:
+                pair_scores[key] = core.pair_grammar(left, right, lex)
+            score = pair_scores[key]
+            if score > 0:
+                positives.append(score)
+    positives.sort(reverse=True)
+    raw = sum(positives[: n - 1]) / (n - 1)
+    return core.sigmoid((raw - 1.5) * 1.35)
+
+
 def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
-    """Canonicalize unordered bags, then delegate to the captured core function."""
+    """Prepare rows with per-pass word and directed-pair memoization."""
     for row in rows:
         row.words = tuple(sorted(row.words))
     rows.sort(key=lambda row: (row.word_count, row.words))
+
+    recognized: dict[str, bool] = {}
+    family_words: dict[str, str] = {}
+    pair_scores: dict[tuple[str, str], float] = {}
+
     with performance_hooks():
-        _CORE_PREPARE_ROWS(rows, lex)
+        for idx, row in enumerate(rows, 1):
+            for word in row.words:
+                if word not in recognized:
+                    recognized[word] = lex.features(word).recognized
+                if word not in family_words:
+                    family_words[word] = core.morphology_family_word(word, lex)
+
+            row.wn_coverage = (
+                sum(1.0 for word in row.words if recognized[word]) / len(row.words)
+                if row.words
+                else 0.0
+            )
+            row.grammar_potential_norm = _cached_grammar_potential(
+                row.words, lex, pair_scores
+            )
+            row.family_key = tuple(sorted(family_words[word] for word in row.words))
+            row.pre_score = core.score_pre(row)
+            if idx % 25000 == 0:
+                print(f"  prepared {idx:,} / {len(rows):,}")
 
 
 def rank_orders(
