@@ -19,7 +19,9 @@ class SmokeCase:
 CASES = (
     SmokeCase("YOSCOZ", "so cozy"),
     SmokeCase("OEEEVHYNRI", "hi everyone"),
-    SmokeCase("ODITIHNSLSHEEEPT", "these hips don't lie"),
+    # This remains a completion smoke while the research beam experiment measures
+    # whether the intended bag can be retained generically without target tuning.
+    SmokeCase("ODITIHNSLSHEEEPT"),
     # Proper names are intentionally still a separate lexical-source problem.
     SmokeCase("AHCWSOPSIO"),
 )
@@ -59,15 +61,20 @@ def _file_contains_bag(
     path: Path,
     expected: tuple[str, ...],
     pattern: re.Pattern[str],
-) -> bool:
+) -> tuple[bool, int]:
+    """Return target presence plus number of lines understood by the parser."""
     if not path.is_file():
-        return False
+        return False, 0
+    matched_lines = 0
     with path.open("r", encoding="utf-8", errors="replace") as handle:
         for line in handle:
             match = pattern.search(line)
-            if match and _normalized_bag(match.group("phrase")) == expected:
-                return True
-    return False
+            if match is None:
+                continue
+            matched_lines += 1
+            if _normalized_bag(match.group("phrase")) == expected:
+                return True, matched_lines
+    return False, matched_lines
 
 
 def _dropout_diagnostic(output: str, phrase: str) -> str:
@@ -76,17 +83,20 @@ def _dropout_diagnostic(output: str, phrase: str) -> str:
         return "run directory unavailable"
     run_dir = Path(run_match.group("path").strip())
     expected = _normalized_bag(phrase)
-    generated = _file_contains_bag(
+    generated, candidate_lines = _file_contains_bag(
         run_dir / "candidates.txt",
         expected,
         _CANDIDATE_PHRASE_RE,
     )
-    deep_exported = _file_contains_bag(
+    deep_exported, reranked_lines = _file_contains_bag(
         run_dir / "reranked.txt",
         expected,
         _CANON_RE,
     )
-    return f"candidate_present={generated}; reranked_present={deep_exported}"
+    return (
+        f"candidate_present={generated}; candidate_lines_parsed={candidate_lines}; "
+        f"reranked_present={deep_exported}; reranked_lines_parsed={reranked_lines}"
+    )
 
 
 def run_case(case: SmokeCase) -> None:
