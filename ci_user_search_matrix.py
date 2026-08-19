@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Informational narrow-budget A/B for contextual partial-beam diversity."""
+"""Informational fixed-budget A/B for contextual partial-beam diversity."""
 
 from __future__ import annotations
 
@@ -11,8 +11,11 @@ import anagram_generate as generator
 import anagram_user_lexicon as lexicon
 import anagram_user_search as search
 
-RESEARCH_RESULT_LIMIT = 1_000
-RESEARCH_BEAM_WIDTH = 1_500
+# Keep this experiment intentionally small. Its job is to compare retention
+# efficiency between policies, not to recreate a production-sized beam twice for
+# every holdout on a rented CI potato.
+RESEARCH_RESULT_LIMIT = 256
+RESEARCH_BEAM_WIDTH = 384
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,7 +123,7 @@ def main() -> int:
     context_hits = 0
     comparable = 0
     print(
-        f"narrow-budget search A/B: beam={RESEARCH_BEAM_WIDTH:,}, "
+        f"fixed-budget search A/B: beam={RESEARCH_BEAM_WIDTH:,}, "
         f"retained={RESEARCH_RESULT_LIMIT:,}",
         flush=True,
     )
