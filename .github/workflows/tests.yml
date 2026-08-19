@@ -32,14 +32,14 @@ jobs:
           anagram_paths.py anagram_benchmark.py anagram_generate.py anagram_user_generate.py anagram_user_lexicon.py anagram_user_search.py
           anagram_rerank.py anagram_rerank_core.py anagram_rerank_topk_impl.py anagram_solver.py anagram_performance.py anagram_corpus_cohesion.py
           anagram_feature_ranker.py anagram_order_diversity.py anagram_order_refinement.py train_feature_ranker.py build_wikimedia_phrase_index.py
-          ci_phrase_matrix.py ci_ordering_gate.py ci_performance_probe.py ci_order_refinement.py ci_user_runs.py ci_user_search_probe.py
+          ci_phrase_matrix.py ci_ordering_gate.py ci_performance_probe.py ci_order_refinement.py ci_user_runs.py ci_user_search_probe.py ci_user_search_matrix.py
       - name: Enforce Pylance/Pyright diagnostics
         run: >-
           pyright anagram_paths.py anagram_generate.py anagram_user_generate.py anagram_user_lexicon.py anagram_user_search.py
           anagram_rerank_core.py anagram_rerank.py anagram_rerank_topk_impl.py anagram_solver.py
           anagram_performance.py anagram_corpus_cohesion.py anagram_feature_ranker.py anagram_order_diversity.py
           anagram_order_refinement.py train_feature_ranker.py ci_ordering_gate.py ci_performance_probe.py
-          ci_order_refinement.py ci_user_runs.py ci_user_search_probe.py
+          ci_order_refinement.py ci_user_runs.py ci_user_search_probe.py ci_user_search_matrix.py
 
   unit-tests:
     name: unit tests (Python ${{ matrix.python-version }})
@@ -93,6 +93,9 @@ jobs:
       - name: Probe known holdout beam path
         continue-on-error: true
         run: python ci_user_search_probe.py
+      - name: Compare contextual search on unrelated holdouts
+        continue-on-error: true
+        run: python ci_user_search_matrix.py
       - name: Clear puzzle-specific caches
         run: rm -rf .anagram_data/prepared_cache .anagram_data/solver_runs
       - name: Run ordinary verbose user invocations
