@@ -37,9 +37,10 @@ def main() -> int:
         return generator.main()
 
     settings = _lexicon_settings(original_args)
+    ngram_dir = Path(settings.ngram_dir).expanduser()
     lexicon = ensure_user_lexicon(
         dictionary_source=settings.dictionary,
-        ngram_dir=Path(settings.ngram_dir),
+        ngram_dir=ngram_dir,
         refresh=settings.refresh,
     )
     policy = ["--dict", str(lexicon.dictionary)]
@@ -51,15 +52,33 @@ def main() -> int:
 
     previous_argv = sys.argv
     previous_solve = generator.solve
+    previous_load_unigrams = generator.load_unigram_model
+    unigram_cache: dict[Path, generator.UnigramModel] = {}
+
+    def cached_load_unigram_model(path: Path) -> generator.UnigramModel:
+        """Share the generator's already-parsed unigram model with beam search."""
+        key = path.expanduser().resolve()
+        cached = unigram_cache.get(key)
+        if cached is None:
+            cached = previous_load_unigrams(path)
+            unigram_cache[key] = cached
+        return cached
+
     try:
-        # This is scoped to the dedicated child process. Direct research calls
-        # to anagram_generate.py keep the historical DFS unchanged.
-        generator.solve = make_quality_guided_solve(previous_solve)
+        # These hooks are scoped to the dedicated child process. Direct research
+        # calls to anagram_generate.py keep the historical DFS/loading behavior.
+        generator.load_unigram_model = cached_load_unigram_model
+        generator.solve = make_quality_guided_solve(
+            previous_solve,
+            ngram_dir=ngram_dir,
+            refresh=settings.refresh,
+        )
         sys.argv = [str(previous_argv[0]), *argv]
         return generator.main()
     finally:
         sys.argv = previous_argv
         generator.solve = previous_solve
+        generator.load_unigram_model = previous_load_unigrams
 
 
 if __name__ == "__main__":
