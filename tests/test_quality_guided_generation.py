@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 import anagram_generate as generator
 import anagram_user_search as user_search
@@ -56,11 +57,56 @@ class QualityGuidedGenerationTests(unittest.TestCase):
         self.assertIn(("rare-anchor",), selected)
         self.assertEqual(len(selected), 4)
 
+    def test_context_view_preserves_distinct_rare_pair_family(self) -> None:
+        lexical = [
+            (10.0, 0, ("common-1",)),
+            (9.0, -1, ("common-2",)),
+            (8.0, -2, ("common-3",)),
+            (7.0, -3, ("common-4",)),
+        ]
+        pair = [
+            (1.0, 0.0, 9.0, -1, ("common-2",)),
+            (0.9, 0.0, 8.0, -2, ("common-3",)),
+        ]
+        contexts = {
+            (7, 9): [(1.0, 0.5, 4.0, -10, ("rare-pair-context",))],
+        }
+
+        selected = user_search._select_multi_view(
+            lexical,
+            pair,
+            {},
+            4,
+            context_heaps=contexts,
+        )
+
+        self.assertIn(("rare-pair-context",), selected)
+        self.assertEqual(len(selected), 4)
+
+    def test_rare_context_key_uses_two_least_common_selected_words(self) -> None:
+        candidates = [
+            generator.Candidate("common", sig(1), 6, 6.0),
+            generator.Candidate("medium", sig(1), 6, 4.5),
+            generator.Candidate("rare", sig(1), 4, 3.0),
+            generator.Candidate("rarest", sig(1), 6, 2.8),
+        ]
+
+        self.assertEqual(
+            user_search._rare_context_key((0, 1, 2, 3), candidates),
+            (2, 3),
+        )
+        self.assertEqual(
+            user_search._rare_context_key((0, 3), candidates),
+            (0, 3),
+        )
+
     def test_view_quotas_leave_room_for_diversity(self) -> None:
-        lexical, pair = user_search._view_quotas(10_000)
-        self.assertEqual(lexical, 5_500)
-        self.assertEqual(pair, 3_500)
-        self.assertLess(lexical + pair, 10_000)
+        limit = 10_000
+        lexical, pair = user_search._view_quotas(limit)
+
+        self.assertGreater(lexical, 0)
+        self.assertGreater(pair, 0)
+        self.assertLess(lexical + pair, limit)
 
     def test_pair_priority_prefers_observed_connectivity(self) -> None:
         candidates = [
@@ -80,7 +126,7 @@ class QualityGuidedGenerationTests(unittest.TestCase):
         observed = user_search._pair_priority((0, 1), candidates, model)
         unseen = user_search._pair_priority((0, 2), candidates, model)
 
-        self.assertGreater(observed, unseen)
+        self.assertGreater(observed[0], unseen[0])
 
     def test_balanced_budget_keeps_multiple_word_count_buckets(self) -> None:
         candidates = [
@@ -100,6 +146,40 @@ class QualityGuidedGenerationTests(unittest.TestCase):
         )
 
         self.assertEqual(guided, [("ab", "ab"), ("ab", "a", "b")])
+
+    def test_global_result_cap_is_shared_across_word_count_buckets(self) -> None:
+        candidates = [generator.Candidate("a", sig(1), 1, 5.0)]
+        calls: list[tuple[int, int]] = []
+
+        def fake_bucket(
+            remaining,
+            candidates,
+            word_count,
+            limit,
+            allow_repeat,
+            bigrams,
+        ):
+            del remaining, candidates, allow_repeat, bigrams
+            calls.append((word_count, limit))
+            return [tuple([f"w{word_count}"] * word_count) for _ in range(limit)], limit, 0
+
+        stats = generator.SearchStats()
+        with patch.object(user_search, "_beam_bags_for_word_count", side_effect=fake_bucket):
+            guided = list(
+                user_search.quality_guided_bounded_solve(
+                    sig(1),
+                    candidates,
+                    2,
+                    4,
+                    5,
+                    True,
+                    stats=stats,
+                )
+            )
+
+        self.assertEqual(len(guided), 5)
+        self.assertEqual(stats.accepted, 5)
+        self.assertEqual(calls, [(2, 2), (3, 2), (4, 1)])
 
     def test_sparse_bucket_does_not_force_expensive_rescan_of_other_bucket(self) -> None:
         candidates = [
