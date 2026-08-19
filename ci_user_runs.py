@@ -17,7 +17,12 @@ class SmokeCase:
 
 CASES = (
     SmokeCase("YOSCOZ", "so cozy"),
-    SmokeCase("OEEEVHYNRI"),
+    SmokeCase("OEEEVHYNRI", "hi everyone"),
+    # `dont` is now lexically available, but the intended Shakira bag is still
+    # outside the default first-100k generation prefix. Keep this as a normal
+    # completion smoke until the shortlist/search PR fixes that separate issue.
+    SmokeCase("ODITIHNSLSHEEEPT"),
+    # Proper names are intentionally still a separate lexical-source problem.
     SmokeCase("AHCWSOPSIO"),
 )
 
