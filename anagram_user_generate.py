@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply normal-user lexicon/search policy, then run the research generator."""
+"""Apply the normal-user lexicon policy, then run the research generator."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ import sys
 from pathlib import Path
 
 import anagram_generate as generator
-import anagram_user_search as user_search
 from anagram_user_lexicon import ensure_user_lexicon
 
 
@@ -37,10 +36,9 @@ def main() -> int:
         return generator.main()
 
     settings = _lexicon_settings(original_args)
-    ngram_dir = Path(settings.ngram_dir).expanduser()
     lexicon = ensure_user_lexicon(
         dictionary_source=settings.dictionary,
-        ngram_dir=ngram_dir,
+        ngram_dir=Path(settings.ngram_dir),
         refresh=settings.refresh,
     )
     policy = ["--dict", str(lexicon.dictionary)]
@@ -50,51 +48,12 @@ def main() -> int:
     argv = original_args
     argv[separator:separator] = policy
 
-    previous_argv = sys.argv
-    previous_solve = generator.solve
-    previous_load_unigrams = generator.load_unigram_model
-    previous_search_bigram_loader = user_search._load_search_bigram_model
-    unigram_cache: dict[Path, generator.UnigramModel] = {}
-
-    def cached_load_unigram_model(path: Path) -> generator.UnigramModel:
-        """Share the generator's parsed unigram model with bounded search."""
-        key = path.expanduser().resolve()
-        cached = unigram_cache.get(key)
-        if cached is None:
-            cached = previous_load_unigrams(path)
-            unigram_cache[key] = cached
-        return cached
-
-    def load_active_search_bigrams(
-        candidates: list[generator.Candidate],
-        *,
-        unigrams: generator.UnigramModel | None = None,
-        ngram_dir: Path | str = generator.DEFAULT_NGRAM_DIR,
-        refresh: bool = False,
-    ) -> generator.BigramModel:
-        # The wrapper's parsed settings are authoritative. The keyword parameters
-        # keep this scoped replacement compatible with the search helper API.
-        del ngram_dir, refresh
-        return previous_search_bigram_loader(
-            candidates,
-            unigrams=unigrams,
-            ngram_dir=Path(settings.ngram_dir).expanduser(),
-            refresh=settings.refresh,
-        )
-
+    previous = sys.argv
     try:
-        # These hooks are scoped to the dedicated child process. Direct research
-        # calls to anagram_generate.py keep the historical DFS/loading behavior.
-        generator.load_unigram_model = cached_load_unigram_model
-        user_search._load_search_bigram_model = load_active_search_bigrams
-        generator.solve = user_search.make_quality_guided_solve(previous_solve)
-        sys.argv = [str(previous_argv[0]), *argv]
+        sys.argv = [str(previous[0]), *argv]
         return generator.main()
     finally:
-        sys.argv = previous_argv
-        generator.solve = previous_solve
-        generator.load_unigram_model = previous_load_unigrams
-        user_search._load_search_bigram_model = previous_search_bigram_loader
+        sys.argv = previous
 
 
 if __name__ == "__main__":

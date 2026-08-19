@@ -27,7 +27,6 @@ HERE = Path(__file__).resolve().parent
 GENERATOR = HERE / "anagram_user_generate.py"
 GENERATOR_CORE = HERE / "anagram_generate.py"
 USER_LEXICON = HERE / "anagram_user_lexicon.py"
-USER_SEARCH = HERE / "anagram_user_search.py"
 RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_RUN_ROOT = SOLVER_RUNS_DIR
 BALANCED_MAX_RESULTS = 100_000
@@ -128,7 +127,6 @@ def _run_key(
         "generator": _source_hash(GENERATOR),
         "generator_core": _source_hash(GENERATOR_CORE),
         "user_lexicon": _source_hash(USER_LEXICON),
-        "user_search": _source_hash(USER_SEARCH),
         "user_lexicon_token": user_lexicon_token or "unresolved",
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
