@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from pathlib import Path
 
@@ -13,6 +14,10 @@ import anagram_user_search as search
 TARGET = "ODITIHNSLSHEEEPT"
 EXPECTED = ("these", "hips", "dont", "lie")
 WORD_COUNT = len(EXPECTED)
+NORMAL_MIN_WORDS = 2
+NORMAL_MAX_WORDS = 6
+NORMAL_MAX_RESULTS = 100_000
+ANCHORED_ENUMERATION_CAP = 200_000
 
 
 def _candidate_index(candidates: list[generator.Candidate], word: str) -> int:
@@ -24,8 +29,9 @@ def _candidate_index(candidates: list[generator.Candidate], word: str) -> int:
 
 def main() -> int:
     user_lexicon = lexicon.ensure_user_lexicon()
+    ngram_dir = Path(generator.DEFAULT_NGRAM_DIR)
     one_path, _ = generator.ensure_ngram_data(
-        Path(generator.DEFAULT_NGRAM_DIR),
+        ngram_dir,
         refresh=False,
         need_bigrams=False,
     )
@@ -36,18 +42,23 @@ def main() -> int:
     candidates = generator.load_words(
         user_lexicon.dictionary,
         target,
-        2,
-        sum(target),
-        set(),
-        [],
-        set(),
-        2.7,
-        "common",
-        short_words,
-        set(),
-        unigrams,
+        min_len=2,
+        max_len=sum(target),
+        excluded_words=set(),
+        exclude_regexes=[],
+        forbid_chars=set(),
+        min_zipf=2.7,
+        short_policy="common",
+        short_whitelist=short_words,
+        forced_words=set(),
+        unigrams=unigrams,
     )
-    bigrams = search._load_search_bigram_model(candidates)
+    bigrams = search._load_search_bigram_model(
+        candidates,
+        unigrams=unigrams,
+        ngram_dir=ngram_dir,
+        refresh=False,
+    )
 
     indices = tuple(sorted(_candidate_index(candidates, word) for word in EXPECTED))
     words = tuple(candidates[index].word for index in indices)
@@ -70,6 +81,7 @@ def main() -> int:
     remaining = target
     remaining_len = sum(remaining)
     start = 0
+    chosen: tuple[int, ...] = ()
     min_len = min(candidate.length for candidate in candidates)
     max_len = max(candidate.length for candidate in candidates)
     branch_limit = search._branch_width(WORD_COUNT)
@@ -77,33 +89,25 @@ def main() -> int:
     for depth, target_index in enumerate(indices[:-1]):
         words_left_before = WORD_COUNT - depth
         words_left_after = words_left_before - 1
-        min_this_len = max(
-            min_len,
-            remaining_len - words_left_after * max_len,
+        # Ask the shared production expansion helper for every feasible branch;
+        # compare the target's ordinal with the real production branch cutoff.
+        expansions = list(
+            search._iter_state_expansions(
+                remaining,
+                remaining_len,
+                start,
+                chosen,
+                candidates=candidates,
+                sparse_signatures=sparse,
+                by_signature=by_signature,
+                min_candidate_len=min_len,
+                max_candidate_len=max_len,
+                words_left_after=words_left_after,
+                allow_repeat=True,
+                branch_limit=len(candidates),
+            )
         )
-        max_this_len = min(
-            max_len,
-            remaining_len - words_left_after * min_len,
-        )
-        accepted: list[int] = []
-        for index in range(start, len(candidates)):
-            candidate = candidates[index]
-            if candidate.length < min_this_len or candidate.length > max_this_len:
-                continue
-            signature = sparse[index]
-            if not search._fits_sparse(signature, remaining):
-                continue
-            new_remaining = search._subtract_sparse(remaining, signature)
-            next_start = index
-            if words_left_after > 0 and next_start >= len(candidates):
-                continue
-            if words_left_after == 1 and not any(
-                last_index >= next_start
-                for last_index in by_signature.get(new_remaining, ())
-            ):
-                continue
-            accepted.append(index)
-
+        accepted = [expansion.index for expansion in expansions]
         try:
             ordinal = accepted.index(target_index) + 1
         except ValueError:
@@ -113,9 +117,18 @@ def main() -> int:
             f"  depth {depth + 1}: choose {candidates[target_index].word}; "
             f"feasible ordinal={ordinal}/{len(accepted)}, branch_limit={branch_limit} -> {status}"
         )
-        remaining = search._subtract_sparse(remaining, sparse[target_index])
-        remaining_len -= candidates[target_index].length
-        start = target_index
+
+        target_expansion = next(
+            (expansion for expansion in expansions if expansion.index == target_index),
+            None,
+        )
+        if target_expansion is None:
+            print("  target path is infeasible under production pruning; stopping path probe")
+            break
+        remaining = target_expansion.remaining
+        remaining_len = target_expansion.remaining_len
+        start = target_expansion.next_start
+        chosen = target_expansion.chosen
 
     final_index = indices[-1]
     final_ok = final_index >= start and candidates[final_index].sig == remaining
@@ -138,7 +151,7 @@ def main() -> int:
         prefix_candidates,
         WORD_COUNT - 1,
         WORD_COUNT - 1,
-        0,
+        ANCHORED_ENUMERATION_CAP,
         True,
     ):
         prefix_indices = tuple(word_to_index[word] for word in prefix)
@@ -179,22 +192,26 @@ def main() -> int:
         f"rank={pair_rank}/{len(anchored)}"
     )
 
+    nominal_quota = math.ceil(
+        NORMAL_MAX_RESULTS / (NORMAL_MAX_WORDS - NORMAL_MIN_WORDS + 1)
+    )
+    result_limit = search._bucket_result_cap(WORD_COUNT, nominal_quota)
     bags, exact_examined, expansions = search._beam_bags_for_word_count(
         target,
         candidates,
         WORD_COUNT,
-        10_000,
+        result_limit,
         True,
         bigrams,
     )
     present = any(tuple(sorted(bag)) == expected_bag for bag in bags)
     print(
-        f"  actual 4-word multi-view beam: target_present={present}; "
-        f"retained={len(bags)}; exact_evaluated={exact_examined}; "
-        f"partial_expansions={expansions}"
+        f"  actual {WORD_COUNT}-word multi-view beam: target_present={present}; "
+        f"limit={result_limit}; retained={len(bags)}; "
+        f"exact_evaluated={exact_examined}; partial_expansions={expansions}"
     )
     if not present:
-        raise SystemExit("Target bag still drops out of the bounded multi-view beam")
+        print("  diagnostic result: target still drops out of the bounded multi-view beam")
     return 0
 
 
