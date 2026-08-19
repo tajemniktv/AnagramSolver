@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Informational A/B for contextual partial-beam diversity on unrelated holdouts."""
+"""Informational narrow-budget A/B for contextual partial-beam diversity."""
 
 from __future__ import annotations
 
-import math
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,9 +11,8 @@ import anagram_generate as generator
 import anagram_user_lexicon as lexicon
 import anagram_user_search as search
 
-NORMAL_MIN_WORDS = 2
-NORMAL_MAX_WORDS = 6
-NORMAL_MAX_RESULTS = 100_000
+RESEARCH_RESULT_LIMIT = 1_000
+RESEARCH_BEAM_WIDTH = 1_500
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,26 +45,35 @@ def _run_beam(
     target: tuple[int, ...],
     candidates: list[generator.Candidate],
     word_count: int,
-    result_limit: int,
     bigrams: generator.BigramModel,
     *,
     context_champions: int,
-) -> tuple[bool, int, int, float, list[tuple[str, ...]]]:
-    previous = search.CONTEXT_CHAMPIONS_PER_GROUP
+) -> tuple[int, int, float, list[tuple[str, ...]]]:
+    previous_context = search.CONTEXT_CHAMPIONS_PER_GROUP
+    previous_beam_width = search._beam_width
+
+    def research_beam_width(active_word_count: int, result_limit: int) -> int:
+        return min(
+            RESEARCH_BEAM_WIDTH,
+            previous_beam_width(active_word_count, result_limit),
+        )
+
     search.CONTEXT_CHAMPIONS_PER_GROUP = context_champions
+    search._beam_width = research_beam_width
     started = time.perf_counter()
     try:
         bags, exact, expansions = search._beam_bags_for_word_count(
             target,
             candidates,
             word_count,
-            result_limit,
+            RESEARCH_RESULT_LIMIT,
             True,
             bigrams,
         )
     finally:
-        search.CONTEXT_CHAMPIONS_PER_GROUP = previous
-    return bool(bags), exact, expansions, time.perf_counter() - started, bags
+        search.CONTEXT_CHAMPIONS_PER_GROUP = previous_context
+        search._beam_width = previous_beam_width
+    return exact, expansions, time.perf_counter() - started, bags
 
 
 def main() -> int:
@@ -108,45 +115,46 @@ def main() -> int:
         vocabulary.update(candidate.word for candidate in candidates)
 
     bigrams = generator.load_bigram_model(two_path, unigrams, vocabulary)
-    nominal_quota = math.ceil(
-        NORMAL_MAX_RESULTS / (NORMAL_MAX_WORDS - NORMAL_MIN_WORDS + 1)
-    )
 
     baseline_hits = 0
     context_hits = 0
     comparable = 0
     print(
-        "case                    words vocab limit  anchor context  "
-        "exact(anchor/context)  expansions(anchor/context)  seconds(anchor/context)"
+        f"narrow-budget search A/B: beam={RESEARCH_BEAM_WIDTH:,}, "
+        f"retained={RESEARCH_RESULT_LIMIT:,}",
+        flush=True,
     )
-    print("-" * 122)
+    print(
+        "case                    words vocab  anchor context  "
+        "exact(anchor/context)  expansions(anchor/context)  seconds(anchor/context)",
+        flush=True,
+    )
+    print("-" * 116, flush=True)
 
     for holdout, target, expected, candidates in prepared:
         word_count = len(expected)
         missing = sorted(set(expected) - {candidate.word for candidate in candidates})
         if missing:
             print(
-                f"{holdout.name:<23} {word_count:>5} {len(candidates):>5} "
-                f"  n/a   lexical-miss={','.join(missing)}"
+                f"{holdout.name:<23} {word_count:>5} {len(candidates):>5}  "
+                f"lexical-miss={','.join(missing)}",
+                flush=True,
             )
             continue
 
-        result_limit = search._bucket_result_cap(word_count, nominal_quota)
-        _, base_exact, base_exp, base_seconds, base_bags = _run_beam(
+        base_exact, base_exp, base_seconds, base_bags = _run_beam(
             target,
             candidates,
             word_count,
-            result_limit,
             bigrams,
             context_champions=0,
         )
-        _, ctx_exact, ctx_exp, ctx_seconds, ctx_bags = _run_beam(
+        ctx_exact, ctx_exp, ctx_seconds, ctx_bags = _run_beam(
             target,
             candidates,
             word_count,
-            result_limit,
             bigrams,
-            context_champions=search.CONTEXT_CHAMPIONS_PER_GROUP,
+            context_champions=1,
         )
         base_hit = _contains_expected(base_bags, expected)
         ctx_hit = _contains_expected(ctx_bags, expected)
@@ -154,17 +162,19 @@ def main() -> int:
         context_hits += int(ctx_hit)
         comparable += 1
         print(
-            f"{holdout.name:<23} {word_count:>5} {len(candidates):>5} {result_limit:>5}  "
+            f"{holdout.name:<23} {word_count:>5} {len(candidates):>5}  "
             f"{base_hit!s:>6} {ctx_hit!s:>7}  "
             f"{base_exact:>7}/{ctx_exact:<7}  {base_exp:>9}/{ctx_exp:<9}  "
-            f"{base_seconds:>7.3f}/{ctx_seconds:<7.3f}"
+            f"{base_seconds:>7.3f}/{ctx_seconds:<7.3f}",
+            flush=True,
         )
 
-    print()
+    print(flush=True)
     print(
         f"target-bag retention: anchor-only={baseline_hits}/{comparable}; "
         f"contextual={context_hits}/{comparable}; "
-        f"delta={context_hits - baseline_hits:+d}"
+        f"delta={context_hits - baseline_hits:+d}",
+        flush=True,
     )
     return 0
 
