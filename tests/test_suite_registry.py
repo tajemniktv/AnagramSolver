@@ -217,6 +217,20 @@ class SuiteRegistryTests(unittest.TestCase):
             errors = validate_registry(path)
         self.assertIn("case custom_case source is not an anagram of answer", errors)
 
+    def test_source_derived_target_uses_production_unicode_normalization(self) -> None:
+        payload = self._custom_registry()
+        raw_cases = payload["cases"]
+        assert isinstance(raw_cases, list)
+        case = raw_cases[0]
+        assert isinstance(case, dict)
+        case.pop("target")
+        case["source"] = "café noir"
+        case["answer"] = "face iron"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_json(tmp, payload)
+            errors = validate_registry(path)
+        self.assertEqual(errors, ())
+
     def test_performance_case_must_have_benchmark_tokens(self) -> None:
         payload = self._custom_registry()
         raw_cases = payload["cases"]
