@@ -230,6 +230,39 @@ class SuiteRegistryTests(unittest.TestCase):
             errors = validate_registry(path)
         self.assertIn("case custom_case performance answer has no benchmark tokens", errors)
 
+    def test_registry_rejects_solver_word_count_outside_cli_range(self) -> None:
+        payload = self._custom_registry()
+        raw_cases = payload["cases"]
+        assert isinstance(raw_cases, list)
+        case = raw_cases[0]
+        assert isinstance(case, dict)
+        case["solver"] = {"words": 0}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_json(tmp, payload)
+            errors = validate_registry(path)
+        self.assertTrue(any("--words must be >= 1" in error for error in errors))
+
+    def test_registry_rejects_solver_cross_field_word_range(self) -> None:
+        payload = self._custom_registry()
+        raw_cases = payload["cases"]
+        assert isinstance(raw_cases, list)
+        case = raw_cases[0]
+        assert isinstance(case, dict)
+        case["solver"] = {"min_words": 5, "max_words": 3}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write_json(tmp, payload)
+            errors = validate_registry(path)
+        self.assertTrue(
+            any("Invalid --min-words/--max-words range" in error for error in errors)
+        )
+
+    def test_missing_registry_is_a_validation_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "missing.json"
+            errors = validate_registry(path)
+        self.assertEqual(len(errors), 1)
+        self.assertIn("missing.json", errors[0])
+
     def test_loader_rejects_duplicate_ids(self) -> None:
         payload = {
             "cases": [
