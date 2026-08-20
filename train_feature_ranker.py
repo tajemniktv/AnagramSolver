@@ -142,7 +142,11 @@ def main() -> int:
     registry_cases = (
         cases_for("feature_ranker")
         if args.cases.expanduser().resolve() == DEFAULT_CASES.resolve()
-        else load_cases(args.cases, require_ids=False)
+        else load_cases(
+            args.cases,
+            require_ids=False,
+            require_answer=True,
+        )
     )
     try:
         groups, skipped = build_groups(
