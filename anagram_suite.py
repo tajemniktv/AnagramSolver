@@ -134,11 +134,16 @@ def _expand_suites(value: object, name: str) -> frozenset[str]:
     return frozenset(suites)
 
 
-def _parse_defaults(document: dict[str, object]) -> tuple[frozenset[str], NormalUserDefaults]:
+def _parse_defaults(
+    document: dict[str, object],
+) -> tuple[frozenset[str], NormalUserDefaults]:
     defaults = _mapping(document.get("defaults"), "defaults")
     default_suites = _expand_suites(defaults.get("suites", ["all"]), "defaults.suites")
     raw_cli = _mapping(defaults.get("normal_user_cli", {}), "defaults.normal_user_cli")
-    timeout = _positive_int(raw_cli.get("timeout_seconds", 120), "normal_user_cli.timeout_seconds")
+    timeout = _positive_int(
+        raw_cli.get("timeout_seconds", 120),
+        "normal_user_cli.timeout_seconds",
+    )
     verbose = raw_cli.get("verbose", True)
     expect_answer = raw_cli.get("expect_answer", True)
     if not isinstance(verbose, bool) or not isinstance(expect_answer, bool):
@@ -168,12 +173,21 @@ def _parse_profiles(
         ),
     )
 
-    raw_phrase = _mapping(profiles.get("phrase_ordering"), "profiles.phrase_ordering")
+    raw_phrase = _mapping(
+        profiles.get("phrase_ordering"),
+        "profiles.phrase_ordering",
+    )
     phrase = PhraseOrderingConfig(
-        _positive_int(raw_phrase.get("order_candidates"), "phrase_ordering.order_candidates")
+        _positive_int(
+            raw_phrase.get("order_candidates"),
+            "phrase_ordering.order_candidates",
+        )
     )
 
-    raw_perf = _mapping(profiles.get("performance_probe"), "profiles.performance_probe")
+    raw_perf = _mapping(
+        profiles.get("performance_probe"),
+        "profiles.performance_probe",
+    )
     performance = PerformanceProbeConfig(
         frame_words=_string_tuple(
             raw_perf.get("frame_words"),
@@ -221,9 +235,14 @@ def load_cases(
     selected_ids: set[str] | None = None,
     *,
     require_ids: bool = True,
-    require_answer: bool = True,
+    require_answer: bool = False,
 ) -> list[dict[str, object]]:
-    """Load raw case objects, with an opt-out for legacy answer-only training files."""
+    """Load raw case objects from a registry or legacy case file.
+
+    Raw registry cases may be target-only because the normal-user suite supports
+    control puzzles without a known answer. Consumers that require labels, such
+    as custom feature-ranker training, opt into ``require_answer=True``.
+    """
     payload: object = json.loads(path.read_text(encoding="utf-8"))
     raw_cases: object = payload.get("cases") if isinstance(payload, dict) else payload
     if not isinstance(raw_cases, list):
@@ -262,8 +281,14 @@ def load_cases(
     return cases
 
 
-def _case_suites(case: dict[str, object], default_suites: frozenset[str]) -> frozenset[str]:
-    return _expand_suites(case.get("suites", list(default_suites)), f"case {case.get('id')}.suites")
+def _case_suites(
+    case: dict[str, object],
+    default_suites: frozenset[str],
+) -> frozenset[str]:
+    return _expand_suites(
+        case.get("suites", list(default_suites)),
+        f"case {case.get('id')}.suites",
+    )
 
 
 def cases_for(
@@ -282,7 +307,7 @@ def cases_for(
             f"got {document.get('schema')!r}"
         )
     default_suites, _ = _parse_defaults(document)
-    cases = load_cases(path, require_answer=False)
+    cases = load_cases(path)
     selected: list[dict[str, object]] = []
     for case in cases:
         enabled = case.get("enabled", True)
@@ -293,7 +318,9 @@ def cases_for(
         if suite in _ANSWER_REQUIRED_SUITES:
             answer = case.get("answer")
             if not isinstance(answer, str) or not answer.strip():
-                raise ValueError(f"case {case.get('id')} requires an answer for suite {suite}")
+                raise ValueError(
+                    f"case {case.get('id')} requires an answer for suite {suite}"
+                )
         selected.append(case)
 
     wanted = selected_ids or set()
@@ -315,11 +342,7 @@ def case_by_id(
 ) -> dict[str, object]:
     """Return one canonical registry case by stable id, including target-only cases."""
     try:
-        return next(
-            case
-            for case in load_cases(path, require_answer=False)
-            if case["id"] == case_id
-        )
+        return next(case for case in load_cases(path) if case["id"] == case_id)
     except StopIteration as exc:
         raise KeyError(f"Unknown case id: {case_id}") from exc
 
@@ -369,7 +392,10 @@ def normal_user_case(
     target = target_for_case(case)
 
     timeout_value = options.get("timeout_seconds", defaults.timeout_seconds)
-    timeout = _positive_int(timeout_value, f"case {case.get('id')}.timeout_seconds")
+    timeout = _positive_int(
+        timeout_value,
+        f"case {case.get('id')}.timeout_seconds",
+    )
     verbose = options.get("verbose", defaults.verbose)
     expect_answer = options.get("expect_answer", defaults.expect_answer)
     if not isinstance(verbose, bool) or not isinstance(expect_answer, bool):
@@ -382,11 +408,17 @@ def normal_user_case(
     expected_phrase = (
         explicit_expected
         if isinstance(explicit_expected, str)
-        else str(answer) if expect_answer and isinstance(answer, str) and answer.strip() else None
+        else str(answer)
+        if expect_answer and isinstance(answer, str) and answer.strip()
+        else None
     )
 
     args: list[str] = []
-    for key, flag in (("hints", "--hint"), ("exclude", "--exclude"), ("require", "--require")):
+    for key, flag in (
+        ("hints", "--hint"),
+        ("exclude", "--exclude"),
+        ("require", "--require"),
+    ):
         for value in _option_strings(options, key):
             args += [flag, value]
 
@@ -407,7 +439,10 @@ def normal_user_case(
 
     min_zipf_value = options.get("min_zipf")
     if min_zipf_value is not None:
-        if not isinstance(min_zipf_value, (int, float)) or isinstance(min_zipf_value, bool):
+        if not isinstance(min_zipf_value, (int, float)) or isinstance(
+            min_zipf_value,
+            bool,
+        ):
             raise TypeError("normal_user_cli min_zipf must be numeric")
         min_zipf = float(min_zipf_value)
         if not math.isfinite(min_zipf):
@@ -449,7 +484,7 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
             )
         default_suites, cli_defaults = _parse_defaults(document)
         ordering_gate, phrase_ordering, performance_probe = _parse_profiles(document)
-        cases = load_cases(path, require_answer=False)
+        cases = load_cases(path)
     except (KeyError, TypeError, ValueError) as exc:
         return (str(exc),)
 
@@ -474,9 +509,12 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
                 errors.append(f"case {case_id} requires an answer for suite {suite}")
 
         explicit_target = case.get("target")
-        if isinstance(explicit_target, str) and isinstance(answer, str):
-            if _letters(explicit_target) != _letters(answer):
-                errors.append(f"case {case_id} target is not an anagram of answer")
+        if (
+            isinstance(explicit_target, str)
+            and isinstance(answer, str)
+            and _letters(explicit_target) != _letters(answer)
+        ):
+            errors.append(f"case {case_id} target is not an anagram of answer")
 
         if "normal_user_cli" in suites:
             try:
@@ -493,12 +531,18 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
                 options = {}
             max_rank = options.get("max_rank")
             if max_rank is not None and (
-                not isinstance(max_rank, int) or isinstance(max_rank, bool) or max_rank < 1
+                not isinstance(max_rank, int)
+                or isinstance(max_rank, bool)
+                or max_rank < 1
             ):
-                errors.append(f"case {case_id} ordering.max_rank must be a positive integer")
+                errors.append(
+                    f"case {case_id} ordering.max_rank must be a positive integer"
+                )
             cross_ref = options.get("cross_bag_reference", False)
             if not isinstance(cross_ref, bool):
-                errors.append(f"case {case_id} ordering.cross_bag_reference must be boolean")
+                errors.append(
+                    f"case {case_id} ordering.cross_bag_reference must be boolean"
+                )
             elif cross_ref:
                 if "ordering" not in suites:
                     errors.append(f"case {case_id} cross-bag reference must run ordering")
@@ -537,7 +581,10 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
 
 def _write_registry(path: Path, document: dict[str, object]) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.write_text(
+        json.dumps(document, indent=2, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
     errors = validate_registry(tmp)
     if errors:
         tmp.unlink(missing_ok=True)
@@ -546,7 +593,9 @@ def _write_registry(path: Path, document: dict[str, object]) -> None:
 
 
 def _management_main() -> int:
-    parser = argparse.ArgumentParser(description="Inspect or edit the AnagramSolver test registry")
+    parser = argparse.ArgumentParser(
+        description="Inspect or edit the AnagramSolver test registry"
+    )
     parser.add_argument("--registry", type=Path, default=DEFAULT_CASES)
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -559,7 +608,11 @@ def _management_main() -> int:
     add.add_argument("--answer")
     add.add_argument("--target")
     add.add_argument("--category", default="custom")
-    add.add_argument("--suite", action="append", choices=(*CASE_SUITES, "core", "all"))
+    add.add_argument(
+        "--suite",
+        action="append",
+        choices=(*CASE_SUITES, "core", "all"),
+    )
     add.add_argument("--hint", action="append", default=[])
     add.add_argument("--words", type=int)
     verbosity = add.add_mutually_exclusive_group()
@@ -584,7 +637,7 @@ def _management_main() -> int:
         return 0
 
     document = _load_document(path)
-    cases = load_cases(path, require_answer=False)
+    cases = load_cases(path)
     if args.command == "list":
         selected = cases_for(args.suite, path=path) if args.suite else cases
         default_suites, _ = _parse_defaults(document)
@@ -592,14 +645,21 @@ def _management_main() -> int:
             enabled = case.get("enabled", True)
             suites = ",".join(sorted(_case_suites(case, default_suites)))
             answer = case.get("answer", "?")
-            print(f"{case['id']:<34} enabled={str(enabled):<5} suites={suites:<70} {answer}")
+            print(
+                f"{case['id']:<34} enabled={enabled!s:<5} "
+                f"suites={suites:<70} {answer}"
+            )
         return 0
 
     raw_cases = document.get("cases")
     if not isinstance(raw_cases, list):
         raise SystemExit("Registry has no cases list")
     index = next(
-        (idx for idx, case in enumerate(raw_cases) if isinstance(case, dict) and case.get("id") == args.id),
+        (
+            idx
+            for idx, case in enumerate(raw_cases)
+            if isinstance(case, dict) and case.get("id") == args.id
+        ),
         None,
     )
 
