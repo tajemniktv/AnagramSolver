@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small repeatable hot-path probe for ranking-performance changes.
+"""Small repeatable hot-path probe for registry-selected ranking cases.
 
 This is deliberately not a hard timing gate: hosted-runner noise is too large for
 that. It prints stable workloads and output-sensitive digests so PRs can compare
@@ -14,10 +14,11 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+import anagram_benchmark as benchmark
 import anagram_performance as perf
 import anagram_rerank as rerank
 import anagram_rerank_core as core
-from anagram_suite import PERFORMANCE_PROBE
+from anagram_suite import PERFORMANCE_PROBE, cases_for
 
 
 def _digest(value: object) -> str:
@@ -80,14 +81,14 @@ def _probe_row(words: tuple[str, ...], rank: int) -> core.Row:
 
 def _deep_work(
     wn_dir: Path,
+    order_bags: tuple[tuple[str, ...], ...],
     *,
     workers: int,
     batch_size: int,
 ) -> tuple[float, object]:
     perf.clear_performance_caches()
     lex = rerank.WordNetLexicon.load(wn_dir)
-    bags = PERFORMANCE_PROBE.order_bags
-    rows = [_probe_row(bags[i % len(bags)], i + 1) for i in range(384)]
+    rows = [_probe_row(order_bags[i % len(order_bags)], i + 1) for i in range(384)]
     selected = set(range(len(rows)))
     start = time.perf_counter()
     stats = rerank.deep_analyze(
@@ -126,6 +127,16 @@ def _deep_work(
 def main() -> int:
     wn_dir = core.ensure_wordnet(core.DEFAULT_WORDNET_DIR)
     lex = rerank.WordNetLexicon.load(wn_dir)
+    performance_cases = cases_for("performance")
+    order_bags = tuple(
+        benchmark.tokens(str(case["answer"])) for case in performance_cases
+    )
+    if not order_bags:
+        raise RuntimeError("Performance registry selected no ordering bags")
+    print(
+        "PERF registry cases   "
+        + ", ".join(str(case["id"]) for case in performance_cases)
+    )
 
     for word in set(PERFORMANCE_PROBE.frame_words) | set(
         PERFORMANCE_PROBE.function_words
@@ -153,7 +164,7 @@ def main() -> int:
     def ordering_work() -> object:
         observed: list[dict[str, object]] = []
         for _ in range(3):
-            for words in PERFORMANCE_PROBE.order_bags:
+            for words in order_bags:
                 candidates, evaluated = rerank.rank_orders(
                     words,
                     lex,
@@ -187,14 +198,18 @@ def main() -> int:
     _measure("exact-ordering", ordering_work)
 
     deep_digests: dict[str, str] = {}
-    serial_seconds, serial_output = _deep_work(wn_dir, workers=1, batch_size=32)
+    serial_seconds, serial_output = _deep_work(
+        wn_dir, order_bags, workers=1, batch_size=32
+    )
     deep_digests["serial"] = _digest(serial_output)
     print(
         f"PERF {'deep-serial':<18} best={serial_seconds:.6f}s "
         f"median={serial_seconds:.6f}s digest={deep_digests['serial']}"
     )
     for batch_size in (8, 32, 96):
-        seconds, output = _deep_work(wn_dir, workers=2, batch_size=batch_size)
+        seconds, output = _deep_work(
+            wn_dir, order_bags, workers=2, batch_size=batch_size
+        )
         digest = _digest(output)
         deep_digests[f"p2-b{batch_size}"] = digest
         print(
