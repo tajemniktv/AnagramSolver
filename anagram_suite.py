@@ -112,6 +112,13 @@ def _positive_int(value: object, name: str) -> int:
     return value
 
 
+def _arg_positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be >= 1")
+    return parsed
+
+
 def _letters(text: str) -> tuple[str, ...]:
     return tuple(sorted(ch.lower() for ch in text if ch.isalpha()))
 
@@ -472,6 +479,17 @@ def normal_user_case(
     if verbose:
         args.append("--verbose")
 
+    # Reuse the real frontend's validation so registry-backed CI cannot accept
+    # argument ranges or require/word-count combinations the solver itself rejects.
+    from anagram_solver import _validate_args as validate_solver_args
+    from anagram_solver import build_parser as build_solver_parser
+
+    try:
+        parsed = build_solver_parser().parse_args([target, *args])
+        validate_solver_args(parsed)
+    except SystemExit as exc:
+        raise ValueError(f"solver arguments invalid: {exc}") from exc
+
     return NormalUserCase(
         id=str(case["id"]),
         target=target,
@@ -495,7 +513,7 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
         default_suites, cli_defaults = _parse_defaults(document)
         ordering_gate, phrase_ordering, performance_probe = _parse_profiles(document)
         cases = load_cases(path)
-    except (KeyError, TypeError, ValueError) as exc:
+    except (KeyError, OSError, TypeError, ValueError) as exc:
         return (str(exc),)
 
     cross_bag_references: list[str] = []
@@ -646,7 +664,7 @@ def _management_main() -> int:
         choices=(*CASE_SUITES, "core", "all"),
     )
     add.add_argument("--hint", action="append", default=[])
-    add.add_argument("--words", type=int)
+    add.add_argument("--words", type=_arg_positive_int)
     verbosity = add.add_mutually_exclusive_group()
     verbosity.add_argument("--verbose", dest="verbose", action="store_true")
     verbosity.add_argument("--quiet", dest="verbose", action="store_false")
