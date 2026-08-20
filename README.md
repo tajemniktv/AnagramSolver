@@ -137,4 +137,8 @@ python anagram_rerank.py candidates.txt --export reranked.txt
 python -m unittest discover -s tests -v
 ```
 
+Shared real-world test/benchmark data lives in **`anagram_benchmarks.json`**. Its `cases` list is the benchmark corpus, while `profiles` defines the normal-user CLI smoke workload, ordering-regression thresholds/controls, and performance-probe workload. `anagram_suite.py` is the typed loader used by CI and supporting tools. Add or change shared scenarios there instead of hard-coding separate case lists in individual runners.
+
+Small synthetic fixtures that only exercise one function or subsystem should stay beside that subsystem's unit tests. Test modules are grouped by behavior rather than by the PR/review that introduced a regression.
+
 Pull requests also run the fast phrase-order A/B benchmark. The expensive full corpus matrix is kept as an explicit manual workflow rather than running after every merge.

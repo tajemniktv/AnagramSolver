@@ -1,15 +1,71 @@
 {
-  "schema": 1,
-  "description": "Generalization suite for anagram word-order/reranking. Includes common sayings/titles plus ordinary non-lexicalized English clauses so phrase dictionaries cannot trivially ace the suite.",
+  "schema": 2,
+  "description": "Canonical shared scenario catalog for AnagramSolver benchmarks and CI profiles. Unit-only synthetic fixtures remain local to their subsystem tests.",
+  "profiles": {
+    "normal_user_cli": [
+      {
+        "id": "cli_so_cozy",
+        "target": "YOSCOZ",
+        "expected_phrase": "so cozy"
+      },
+      {
+        "id": "cli_hi_everyone",
+        "target": "OEEEVHYNRI",
+        "expected_phrase": "hi everyone"
+      },
+      {
+        "id": "shakira_control",
+        "target": "ODITIHNSLSHEEEPT"
+      },
+      {
+        "id": "cli_proper_name_control",
+        "target": "AHCWSOPSIO"
+      }
+    ],
+    "ordering_gate": {
+      "min_recall_1": 0.35,
+      "min_recall_10": 0.79,
+      "min_recall_50": 0.95,
+      "min_mrr": 0.47,
+      "min_cross_bag_margin": 0.02,
+      "cross_bag_case_id": "user_testing_anagrams",
+      "malformed_bags": [
+        ["a", "am", "sitting", "managers"],
+        ["an", "game", "starting", "aims"]
+      ],
+      "target_max_ranks": {
+        "actions_words": 10,
+        "united_stand": 4
+      }
+    },
+    "performance_probe": {
+      "frame_words": [
+        "chased", "needs", "arrived", "speak", "stand", "fall", "testing",
+        "tasting", "reads", "boils", "favors", "helps", "stopped", "runs"
+      ],
+      "function_words": [
+        "the", "a", "than", "we", "they", "is", "are", "will", "have",
+        "never", "of", "with", "and", "dog", "ball", "testing", "louder"
+      ],
+      "order_bags": [
+        ["actions", "speak", "louder", "than", "words"],
+        ["united", "we", "stand", "divided", "fall"],
+        ["i", "am", "testing", "anagrams"],
+        ["the", "ball", "chased", "dog"],
+        ["my", "phone", "needs", "charge"],
+        ["the", "pot", "never", "boils"],
+        ["fortune", "favors", "the", "bold"],
+        ["a", "quiet", "room", "helps", "focus"]
+      ]
+    }
+  },
   "cases": [
     {
       "id": "shakira_control",
       "answer": "these hips dont lie",
       "category": "title/control",
       "full": true,
-      "hints": [
-        "dont"
-      ],
+      "hints": ["dont"],
       "min_zipf": 3.0,
       "max_results": 0
     },
@@ -19,9 +75,7 @@
       "answer": "i am lord voldemort",
       "category": "title/anagram",
       "full": true,
-      "hints": [
-        "voldemort"
-      ],
+      "hints": ["voldemort"],
       "min_zipf": 2.7,
       "max_results": 100000
     },
@@ -81,228 +135,43 @@
       "min_zipf": 3.0,
       "max_results": 100000
     },
-    {
-      "id": "actions_words",
-      "answer": "actions speak louder than words",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "birds_feather",
-      "answer": "birds of a feather",
-      "category": "phrase",
-      "full": false
-    },
-    {
-      "id": "roads_rome",
-      "answer": "all roads lead to rome",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "time_arrow",
-      "answer": "time flies like an arrow",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "fortune_bold",
-      "answer": "fortune favors the bold",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "honesty_policy",
-      "answer": "honesty is the best policy",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "watched_pot",
-      "answer": "a watched pot never boils",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "two_heads",
-      "answer": "two heads are better than one",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "silver_lining",
-      "answer": "every cloud has a silver lining",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "still_waste",
-      "answer": "waste not want not",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "easy_go",
-      "answer": "easy come easy go",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "pain_gain",
-      "answer": "no pain no gain",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "curiosity_cat",
-      "answer": "curiosity killed the cat",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "early_bird",
-      "answer": "the early bird catches the worm",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "absence_fonder",
-      "answer": "absence makes the heart grow fonder",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "united_stand",
-      "answer": "united we stand divided we fall",
-      "category": "aphorism",
-      "full": false
-    },
-    {
-      "id": "necessity_invention",
-      "answer": "necessity is the mother of invention",
-      "category": "proverb",
-      "full": false
-    },
-    {
-      "id": "dog_ball",
-      "answer": "the dog chased the ball",
-      "category": "ordinary-clause",
-      "full": false
-    },
-    {
-      "id": "birds_dawn",
-      "answer": "small birds sing at dawn",
-      "category": "ordinary-clause",
-      "full": false
-    },
-    {
-      "id": "phone_charge",
-      "answer": "my phone needs a charge",
-      "category": "ordinary-clause",
-      "full": false
-    },
-    {
-      "id": "water_cold",
-      "answer": "the water feels cold",
-      "category": "ordinary-predicative",
-      "full": false
-    },
-    {
-      "id": "reads_night",
-      "answer": "she reads books at night",
-      "category": "ordinary-clause",
-      "full": false
-    },
-    {
-      "id": "leave_sunrise",
-      "answer": "we should leave before sunrise",
-      "category": "ordinary-modal",
-      "full": false
-    },
-    {
-      "id": "red_car",
-      "answer": "the red car stopped suddenly",
-      "category": "ordinary-clause",
-      "full": false
-    },
-    {
-      "id": "keys_table",
-      "answer": "your keys are on the table",
-      "category": "ordinary-copula",
-      "full": false
-    },
-    {
-      "id": "machine_quietly",
-      "answer": "this machine runs quietly",
-      "category": "ordinary-predicative",
-      "full": false
-    },
-    {
-      "id": "bridge_unsafe",
-      "answer": "the old bridge looks unsafe",
-      "category": "ordinary-predicative",
-      "full": false
-    },
-    {
-      "id": "never_answer",
-      "answer": "they never found the answer",
-      "category": "ordinary-adverb",
-      "full": false
-    },
-    {
-      "id": "quiet_focus",
-      "answer": "a quiet room helps focus",
-      "category": "ordinary-clause",
-      "full": false
-    },
-    {
-      "id": "train_time",
-      "answer": "the train arrived on time",
-      "category": "ordinary-pp",
-      "full": false
-    },
-    {
-      "id": "rain_slippery",
-      "answer": "rain makes roads slippery",
-      "category": "ordinary-resultative",
-      "full": false
-    },
-    {
-      "id": "cats_places",
-      "answer": "cats sleep in warm places",
-      "category": "ordinary-pp",
-      "full": false
-    },
-    {
-      "id": "package_yesterday",
-      "answer": "the package arrived yesterday",
-      "category": "ordinary-adverb",
-      "full": false
-    },
-    {
-      "id": "choice_cost",
-      "answer": "every choice has a cost",
-      "category": "ordinary-clause",
-      "full": false
-    },
-    {
-      "id": "tools_time",
-      "answer": "good tools save time",
-      "category": "ordinary-clause",
-      "full": false
-    },
-    {
-      "id": "learn_mistakes",
-      "answer": "we learn by making mistakes",
-      "category": "ordinary-pp",
-      "full": false
-    },
-    {
-      "id": "coffee_hot",
-      "answer": "coffee tastes better hot",
-      "category": "ordinary-predicative",
-      "full": false
-    },
+    {"id": "actions_words", "answer": "actions speak louder than words", "category": "proverb", "full": false},
+    {"id": "birds_feather", "answer": "birds of a feather", "category": "phrase", "full": false},
+    {"id": "roads_rome", "answer": "all roads lead to rome", "category": "proverb", "full": false},
+    {"id": "time_arrow", "answer": "time flies like an arrow", "category": "proverb", "full": false},
+    {"id": "fortune_bold", "answer": "fortune favors the bold", "category": "proverb", "full": false},
+    {"id": "honesty_policy", "answer": "honesty is the best policy", "category": "proverb", "full": false},
+    {"id": "watched_pot", "answer": "a watched pot never boils", "category": "proverb", "full": false},
+    {"id": "two_heads", "answer": "two heads are better than one", "category": "proverb", "full": false},
+    {"id": "silver_lining", "answer": "every cloud has a silver lining", "category": "proverb", "full": false},
+    {"id": "still_waste", "answer": "waste not want not", "category": "proverb", "full": false},
+    {"id": "easy_go", "answer": "easy come easy go", "category": "proverb", "full": false},
+    {"id": "pain_gain", "answer": "no pain no gain", "category": "proverb", "full": false},
+    {"id": "curiosity_cat", "answer": "curiosity killed the cat", "category": "proverb", "full": false},
+    {"id": "early_bird", "answer": "the early bird catches the worm", "category": "proverb", "full": false},
+    {"id": "absence_fonder", "answer": "absence makes the heart grow fonder", "category": "proverb", "full": false},
+    {"id": "united_stand", "answer": "united we stand divided we fall", "category": "aphorism", "full": false},
+    {"id": "necessity_invention", "answer": "necessity is the mother of invention", "category": "proverb", "full": false},
+    {"id": "dog_ball", "answer": "the dog chased the ball", "category": "ordinary-clause", "full": false},
+    {"id": "birds_dawn", "answer": "small birds sing at dawn", "category": "ordinary-clause", "full": false},
+    {"id": "phone_charge", "answer": "my phone needs a charge", "category": "ordinary-clause", "full": false},
+    {"id": "water_cold", "answer": "the water feels cold", "category": "ordinary-predicative", "full": false},
+    {"id": "reads_night", "answer": "she reads books at night", "category": "ordinary-clause", "full": false},
+    {"id": "leave_sunrise", "answer": "we should leave before sunrise", "category": "ordinary-modal", "full": false},
+    {"id": "red_car", "answer": "the red car stopped suddenly", "category": "ordinary-clause", "full": false},
+    {"id": "keys_table", "answer": "your keys are on the table", "category": "ordinary-copula", "full": false},
+    {"id": "machine_quietly", "answer": "this machine runs quietly", "category": "ordinary-predicative", "full": false},
+    {"id": "bridge_unsafe", "answer": "the old bridge looks unsafe", "category": "ordinary-predicative", "full": false},
+    {"id": "never_answer", "answer": "they never found the answer", "category": "ordinary-adverb", "full": false},
+    {"id": "quiet_focus", "answer": "a quiet room helps focus", "category": "ordinary-clause", "full": false},
+    {"id": "train_time", "answer": "the train arrived on time", "category": "ordinary-pp", "full": false},
+    {"id": "rain_slippery", "answer": "rain makes roads slippery", "category": "ordinary-resultative", "full": false},
+    {"id": "cats_places", "answer": "cats sleep in warm places", "category": "ordinary-pp", "full": false},
+    {"id": "package_yesterday", "answer": "the package arrived yesterday", "category": "ordinary-adverb", "full": false},
+    {"id": "choice_cost", "answer": "every choice has a cost", "category": "ordinary-clause", "full": false},
+    {"id": "tools_time", "answer": "good tools save time", "category": "ordinary-clause", "full": false},
+    {"id": "learn_mistakes", "answer": "we learn by making mistakes", "category": "ordinary-pp", "full": false},
+    {"id": "coffee_hot", "answer": "coffee tastes better hot", "category": "ordinary-predicative", "full": false},
     {
       "id": "user_testing_anagrams",
       "answer": "i am testing anagrams",
@@ -311,35 +180,10 @@
       "min_zipf": 2.7,
       "max_results": 100000
     },
-    {
-      "id": "reading_books_progressive",
-      "answer": "she is reading books",
-      "category": "ordinary-progressive",
-      "full": false
-    },
-    {
-      "id": "testing_systems_modal_progressive",
-      "answer": "we will be testing systems",
-      "category": "ordinary-modal-progressive",
-      "full": false
-    },
-    {
-      "id": "testing_systems_perfect_progressive",
-      "answer": "we have been testing systems",
-      "category": "ordinary-perfect-progressive",
-      "full": false
-    },
-    {
-      "id": "anagrams_progressive_passive",
-      "answer": "anagrams are being tested",
-      "category": "ordinary-progressive-passive",
-      "full": false
-    },
-    {
-      "id": "package_passive",
-      "answer": "the package was delivered",
-      "category": "ordinary-passive",
-      "full": false
-    }
+    {"id": "reading_books_progressive", "answer": "she is reading books", "category": "ordinary-progressive", "full": false},
+    {"id": "testing_systems_modal_progressive", "answer": "we will be testing systems", "category": "ordinary-modal-progressive", "full": false},
+    {"id": "testing_systems_perfect_progressive", "answer": "we have been testing systems", "category": "ordinary-perfect-progressive", "full": false},
+    {"id": "anagrams_progressive_passive", "answer": "anagrams are being tested", "category": "ordinary-progressive-passive", "full": false},
+    {"id": "package_passive", "answer": "the package was delivered", "category": "ordinary-passive", "full": false}
   ]
 }

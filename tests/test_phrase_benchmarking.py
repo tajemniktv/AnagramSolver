@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import json
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
 import anagram_benchmark as benchmark
+from anagram_suite import case_by_id
 
 
 class _FakeReranker:
     @staticmethod
     def rank_orders(words, _lex, **_kwargs):
-        # Grammar winner first; intended phrase second.
         return (
             (
                 SimpleNamespace(
@@ -42,8 +41,6 @@ class _NoTargetReranker:
 class _TiedReranker:
     @staticmethod
     def rank_orders(words, _lex, **_kwargs):
-        # Incoming rank_orders() tie order is authoritative. The intended phrase
-        # deliberately comes second and has stronger phrase evidence.
         return (
             (
                 SimpleNamespace(order=("power", "is", "knowledge"), objective=0.90),
@@ -191,16 +188,27 @@ class PhraseBenchmarkTests(unittest.TestCase):
         self.assertNotIn("--phrase-db", cmd)
         self.assertNotIn("--phrase-bonus-max", cmd)
         self.assertNotIn("--order-candidates", cmd)
-        # Existing positive-bigram rescoring remains part of the baseline.
         self.assertIn("--phrase-rescore-top", cmd)
 
-    def test_voldemort_benchmark_source_is_exact_anagram(self):
-        cases_path = Path(__file__).resolve().parents[1] / "anagram_benchmarks.json"
-        payload = json.loads(cases_path.read_text(encoding="utf-8"))
-        case = next(row for row in payload["cases"] if row["id"] == "voldemort_reveal")
+    def test_pre_rank_regex_ignores_generator_pre_rank(self) -> None:
+        output = """BENCHMARK: example
+  generator PRE rank: 1,749 / 5,696
+  PRE rank: 29 / 5,696  (87.42)
+  FINAL rank: 3 / 5,696 (90.27)
+"""
+        pre = benchmark.PRE_RE.search(output)
+        final = benchmark.FINAL_RE.search(output)
+        self.assertIsNotNone(pre)
+        self.assertIsNotNone(final)
+        assert pre is not None and final is not None
+        self.assertEqual(pre.groups(), ("29", "5,696"))
+        self.assertEqual(final.groups(), ("3", "5,696"))
 
-        source_letters = sorted("".join(benchmark.tokens(case["source"])))
-        answer_letters = sorted("".join(benchmark.tokens(case["answer"])))
+    def test_voldemort_benchmark_source_is_exact_anagram(self):
+        case = case_by_id("voldemort_reveal")
+
+        source_letters = sorted("".join(benchmark.tokens(str(case["source"]))))
+        answer_letters = sorted("".join(benchmark.tokens(str(case["answer"]))))
         self.assertEqual(source_letters, answer_letters)
         self.assertEqual(case["answer"], "i am lord voldemort")
         self.assertIn("voldemort", case["hints"])

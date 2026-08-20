@@ -63,7 +63,6 @@ class OrderingLayerTests(unittest.TestCase):
     @classmethod
     def _install_candidate(cls, row, candidate) -> None:
         cls._candidate_table()[id(row)] = (candidate,)
-        # Newer implementations may use list indices; one-row tests use index 0.
         if hasattr(rerank.impl, "_ORDER_CANDIDATES_BY_INDEX"):
             rerank.impl._ORDER_CANDIDATES_BY_INDEX[0] = (candidate,)
         row.best_order = candidate.order
@@ -139,6 +138,24 @@ class OrderingLayerTests(unittest.TestCase):
         self.assertIs(returned_structure, sentinel)
         self.assertEqual(evaluated, 7)
         structure.assert_called_once_with(candidate.order, unittest.mock.ANY)
+
+    def test_deep_result_uses_defined_core_final_scorer(self) -> None:
+        row = self._row(("a", "b", "c"))
+        result = rerank.impl.DeepResult(
+            row_index=0,
+            grammar_raw=2.0,
+            best_order=("a", "b", "c"),
+            structure_norm=0.9,
+            valency_norm=1.0,
+            syntax_coverage=1.0,
+            phrase_kind="clause",
+            orders_evaluated=6,
+            order_candidates=(),
+        )
+        with patch.object(core, "score_final", return_value=42.5) as scorer:
+            rerank.impl._apply_deep_result([row], result)
+        scorer.assert_called_once_with(row)
+        self.assertEqual(row.final, 42.5)
 
     def test_phrase_evidence_can_choose_retained_alternative(self) -> None:
         row = self._row(("a", "b", "c"))
@@ -239,8 +256,6 @@ class OrderingLayerTests(unittest.TestCase):
             "_CORE_PREPARE_ROWS",
             side_effect=AssertionError("optimized preparation must not delegate"),
         ):
-            # Reproduce main()'s runtime rebinding. The optimized path must not
-            # look up core.prepare_rows dynamically and recurse through itself.
             with patch.object(core, "prepare_rows", rerank.prepare_rows):
                 rerank.prepare_rows(rows, lex)
 
