@@ -24,7 +24,7 @@ from anagram_feature_ranker import (
     explicit_order_features,
     train_pairwise_ranker,
 )
-from anagram_suite import DEFAULT_CASES, load_cases
+from anagram_suite import DEFAULT_CASES, cases_for, load_cases
 
 
 def _group_key(words: tuple[str, ...]) -> str:
@@ -139,9 +139,14 @@ def main() -> int:
         if args.phrase_db is not None
         else None
     )
+    registry_cases = (
+        cases_for("feature_ranker")
+        if args.cases.expanduser().resolve() == DEFAULT_CASES.resolve()
+        else load_cases(args.cases, require_ids=False)
+    )
     try:
         groups, skipped = build_groups(
-            load_cases(args.cases, require_ids=False),
+            registry_cases,
             lex=lex,
             phrase_index=phrase_index,
             order_candidates=args.order_candidates,
