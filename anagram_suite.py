@@ -119,17 +119,22 @@ def _arg_positive_int(value: str) -> int:
     return parsed
 
 
-def _letters(text: str) -> tuple[str, ...]:
-    return tuple(sorted(ch.lower() for ch in text if ch.isalpha()))
-
-
-def _has_benchmark_token(text: str) -> bool:
+def _ascii_letters(text: str) -> tuple[str, ...]:
     normalized = (
         unicodedata.normalize("NFKD", text)
         .encode("ascii", "ignore")
         .decode("ascii")
+        .lower()
     )
-    return any("a" <= ch.lower() <= "z" for ch in normalized)
+    return tuple(ch for ch in normalized if "a" <= ch <= "z")
+
+
+def _letters(text: str) -> tuple[str, ...]:
+    return tuple(sorted(_ascii_letters(text)))
+
+
+def _has_benchmark_token(text: str) -> bool:
+    return bool(_ascii_letters(text))
 
 
 def _expand_suites(value: object, name: str) -> frozenset[str]:
