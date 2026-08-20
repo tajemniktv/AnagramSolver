@@ -10,6 +10,7 @@ honest generalization estimate.
 from __future__ import annotations
 
 import argparse
+import json
 import math
 from pathlib import Path
 from typing import cast
@@ -29,6 +30,14 @@ from anagram_suite import DEFAULT_CASES, cases_for, load_cases
 
 def _group_key(words: tuple[str, ...]) -> str:
     return " ".join(sorted(words))
+
+
+def _load_ranker_cases(path: Path) -> list[dict[str, object]]:
+    """Load suite-selected registry cases or preserve legacy case-file behavior."""
+    payload: object = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, dict) and "schema" in payload:
+        return cases_for("feature_ranker", path=path)
+    return load_cases(path, require_ids=False, require_answer=True)
 
 
 def build_groups(
@@ -139,15 +148,7 @@ def main() -> int:
         if args.phrase_db is not None
         else None
     )
-    registry_cases = (
-        cases_for("feature_ranker")
-        if args.cases.expanduser().resolve() == DEFAULT_CASES.resolve()
-        else load_cases(
-            args.cases,
-            require_ids=False,
-            require_answer=True,
-        )
-    )
+    registry_cases = _load_ranker_cases(args.cases)
     try:
         groups, skipped = build_groups(
             registry_cases,
