@@ -9,24 +9,57 @@ from unittest.mock import patch
 import anagram_generate as generator
 
 
-def sig(a=0, b=0, c=0):
+def _sig(a: int = 0, b: int = 0, c: int = 0) -> tuple[int, ...]:
     return (a, b, c) + (0,) * 23
 
 
-class ClueAwareGenerationTests(unittest.TestCase):
-    def _candidates(self) -> list[generator.Candidate]:
-        return [
-            generator.Candidate("a", sig(1), 1, 5.0),
-            generator.Candidate("b", sig(0, 1), 1, 4.9),
-            generator.Candidate("ab", sig(1, 1), 2, 4.8),
+def _small_candidates() -> list[generator.Candidate]:
+    return [
+        generator.Candidate("a", _sig(1), 1, 5.0),
+        generator.Candidate("b", _sig(0, 1), 1, 4.9),
+        generator.Candidate("ab", _sig(1, 1), 2, 4.8),
+    ]
+
+
+class GeneratorSearchTests(unittest.TestCase):
+    def test_historical_exhaustive_order_is_preserved(self) -> None:
+        candidates = [
+            generator.Candidate("ab", _sig(1, 1), 2, 5.0),
+            generator.Candidate("ac", _sig(1, 0, 1), 2, 4.9),
+            generator.Candidate("bc", _sig(0, 1, 1), 2, 4.8),
+            generator.Candidate("abc", _sig(1, 1, 1), 3, 4.7),
         ]
+        remaining = _sig(2, 2, 2)
+        self.assertEqual(
+            list(generator.solve(remaining, candidates, 2, 3, 0, True)),
+            [("abc", "abc"), ("ab", "ac", "bc")],
+        )
+        self.assertEqual(
+            list(generator.solve(remaining, candidates, 2, 3, 0, False)),
+            [("ab", "ac", "bc")],
+        )
+
+    def test_historical_bounded_prefix_is_preserved(self) -> None:
+        candidates = _small_candidates()
+        remaining = _sig(2, 2)
+        expected = [("ab", "ab"), ("a", "b", "ab"), ("a", "a", "b", "b")]
+        self.assertEqual(
+            list(generator.solve(remaining, candidates, 2, 4, 0, True)),
+            expected,
+        )
+        for limit in (1, 2, 3):
+            with self.subTest(limit=limit):
+                self.assertEqual(
+                    list(generator.solve(remaining, candidates, 2, 4, limit, True)),
+                    expected[:limit],
+                )
 
     def test_cap_counts_clue_accepted_results_not_irrelevant_exact_sets(self) -> None:
         stats = generator.SearchStats()
         actual = list(
             generator.solve(
-                sig(2, 2),
-                self._candidates(),
+                _sig(2, 2),
+                _small_candidates(),
                 2,
                 4,
                 1,
@@ -37,10 +70,6 @@ class ClueAwareGenerationTests(unittest.TestCase):
             )
         )
 
-        # Historical uncued search would find ("ab", "ab") first. Because that
-        # branch can no longer include clue word "a", clue-aware search prunes it
-        # before the terminal leaf and spends the one-result budget on the first
-        # clue-valid bag instead.
         self.assertEqual(actual, [("a", "b", "ab")])
         self.assertEqual(stats.accepted, 1)
         self.assertEqual(stats.exact_examined, 1)
@@ -48,8 +77,8 @@ class ClueAwareGenerationTests(unittest.TestCase):
     def test_exactly_one_counts_distinct_clue_words(self) -> None:
         actual = list(
             generator.solve(
-                sig(2, 2),
-                self._candidates(),
+                _sig(2, 2),
+                _small_candidates(),
                 2,
                 4,
                 0,
@@ -58,16 +87,13 @@ class ClueAwareGenerationTests(unittest.TestCase):
                 hint_mode="exactly-one",
             )
         )
-
-        # Repeating "ab" still matches one distinct clue. The middle bag has
-        # both "a" and "ab" and is rejected; the final bag only has "a".
         self.assertEqual(actual, [("ab", "ab"), ("a", "a", "b", "b")])
 
     def test_required_words_can_satisfy_clue_before_residual_search(self) -> None:
         actual = list(
             generator.solve(
-                sig(2, 2),
-                self._candidates(),
+                _sig(2, 2),
+                _small_candidates(),
                 2,
                 4,
                 1,
@@ -133,7 +159,7 @@ class ClueAwareGenerationTests(unittest.TestCase):
     def test_uncued_bounded_prefix_remains_unchanged(self) -> None:
         expected = [("ab", "ab"), ("a", "b", "ab")]
         self.assertEqual(
-            list(generator.solve(sig(2, 2), self._candidates(), 2, 4, 2, True)),
+            list(generator.solve(_sig(2, 2), _small_candidates(), 2, 4, 2, True)),
             expected,
         )
 
@@ -141,8 +167,8 @@ class ClueAwareGenerationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             list(
                 generator.solve(
-                    sig(2, 2),
-                    self._candidates(),
+                    _sig(2, 2),
+                    _small_candidates(),
                     2,
                     4,
                     0,

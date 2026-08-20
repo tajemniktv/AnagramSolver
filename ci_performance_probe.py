@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small repeatable hot-path probe for ranking-performance changes.
+"""Small repeatable hot-path probe for registry-selected ranking cases.
 
 This is deliberately not a hard timing gate: hosted-runner noise is too large for
 that. It prints stable workloads and output-sensitive digests so PRs can compare
@@ -14,28 +14,11 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+import anagram_benchmark as benchmark
 import anagram_performance as perf
 import anagram_rerank as rerank
 import anagram_rerank_core as core
-
-FRAME_WORDS = (
-    "chased", "needs", "arrived", "speak", "stand", "fall", "testing",
-    "tasting", "reads", "boils", "favors", "helps", "stopped", "runs",
-)
-FUNCTION_WORDS = (
-    "the", "a", "than", "we", "they", "is", "are", "will", "have",
-    "never", "of", "with", "and", "dog", "ball", "testing", "louder",
-)
-ORDER_BAGS = (
-    ("actions", "speak", "louder", "than", "words"),
-    ("united", "we", "stand", "divided", "fall"),
-    ("i", "am", "testing", "anagrams"),
-    ("the", "ball", "chased", "dog"),
-    ("my", "phone", "needs", "charge"),
-    ("the", "pot", "never", "boils"),
-    ("fortune", "favors", "the", "bold"),
-    ("a", "quiet", "room", "helps", "focus"),
-)
+from anagram_suite import PERFORMANCE_PROBE, cases_for
 
 
 def _digest(value: object) -> str:
@@ -98,19 +81,14 @@ def _probe_row(words: tuple[str, ...], rank: int) -> core.Row:
 
 def _deep_work(
     wn_dir: Path,
+    order_bags: tuple[tuple[str, ...], ...],
     *,
     workers: int,
     batch_size: int,
 ) -> tuple[float, object]:
-    # Give every backend/configuration the same cold per-lexicon and memoized
-    # helper state. Lexicon file loading stays outside the timer; process startup
-    # and worker-local loading remain real backend costs once timing begins.
     perf.clear_performance_caches()
     lex = rerank.WordNetLexicon.load(wn_dir)
-    rows = [
-        _probe_row(ORDER_BAGS[i % len(ORDER_BAGS)], i + 1)
-        for i in range(384)
-    ]
+    rows = [_probe_row(order_bags[i % len(order_bags)], i + 1) for i in range(384)]
     selected = set(range(len(rows)))
     start = time.perf_counter()
     stats = rerank.deep_analyze(
@@ -146,13 +124,40 @@ def _deep_work(
     return elapsed, canonical
 
 
+def _registry_order_bags(
+    performance_cases: list[dict[str, object]],
+) -> tuple[tuple[str, ...], ...]:
+    order_bags = tuple(
+        benchmark.tokens(str(case["answer"])) for case in performance_cases
+    )
+    if not order_bags:
+        raise RuntimeError("Performance registry selected no ordering bags")
+    empty_case_ids = [
+        str(case["id"])
+        for case, bag in zip(performance_cases, order_bags, strict=True)
+        if not bag
+    ]
+    if empty_case_ids:
+        raise RuntimeError(
+            "Performance registry case(s) produced empty ordering bags: "
+            + ", ".join(empty_case_ids)
+        )
+    return order_bags
+
+
 def main() -> int:
     wn_dir = core.ensure_wordnet(core.DEFAULT_WORDNET_DIR)
     lex = rerank.WordNetLexicon.load(wn_dir)
+    performance_cases = cases_for("performance")
+    order_bags = _registry_order_bags(performance_cases)
+    print(
+        "PERF registry cases   "
+        + ", ".join(str(case["id"]) for case in performance_cases)
+    )
 
-    # Warm ordinary feature lookup so the frame probe isolates repeated verb
-    # lemma/frame derivation rather than first-use POS feature construction.
-    for word in set(FRAME_WORDS) | set(FUNCTION_WORDS):
+    for word in set(PERFORMANCE_PROBE.frame_words) | set(
+        PERFORMANCE_PROBE.function_words
+    ):
         lex.features(word)
 
     def frame_work() -> object:
@@ -160,7 +165,7 @@ def main() -> int:
         for _ in range(2_000):
             observed = [
                 (word, tuple(sorted(lex.frames_for(word))))
-                for word in FRAME_WORDS
+                for word in PERFORMANCE_PROBE.frame_words
             ]
         return observed
 
@@ -169,14 +174,14 @@ def main() -> int:
         for _ in range(25_000):
             observed = [
                 (word, perf.cached_function_class(word))
-                for word in FUNCTION_WORDS
+                for word in PERFORMANCE_PROBE.function_words
             ]
         return observed
 
     def ordering_work() -> object:
         observed: list[dict[str, object]] = []
         for _ in range(3):
-            for words in ORDER_BAGS:
+            for words in order_bags:
                 candidates, evaluated = rerank.rank_orders(
                     words,
                     lex,
@@ -209,13 +214,9 @@ def main() -> int:
     _measure("function-class", function_work)
     _measure("exact-ordering", ordering_work)
 
-    # Two workers matches GitHub's common hosted-runner CPU allocation. This is
-    # a batch-overhead probe, not a claim about the best worker count on a user's
-    # desktop. Keep the production worker default unchanged unless a broader
-    # machine matrix justifies changing it.
     deep_digests: dict[str, str] = {}
     serial_seconds, serial_output = _deep_work(
-        wn_dir, workers=1, batch_size=32
+        wn_dir, order_bags, workers=1, batch_size=32
     )
     deep_digests["serial"] = _digest(serial_output)
     print(
@@ -224,7 +225,7 @@ def main() -> int:
     )
     for batch_size in (8, 32, 96):
         seconds, output = _deep_work(
-            wn_dir, workers=2, batch_size=batch_size
+            wn_dir, order_bags, workers=2, batch_size=batch_size
         )
         digest = _digest(output)
         deep_digests[f"p2-b{batch_size}"] = digest

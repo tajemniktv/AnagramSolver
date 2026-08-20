@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Run corpus benchmark scenarios and publish a compact GitHub Step Summary."""
+"""Run registry-selected corpus scenarios and publish a compact Step Summary."""
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -12,10 +13,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from anagram_paths import CI_BENCHMARK_RESULTS_DIR
+from anagram_suite import PHRASE_ORDERING, case_options, cases_for
 
 HERE = Path(__file__).resolve().parent
 RESULTS_DIR = CI_BENCHMARK_RESULTS_DIR
-ORDER_CANDIDATES = 56
+ORDER_CANDIDATES = PHRASE_ORDERING.order_candidates
 
 
 @dataclass(slots=True)
@@ -182,7 +184,7 @@ def append_summary(
     with out.open("a", encoding="utf-8") as f:
         f.write("## Anagram corpus benchmark matrix\n\n")
         f.write(
-            "The same code and benchmark cases are evaluated with no phrase DB, "
+            "The same code and registry-selected cases are evaluated with no phrase DB, "
             "Wiktionary titles, and Wiktionary+Wikipedia titles. Phrase A/B deltas "
             "compare the identical retained top-K orders. Exact <=6w R@1 is a separate "
             "exhaustive-permutation metric over only cases with at most six words.\n\n"
@@ -228,6 +230,38 @@ def append_summary(
         )
 
 
+def _legacy_benchmark_case(case: dict[str, object], suite: str) -> dict[str, object]:
+    """Adapt registry metadata to the existing low-level benchmark file contract."""
+    adapted = dict(case)
+    options = case_options(case, suite)
+    for key in (
+        "hints",
+        "exclude",
+        "min_word_len",
+        "min_zipf",
+        "max_results",
+        "deep_per_group",
+    ):
+        if key in options:
+            adapted[key] = options[key]
+    if suite == "full":
+        adapted["full"] = True
+    return adapted
+
+
+def _write_suite_cases(path: Path, suite: str) -> int:
+    selected = cases_for(suite)
+    path.write_text(
+        json.dumps(
+            {"cases": [_legacy_benchmark_case(case, suite) for case in selected]},
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return len(selected)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--wiktionary-db", type=Path, required=True)
@@ -240,8 +274,6 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    # Resolve relative paths against the caller's working directory before child
-    # benchmarks switch cwd to HERE, and fail fast before running the baseline.
     wiktionary_db = args.wiktionary_db.expanduser().resolve()
     wikipedia_db = args.wikipedia_db.expanduser().resolve()
     for label, path in (
@@ -261,6 +293,14 @@ def main() -> int:
         tuple[Scenario, dict[str, float | None], dict[str, float | None] | None]
     ] = []
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    order_cases_path = RESULTS_DIR / "registry-phrase-ordering-cases.json"
+    full_cases_path = RESULTS_DIR / "registry-full-cases.json"
+    order_case_count = _write_suite_cases(order_cases_path, "phrase_ordering")
+    full_case_count = _write_suite_cases(full_cases_path, "full")
+    print(
+        f"Registry selected {order_case_count} phrase-ordering case(s) and "
+        f"{full_case_count} full-pipeline case(s)."
+    )
 
     for scenario in scenarios:
         phrase_args = (
@@ -271,6 +311,8 @@ def main() -> int:
             "anagram_benchmark.py",
             "--mode",
             "order",
+            "--cases",
+            str(order_cases_path),
             "--order-candidates",
             str(ORDER_CANDIDATES),
             *phrase_args,
@@ -290,6 +332,8 @@ def main() -> int:
                 "anagram_benchmark.py",
                 "--mode",
                 "full",
+                "--cases",
+                str(full_cases_path),
                 "--workers",
                 str(args.workers),
                 "--order-candidates",

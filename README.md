@@ -131,10 +131,62 @@ python anagram_generate.py "ODITIHNSLSHEEEPT" --all-results --min-zipf 2.7 --exp
 python anagram_rerank.py candidates.txt --export reranked.txt
 ```
 
-## Tests
+## Tests and shared case registry
 
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+All **shared real-world test/CI cases** live in one case-centric registry: `anagram_benchmarks.json`. The Python API in `anagram_suite.py` exposes `cases_for(...)`, and the scenario-driven CI runners select their workloads from it:
+
+- `ordering` — blocking ordering regression benchmark;
+- `phrase_ordering` — phrase/corpus ordering A/B;
+- `normal_user_cli` — real `anagram_solver.py` invocations;
+- `full` — full generation + reranking matrix;
+- `performance` — repeatable ordering/deep-analysis workload;
+- `refinement` — forced-beam k-opt experiment;
+- `feature_ranker` — grouped ranker training/evaluation.
+
+A case with **no `suites` field defaults to all suites**. Existing cases use explicit `core`, `full`, `performance`, or CLI memberships where needed to preserve the intended runtime. `core` expands to ordering, phrase ordering, refinement, and feature-ranker evaluation; `all` expands to every suite.
+
+A case can own common solver options plus suite-specific overrides. For example:
+
+```json
+{
+  "id": "my_new_anagram",
+  "target": "IAMTESTINGANAGRAMS",
+  "answer": "i am testing anagrams",
+  "solver": {
+    "hints": ["testing"],
+    "words": 4,
+    "min_zipf": 2.7
+  },
+  "normal_user_cli": {
+    "verbose": true,
+    "timeout_seconds": 120
+  },
+  "ordering": {
+    "max_rank": 10
+  }
+}
+```
+
+Because `suites` is omitted, that single object participates in every registry-backed CI suite. Add `"suites": ["core", "normal_user_cli"]` (or any explicit suite list) to restrict it. Set `"enabled": false` to temporarily disable a case without deleting it.
+
+There is also a small management CLI, so routine edits do not require hand-editing JSON:
+
+```powershell
+python anagram_suite.py list
+python anagram_suite.py list --suite normal_user_cli
+python anagram_suite.py add my_new_anagram --target IAMTESTINGANAGRAMS --answer "i am testing anagrams" --hint testing --words 4 --verbose
+python anagram_suite.py disable my_new_anagram
+python anagram_suite.py enable my_new_anagram
+python anagram_suite.py remove my_new_anagram
+python anagram_suite.py validate
+```
+
+`add` defaults to **all suites**. Use repeated `--suite` flags to restrict a new case, for example `--suite core --suite normal_user_cli`.
+
+Small synthetic fixtures that exist only to exercise one function or subsystem should still stay beside that subsystem's unit tests. Test modules are grouped by behavior rather than by the PR/review that introduced a regression.
 
 Pull requests also run the fast phrase-order A/B benchmark. The expensive full corpus matrix is kept as an explicit manual workflow rather than running after every merge.

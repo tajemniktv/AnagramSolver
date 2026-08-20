@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "**/*.py"
+      - "anagram_benchmarks.json"
       - ".github/workflows/performance-probe.yml"
 
 permissions:

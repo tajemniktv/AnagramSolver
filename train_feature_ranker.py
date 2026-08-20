@@ -25,13 +25,19 @@ from anagram_feature_ranker import (
     explicit_order_features,
     train_pairwise_ranker,
 )
-
-HERE = Path(__file__).resolve().parent
-DEFAULT_CASES = HERE / "anagram_benchmarks.json"
+from anagram_suite import DEFAULT_CASES, cases_for, load_cases
 
 
 def _group_key(words: tuple[str, ...]) -> str:
     return " ".join(sorted(words))
+
+
+def _load_ranker_cases(path: Path) -> list[dict[str, object]]:
+    """Load suite-selected registry cases or preserve legacy case-file behavior."""
+    payload: object = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, dict) and "schema" in payload:
+        return cases_for("feature_ranker", path=path)
+    return load_cases(path, require_ids=False, require_answer=True)
 
 
 def build_groups(
@@ -109,22 +115,6 @@ def build_groups(
     return groups, skipped
 
 
-def _load_cases(path: Path) -> list[dict[str, object]]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    raw_cases: object
-    if isinstance(payload, dict):
-        raw_cases = payload.get("cases")
-    else:
-        raw_cases = payload
-    if not isinstance(raw_cases, list):
-        raise TypeError("benchmark case file must contain a cases list")
-    cases: list[dict[str, object]] = []
-    for item in raw_cases:
-        if isinstance(item, dict) and "answer" in item:
-            cases.append(dict(item))
-    return cases
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--cases", type=Path, default=DEFAULT_CASES)
@@ -158,9 +148,10 @@ def main() -> int:
         if args.phrase_db is not None
         else None
     )
+    registry_cases = _load_ranker_cases(args.cases)
     try:
         groups, skipped = build_groups(
-            _load_cases(args.cases),
+            registry_cases,
             lex=lex,
             phrase_index=phrase_index,
             order_candidates=args.order_candidates,

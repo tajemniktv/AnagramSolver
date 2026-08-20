@@ -1,18 +1,15 @@
 #!/usr/bin/env python3
-"""Informational forced-beam A/B for bounded complete-order refinement."""
+"""Informational forced-beam A/B for registry-selected order-refinement cases."""
 
 from __future__ import annotations
 
-import json
 from collections.abc import Sequence
-from pathlib import Path
 
 import anagram_benchmark as benchmark
 import anagram_rerank as reranker
 import anagram_rerank_core as core
 from anagram_order_refinement import augment_seed_pool
-
-HERE = Path(__file__).resolve().parent
+from anagram_suite import cases_for
 
 
 def _objective(order: tuple[str, ...], lex: reranker.WordNetLexicon) -> float:
@@ -25,13 +22,6 @@ def _objective(order: tuple[str, ...], lex: reranker.WordNetLexicon) -> float:
         + 0.12 * structure.valency
         + 0.06 * structure.coverage
     )
-
-
-def _load_cases() -> list[dict[str, object]]:
-    payload = json.loads((HERE / "anagram_benchmarks.json").read_text(encoding="utf-8"))
-    if not isinstance(payload, dict) or not isinstance(payload.get("cases"), list):
-        raise ValueError("invalid benchmark document")
-    return [dict(item) for item in payload["cases"] if isinstance(item, dict)]
 
 
 def _acceptable(case: dict[str, object], answer: str) -> set[tuple[str, ...]]:
@@ -82,10 +72,6 @@ def _run_configuration(
             continue
         evaluated_cases += 1
 
-        # Baseline is deliberately the full retained beam. `seed_limit` controls
-        # how many existing seeds receive refinement, not which existing seeds
-        # count as available answers. Otherwise the A/B could claim a recovery
-        # merely by ignoring a correct answer already present later in the beam.
         seed_orders = tuple(candidate.order for candidate in seeds)
         seed_target = any(benchmark.phrase_key(order) in acceptable for order in seed_orders)
         seed_best_score = max(candidate.objective for candidate in seeds)
@@ -137,9 +123,10 @@ def _run_configuration(
 def main() -> int:
     wordnet_dir = reranker.ensure_wordnet(reranker.DEFAULT_WORDNET_DIR)
     lex = reranker.WordNetLexicon.load(wordnet_dir)
-    cases = _load_cases()
+    cases = cases_for("refinement")
 
     print("=== FORCED-BEAM K-OPT AUGMENTATION BUDGET A/B ===")
+    print(f"registry cases: {len(cases)}")
     configurations = (
         (1, 5, 2, 384),
         (2, 5, 2, 384),
