@@ -11,7 +11,9 @@ import math
 import multiprocessing
 import sys
 import threading
-from collections.abc import Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -39,6 +41,8 @@ DEFAULT_WORDNET_DIR = core.DEFAULT_WORDNET_DIR
 # Capture the stable core functions that facade wrappers delegate to. These must
 # not be looked up dynamically after main() installs the facade overrides.
 _CORE_PREPARE_ROWS = core.prepare_rows
+_CORE_PAIR_GRAMMAR = core.pair_grammar
+_CORE_MORPHOLOGY_FAMILY_WORD = core.morphology_family_word
 
 # The top-K implementation predates this facade and historically patched core at
 # import time. Capture and restore the frozen core API immediately so merely
@@ -100,6 +104,105 @@ setattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)  # noqa: B010
 # facade calls makes that compatibility bridge safe for accidental same-process
 # concurrent callers until the legacy layer can accept the width explicitly.
 _DEEP_ANALYZE_LOCK = threading.RLock()
+
+# Preparation reuses immutable word/pair evidence heavily, but unlimited exports
+# must not retain an unbounded cross-row dictionary. The scoped wrappers below
+# keep core's scoring formulas authoritative while bounding only the memoized
+# evidence. Eviction can therefore cause recomputation, never ranking drift.
+_PREPARE_PAIR_CACHE_LIMIT = 65_536
+_PREPARE_WORD_CACHE_LIMIT = 8_192
+_PrepareCacheState = tuple[
+    dict[tuple[int, str, str], float],
+    dict[tuple[int, str], str],
+]
+_PREPARE_CACHE_STATE: ContextVar[_PrepareCacheState | None] = ContextVar(
+    "anagram_prepare_cache_state",
+    default=None,
+)
+_PREPARE_CACHE_LOCK = threading.RLock()
+_PREPARE_CACHE_DEPTH = 0
+_PREPARE_CACHE_RESTORE: tuple[
+    Callable[[str, str, core.WordNetLexicon], float],
+    Callable[[str, core.WordNetLexicon], str],
+] | None = None
+
+
+def _prepare_cached_pair_grammar(
+    left: str,
+    right: str,
+    lex: core.WordNetLexicon,
+) -> float:
+    restore = _PREPARE_CACHE_RESTORE
+    delegate = restore[0] if restore is not None else _CORE_PAIR_GRAMMAR
+    state = _PREPARE_CACHE_STATE.get()
+    if state is None or _PREPARE_PAIR_CACHE_LIMIT <= 0:
+        return delegate(left, right, lex)
+
+    cache = state[0]
+    key = (id(lex), left, right)
+    if key in cache:
+        return cache[key]
+
+    score = delegate(left, right, lex)
+    if len(cache) >= _PREPARE_PAIR_CACHE_LIMIT:
+        cache.pop(next(iter(cache)))
+    cache[key] = score
+    return score
+
+
+def _prepare_cached_morphology_family_word(
+    word: str,
+    lex: core.WordNetLexicon,
+) -> str:
+    restore = _PREPARE_CACHE_RESTORE
+    delegate = restore[1] if restore is not None else _CORE_MORPHOLOGY_FAMILY_WORD
+    state = _PREPARE_CACHE_STATE.get()
+    if state is None or _PREPARE_WORD_CACHE_LIMIT <= 0:
+        return delegate(word, lex)
+
+    cache = state[1]
+    key = (id(lex), word)
+    if key in cache:
+        return cache[key]
+
+    family = delegate(word, lex)
+    if len(cache) >= _PREPARE_WORD_CACHE_LIMIT:
+        cache.pop(next(iter(cache)))
+    cache[key] = family
+    return family
+
+
+@contextmanager
+def _prepare_feature_cache() -> Iterator[_PrepareCacheState]:
+    """Install bounded context-local memoization beneath stable core preparation."""
+    global _PREPARE_CACHE_DEPTH, _PREPARE_CACHE_RESTORE
+
+    state: _PrepareCacheState = ({}, {})
+    token = _PREPARE_CACHE_STATE.set(state)
+    try:
+        with _PREPARE_CACHE_LOCK:
+            if _PREPARE_CACHE_DEPTH == 0:
+                _PREPARE_CACHE_RESTORE = (
+                    core.pair_grammar,
+                    core.morphology_family_word,
+                )
+                core.pair_grammar = _prepare_cached_pair_grammar
+                core.morphology_family_word = _prepare_cached_morphology_family_word
+            _PREPARE_CACHE_DEPTH += 1
+
+        try:
+            yield state
+        finally:
+            with _PREPARE_CACHE_LOCK:
+                _PREPARE_CACHE_DEPTH -= 1
+                if _PREPARE_CACHE_DEPTH == 0:
+                    restore = _PREPARE_CACHE_RESTORE
+                    if restore is None:
+                        raise RuntimeError("prepare cache restore state was lost")
+                    core.pair_grammar, core.morphology_family_word = restore
+                    _PREPARE_CACHE_RESTORE = None
+    finally:
+        _PREPARE_CACHE_STATE.reset(token)
 
 
 def phrase_structure(
@@ -338,62 +441,13 @@ def save_prepared_cache(cache_path: Path, rows: list[Row]) -> None:
     tmp.replace(cache_path)
 
 
-def _cached_grammar_potential(
-    words: Sequence[str],
-    lex: WordNetLexicon,
-    pair_scores: dict[tuple[str, str], float],
-) -> float:
-    """Match core.grammar_potential while memoizing directed word-pair evidence."""
-    n = len(words)
-    if n <= 1:
-        return 0.0
-
-    positives: list[float] = []
-    for i, left in enumerate(words):
-        for j, right in enumerate(words):
-            if i == j:
-                continue
-            key = (left, right)
-            if key not in pair_scores:
-                pair_scores[key] = core.pair_grammar(left, right, lex)
-            score = pair_scores[key]
-            if score > 0:
-                positives.append(score)
-    positives.sort(reverse=True)
-    raw = sum(positives[: n - 1]) / (n - 1)
-    return core.sigmoid((raw - 1.5) * 1.35)
-
-
 def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
-    """Prepare rows with per-pass word and directed-pair memoization."""
+    """Canonicalize bags and let stable core prepare them with bounded memoization."""
     for row in rows:
         row.words = tuple(sorted(row.words))
     rows.sort(key=lambda row: (row.word_count, row.words))
-
-    recognized: dict[str, bool] = {}
-    family_words: dict[str, str] = {}
-    pair_scores: dict[tuple[str, str], float] = {}
-
-    with performance_hooks():
-        for idx, row in enumerate(rows, 1):
-            for word in row.words:
-                if word not in recognized:
-                    recognized[word] = lex.features(word).recognized
-                if word not in family_words:
-                    family_words[word] = core.morphology_family_word(word, lex)
-
-            row.wn_coverage = (
-                sum(1.0 for word in row.words if recognized[word]) / len(row.words)
-                if row.words
-                else 0.0
-            )
-            row.grammar_potential_norm = _cached_grammar_potential(
-                row.words, lex, pair_scores
-            )
-            row.family_key = tuple(sorted(family_words[word] for word in row.words))
-            row.pre_score = core.score_pre(row)
-            if idx % 25000 == 0:
-                print(f"  prepared {idx:,} / {len(rows):,}")
+    with performance_hooks(), _prepare_feature_cache():
+        _CORE_PREPARE_ROWS(rows, lex)
 
 
 def rank_orders(
