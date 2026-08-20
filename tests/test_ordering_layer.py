@@ -223,16 +223,27 @@ class OrderingLayerTests(unittest.TestCase):
                 item[field] = value
                 self.assertIsNone(rerank._row_from_cache_dict(item))
 
-    def test_prepare_rows_uses_captured_core_delegate(self) -> None:
+    def test_prepare_rows_is_safe_under_runtime_core_rebinding(self) -> None:
         rows = [self._row(("c", "a", "b")), self._row(("f", "d", "e"))]
-        lex = object()
-        with patch.object(rerank, "_CORE_PREPARE_ROWS") as delegate:
-            # Reproduce main()'s runtime rebinding. A dynamic core.prepare_rows
-            # lookup here would recurse back into rerank.prepare_rows.
+        lex = rerank.WordNetLexicon(
+            nouns=set(),
+            verbs=set(),
+            adjs=set(),
+            advs=set(),
+            noun_exc={},
+            verb_exc={},
+            verb_frames={},
+        )
+        with patch.object(
+            rerank,
+            "_CORE_PREPARE_ROWS",
+            side_effect=AssertionError("optimized preparation must not delegate"),
+        ):
+            # Reproduce main()'s runtime rebinding. The optimized path must not
+            # look up core.prepare_rows dynamically and recurse through itself.
             with patch.object(core, "prepare_rows", rerank.prepare_rows):
                 rerank.prepare_rows(rows, lex)
 
-        delegate.assert_called_once_with(rows, lex)
         self.assertEqual(rows[0].words, ("a", "b", "c"))
         self.assertEqual(rows[1].words, ("d", "e", "f"))
 

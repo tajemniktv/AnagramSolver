@@ -36,8 +36,9 @@ PhraseIndex = FastPhraseIndex
 ensure_wordnet = core.ensure_wordnet
 DEFAULT_WORDNET_DIR = core.DEFAULT_WORDNET_DIR
 
-# Capture the stable core functions that facade wrappers delegate to. These must
-# not be looked up dynamically after main() installs the facade overrides.
+# Capture the stable core function that facade preparation delegates to only for
+# formula ownership tests/reference; normal optimized preparation below calls the
+# same public core scoring helpers directly so their formulas stay authoritative.
 _CORE_PREPARE_ROWS = core.prepare_rows
 
 # The top-K implementation predates this facade and historically patched core at
@@ -89,6 +90,7 @@ _BASE_DEEP_ANALYZE = impl.deep_analyze
 
 ENGINE_LAYER = "diverse-top-k-order-reranking"
 PREPARED_CACHE_SCHEMA = "topk-prepared-json-gzip-2"
+PREPARED_CACHE_COMPRESSLEVEL = 1
 DEFAULT_ORDER_CANDIDATES = 56
 # Direct facade callers should see the facade default too; ``main`` may still
 # override this for an explicit --order-candidates value and restores it after.
@@ -99,6 +101,14 @@ setattr(impl, "_ORDER_CANDIDATE_COUNT", DEFAULT_ORDER_CANDIDATES)  # noqa: B010
 # facade calls makes that compatibility bridge safe for accidental same-process
 # concurrent callers until the legacy layer can accept the width explicitly.
 _DEEP_ANALYZE_LOCK = threading.RLock()
+
+# Preparation cache limits are deliberately finite. The hard 100k-bag smoke has
+# only 743 surface words (at most ~551k directed pairs), so a 512k pair window
+# preserves almost all useful reuse while preventing unlimited exports from
+# retaining millions of tuple keys. Eviction only causes recomputation.
+_PREPARE_PAIR_CACHE_LIMIT = 524_288
+_PREPARE_WORD_CACHE_LIMIT = 8_192
+_PREPARE_LOCK = threading.RLock()
 
 
 def phrase_structure(
@@ -321,7 +331,9 @@ def load_prepared_cache(cache_path: Path) -> list[Row] | None:
 def save_prepared_cache(cache_path: Path, rows: list[Row]) -> None:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     tmp = cache_path.with_suffix(cache_path.suffix + ".tmp")
-    with gzip.open(tmp, "wt", encoding="utf-8", compresslevel=6) as handle:
+    with gzip.open(
+        tmp, "wt", encoding="utf-8", compresslevel=PREPARED_CACHE_COMPRESSLEVEL
+    ) as handle:
         json.dump(
             {
                 "schema": PREPARED_CACHE_SCHEMA,
@@ -336,12 +348,78 @@ def save_prepared_cache(cache_path: Path, rows: list[Row]) -> None:
 
 
 def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:
-    """Canonicalize unordered bags, then delegate to the captured core function."""
+    """Prepare rows with bounded memoization and core-owned scoring formulas."""
     for row in rows:
         row.words = tuple(sorted(row.words))
     rows.sort(key=lambda row: (row.word_count, row.words))
-    with performance_hooks():
-        _CORE_PREPARE_ROWS(rows, lex)
+
+    recognized: dict[str, bool] = {}
+    family_words: dict[str, str] = {}
+    pair_scores: dict[tuple[str, str], float] = {}
+
+    with _PREPARE_LOCK, performance_hooks():
+        original_pair_grammar = core.pair_grammar
+        owner_thread = threading.get_ident()
+
+        def cached_pair_grammar(
+            left: str,
+            right: str,
+            call_lex: core.WordNetLexicon,
+        ) -> float:
+            # The monkeypatch is process-global, so unrelated callers must retain
+            # exact core behavior. Only this serialized preparation call gets the
+            # local cache; everyone else delegates immediately.
+            if threading.get_ident() != owner_thread or call_lex is not lex:
+                return original_pair_grammar(left, right, call_lex)
+
+            key = (left, right)
+            cached = pair_scores.get(key)
+            if cached is not None:
+                return cached
+            score = original_pair_grammar(left, right, call_lex)
+            if _PREPARE_PAIR_CACHE_LIMIT > 0:
+                if len(pair_scores) >= _PREPARE_PAIR_CACHE_LIMIT:
+                    pair_scores.pop(next(iter(pair_scores)))
+                pair_scores[key] = score
+            return score
+
+        core.pair_grammar = cached_pair_grammar
+        try:
+            for idx, row in enumerate(rows, 1):
+                recognized_count = 0
+                family: list[str] = []
+                for word in row.words:
+                    known = recognized.get(word)
+                    if known is None:
+                        known = lex.features(word).recognized
+                        if _PREPARE_WORD_CACHE_LIMIT > 0:
+                            if len(recognized) >= _PREPARE_WORD_CACHE_LIMIT:
+                                recognized.pop(next(iter(recognized)))
+                            recognized[word] = known
+                    if known:
+                        recognized_count += 1
+
+                    family_word = family_words.get(word)
+                    if family_word is None:
+                        family_word = core.morphology_family_word(word, lex)
+                        if _PREPARE_WORD_CACHE_LIMIT > 0:
+                            if len(family_words) >= _PREPARE_WORD_CACHE_LIMIT:
+                                family_words.pop(next(iter(family_words)))
+                            family_words[word] = family_word
+                    family.append(family_word)
+
+                row.wn_coverage = (
+                    recognized_count / len(row.words) if row.words else 0.0
+                )
+                # Core remains the single source of truth for the tunable grammar
+                # aggregation; only pair_grammar underneath it is memoized.
+                row.grammar_potential_norm = core.grammar_potential(row.words, lex)
+                row.family_key = tuple(sorted(family))
+                row.pre_score = core.score_pre(row)
+                if idx % 25000 == 0:
+                    print(f"  prepared {idx:,} / {len(rows):,}")
+        finally:
+            core.pair_grammar = original_pair_grammar
 
 
 def rank_orders(
