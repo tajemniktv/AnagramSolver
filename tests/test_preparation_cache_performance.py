@@ -96,6 +96,34 @@ class PreparationMemoizationTests(unittest.TestCase):
         self.assertEqual(pair_calls, 6)
         self.assertEqual(family_calls, 3)
 
+    def test_prepare_feature_caches_are_bounded(self) -> None:
+        lex = _lexicon()
+        with (
+            patch.object(rerank, "_PREPARE_PAIR_CACHE_LIMIT", 2),
+            patch.object(rerank, "_PREPARE_WORD_CACHE_LIMIT", 2),
+            rerank._prepare_feature_cache() as state,
+        ):
+            for left, right in (
+                ("dogs", "chase"),
+                ("chase", "balls"),
+                ("balls", "dogs"),
+            ):
+                core.pair_grammar(left, right, lex)
+            for word in ("dogs", "chase", "balls"):
+                core.morphology_family_word(word, lex)
+
+            pair_cache, word_cache = state
+            self.assertLessEqual(len(pair_cache), 2)
+            self.assertLessEqual(len(word_cache), 2)
+
+    def test_prepare_uses_core_grammar_potential_formula(self) -> None:
+        rows = [_row(("dogs", "chase", "balls"), 1)]
+        with patch.object(core, "grammar_potential", return_value=0.321) as grammar:
+            rerank.prepare_rows(rows, _lexicon())
+
+        grammar.assert_called_once()
+        self.assertEqual(rows[0].grammar_potential_norm, 0.321)
+
 
 class PreparedCacheCompressionTests(unittest.TestCase):
     def test_writer_uses_fast_gzip_and_round_trips(self) -> None:
