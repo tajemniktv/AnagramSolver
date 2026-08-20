@@ -141,7 +141,7 @@ def main() -> int:
     )
     try:
         groups, skipped = build_groups(
-            load_cases(args.cases),
+            load_cases(args.cases, require_ids=False),
             lex=lex,
             phrase_index=phrase_index,
             order_candidates=args.order_candidates,
