@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -113,6 +114,15 @@ def _positive_int(value: object, name: str) -> int:
 
 def _letters(text: str) -> tuple[str, ...]:
     return tuple(sorted(ch.lower() for ch in text if ch.isalpha()))
+
+
+def _has_benchmark_token(text: str) -> bool:
+    normalized = (
+        unicodedata.normalize("NFKD", text)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    return any("a" <= ch.lower() <= "z" for ch in normalized)
 
 
 def _expand_suites(value: object, name: str) -> frozenset[str]:
@@ -507,14 +517,35 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
         for suite in suites & _ANSWER_REQUIRED_SUITES:
             if not isinstance(answer, str) or not answer.strip():
                 errors.append(f"case {case_id} requires an answer for suite {suite}")
+        if (
+            enabled
+            and "performance" in suites
+            and isinstance(answer, str)
+            and answer.strip()
+            and not _has_benchmark_token(answer)
+        ):
+            errors.append(f"case {case_id} performance answer has no benchmark tokens")
 
         explicit_target = case.get("target")
+        has_explicit_target = isinstance(explicit_target, str) and bool(
+            explicit_target.strip()
+        )
         if (
-            isinstance(explicit_target, str)
+            has_explicit_target
             and isinstance(answer, str)
             and _letters(explicit_target) != _letters(answer)
         ):
             errors.append(f"case {case_id} target is not an anagram of answer")
+
+        source = case.get("source")
+        if (
+            not has_explicit_target
+            and isinstance(source, str)
+            and source.strip()
+            and isinstance(answer, str)
+            and _letters(source) != _letters(answer)
+        ):
+            errors.append(f"case {case_id} source is not an anagram of answer")
 
         if "normal_user_cli" in suites:
             try:
@@ -543,14 +574,15 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
                 errors.append(
                     f"case {case_id} ordering.cross_bag_reference must be boolean"
                 )
-            elif cross_ref:
+            elif cross_ref and enabled:
                 if "ordering" not in suites:
                     errors.append(f"case {case_id} cross-bag reference must run ordering")
-                cross_bag_references.append(case_id)
+                else:
+                    cross_bag_references.append(case_id)
 
     if len(cross_bag_references) != 1:
         errors.append(
-            "ordering gate requires exactly one cross_bag_reference case; got "
+            "ordering gate requires exactly one enabled cross_bag_reference case; got "
             + repr(cross_bag_references)
         )
 
