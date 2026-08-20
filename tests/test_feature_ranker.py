@@ -16,6 +16,8 @@ from anagram_feature_ranker import (
     fold_for_group,
     train_pairwise_ranker,
 )
+from anagram_suite import REGISTRY_SCHEMA
+from train_feature_ranker import _load_ranker_cases
 
 
 def _features(signal: float, *, phrase: float = 0.0) -> tuple[float, ...]:
@@ -146,6 +148,51 @@ class ExplicitFeatureRankerTests(unittest.TestCase):
     def test_cross_validation_rejects_invalid_fold_count(self) -> None:
         with self.assertRaisesRegex(ValueError, "folds must be >= 2"):
             cross_validate_pairwise_ranker(_synthetic_groups(4), folds=1)
+
+    def test_custom_schema_registry_uses_feature_ranker_membership(self) -> None:
+        payload = {
+            "schema": REGISTRY_SCHEMA,
+            "defaults": {
+                "suites": ["all"],
+                "normal_user_cli": {
+                    "timeout_seconds": 30,
+                    "verbose": False,
+                    "expect_answer": True,
+                },
+            },
+            "cases": [
+                {
+                    "id": "kept",
+                    "answer": "knowledge is power",
+                    "suites": ["feature_ranker"],
+                },
+                {
+                    "id": "disabled",
+                    "answer": "practice makes perfect",
+                    "suites": ["feature_ranker"],
+                    "enabled": False,
+                },
+                {
+                    "id": "cli_only",
+                    "target": "ABC",
+                    "suites": ["normal_user_cli"],
+                    "normal_user_cli": {"expect_answer": False},
+                },
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "registry.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            cases = _load_ranker_cases(path)
+        self.assertEqual([case["id"] for case in cases], ["kept"])
+
+    def test_legacy_answer_only_ranker_file_remains_supported(self) -> None:
+        payload = {"cases": [{"answer": "knowledge is power"}]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "legacy.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            cases = _load_ranker_cases(path)
+        self.assertEqual(cases, [{"answer": "knowledge is power"}])
 
 
 if __name__ == "__main__":
