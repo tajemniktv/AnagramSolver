@@ -549,7 +549,8 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
             explicit_target.strip()
         )
         if (
-            has_explicit_target
+            isinstance(explicit_target, str)
+            and explicit_target.strip()
             and isinstance(answer, str)
             and _letters(explicit_target) != _letters(answer)
         ):
