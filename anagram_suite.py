@@ -8,6 +8,7 @@ that subsystem's unit tests.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -71,24 +72,23 @@ def _number(mapping: dict[str, object], key: str, name: str) -> float:
     value = mapping.get(key)
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise TypeError(f"{name}.{key} must be numeric")
-    return float(value)
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError(f"{name}.{key} must be finite")
+    return number
 
 
 def _letters(text: str) -> tuple[str, ...]:
     return tuple(sorted(ch.lower() for ch in text if ch.isalpha()))
 
 
-def _load_profiles() -> tuple[
+def _parse_profiles(
+    document: dict[str, object],
+) -> tuple[
     tuple[SmokeCase, ...],
     OrderingGateConfig,
     PerformanceProbeConfig,
 ]:
-    document = _load_document(DEFAULT_CASES)
-    if document.get("schema") != REGISTRY_SCHEMA:
-        raise ValueError(
-            f"scenario catalog schema must be {REGISTRY_SCHEMA}, "
-            f"got {document.get('schema')!r}"
-        )
     profiles = _mapping(document.get("profiles"), "profiles")
 
     raw_smoke = profiles.get("normal_user_cli")
@@ -159,37 +159,66 @@ def _load_profiles() -> tuple[
     return tuple(smoke_cases), ordering, performance
 
 
+def _load_profiles(
+    path: Path = DEFAULT_CASES,
+) -> tuple[
+    tuple[SmokeCase, ...],
+    OrderingGateConfig,
+    PerformanceProbeConfig,
+]:
+    document = _load_document(path)
+    if document.get("schema") != REGISTRY_SCHEMA:
+        raise ValueError(
+            f"scenario catalog schema must be {REGISTRY_SCHEMA}, "
+            f"got {document.get('schema')!r}"
+        )
+    return _parse_profiles(document)
+
+
 SMOKE_CASES, ORDERING_GATE, PERFORMANCE_PROBE = _load_profiles()
 
 
 def load_cases(
     path: Path = DEFAULT_CASES,
     selected_ids: set[str] | None = None,
+    *,
+    require_ids: bool = True,
 ) -> list[dict[str, object]]:
-    """Load and minimally validate benchmark cases from a scenario document."""
+    """Load benchmark cases, optionally permitting answer-only custom training data.
+
+    Canonical and ID-addressable consumers keep ``require_ids=True``. The feature
+    ranker's historical ``--cases`` contract accepts answer-only objects and uses
+    ``require_ids=False``; it never performs stable-ID selection on those files.
+    """
     payload: object = json.loads(path.read_text(encoding="utf-8"))
     raw_cases: object = payload.get("cases") if isinstance(payload, dict) else payload
     if not isinstance(raw_cases, list):
         raise TypeError("benchmark case file must contain a cases list")
+
+    selected = selected_ids or set()
+    if selected and not require_ids:
+        raise ValueError("selected_ids requires stable case IDs")
 
     cases: list[dict[str, object]] = []
     seen: set[str] = set()
     for raw in raw_cases:
         if not isinstance(raw, dict) or not all(isinstance(key, str) for key in raw):
             raise TypeError("benchmark cases must be JSON objects with string keys")
-        if "id" not in raw or "answer" not in raw:
-            raise ValueError("benchmark cases require id and answer")
-        case_id = str(raw["id"])
-        if not case_id:
-            raise ValueError("benchmark case id must not be empty")
-        if case_id in seen:
-            raise ValueError(f"duplicate benchmark case id: {case_id}")
-        seen.add(case_id)
+        if "answer" not in raw:
+            raise ValueError("benchmark cases require answer")
+
+        raw_id = raw.get("id")
+        if require_ids:
+            if not isinstance(raw_id, str) or not raw_id:
+                raise ValueError("benchmark case id must be a non-empty string")
+            if raw_id in seen:
+                raise ValueError(f"duplicate benchmark case id: {raw_id}")
+            seen.add(raw_id)
+
         cases.append(
             {key: value for key, value in raw.items() if isinstance(key, str)}
         )
 
-    selected = selected_ids or set()
     if selected:
         by_id = {str(case["id"]): case for case in cases}
         missing = selected - set(by_id)
@@ -212,22 +241,23 @@ def case_by_id(
 
 
 def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
-    """Return cross-profile integrity errors for tests/CI to enforce."""
+    """Return cross-profile integrity errors for a complete scenario catalog."""
     errors: list[str] = []
     document = _load_document(path)
-    if path == DEFAULT_CASES and document.get("schema") != REGISTRY_SCHEMA:
-        errors.append(
+    if document.get("schema") != REGISTRY_SCHEMA:
+        return (
             f"scenario catalog schema must be {REGISTRY_SCHEMA}, "
-            f"got {document.get('schema')!r}"
+            f"got {document.get('schema')!r}",
         )
 
+    smoke_cases, ordering_gate, performance_probe = _parse_profiles(document)
     cases = load_cases(path)
     cases_by_id = {str(case["id"]): case for case in cases}
     case_ids = set(cases_by_id)
 
     smoke_ids: set[str] = set()
     smoke_targets: set[str] = set()
-    for smoke in SMOKE_CASES:
+    for smoke in smoke_cases:
         if smoke.id in smoke_ids:
             errors.append(f"duplicate smoke id: {smoke.id}")
         smoke_ids.add(smoke.id)
@@ -247,23 +277,29 @@ def validate_registry(path: Path = DEFAULT_CASES) -> tuple[str, ...]:
                     f"smoke target disagrees with linked benchmark case: {smoke.id}"
                 )
 
-    shared_ids = {ORDERING_GATE.cross_bag_case_id}
-    shared_ids.update(case_id for case_id, _ in ORDERING_GATE.target_max_ranks)
+    shared_ids = {ordering_gate.cross_bag_case_id}
+    shared_ids.update(case_id for case_id, _ in ordering_gate.target_max_ranks)
     missing_shared = shared_ids - case_ids
     for case_id in sorted(missing_shared):
         errors.append(f"CI profile references unknown benchmark case: {case_id}")
 
-    if ORDERING_GATE.min_cross_bag_margin < 0:
+    if ordering_gate.min_cross_bag_margin < 0:
         errors.append("cross-bag margin must be non-negative")
     for name, value in (
-        ("recall1", ORDERING_GATE.min_recall_1),
-        ("recall10", ORDERING_GATE.min_recall_10),
-        ("recall50", ORDERING_GATE.min_recall_50),
-        ("mrr", ORDERING_GATE.min_mrr),
+        ("recall1", ordering_gate.min_recall_1),
+        ("recall10", ordering_gate.min_recall_10),
+        ("recall50", ordering_gate.min_recall_50),
+        ("mrr", ordering_gate.min_mrr),
     ):
         if not 0.0 <= value <= 1.0:
             errors.append(f"ordering threshold {name} must be in [0, 1]")
 
-    if not PERFORMANCE_PROBE.order_bags:
-        errors.append("performance probe must define at least one ordering bag")
+    if (
+        not performance_probe.frame_words
+        or not performance_probe.function_words
+        or not performance_probe.order_bags
+    ):
+        errors.append("performance probe workloads must be non-empty")
+    elif any(not bag for bag in performance_probe.order_bags):
+        errors.append("performance probe ordering bags must be non-empty")
     return tuple(errors)
