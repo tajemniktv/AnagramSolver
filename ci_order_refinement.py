@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Informational forced-beam A/B for bounded complete-order refinement."""
+"""Informational forced-beam A/B for registry-selected order-refinement cases."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import anagram_benchmark as benchmark
 import anagram_rerank as reranker
 import anagram_rerank_core as core
 from anagram_order_refinement import augment_seed_pool
-from anagram_suite import load_cases
+from anagram_suite import cases_for
 
 
 def _objective(order: tuple[str, ...], lex: reranker.WordNetLexicon) -> float:
@@ -123,9 +123,10 @@ def _run_configuration(
 def main() -> int:
     wordnet_dir = reranker.ensure_wordnet(reranker.DEFAULT_WORDNET_DIR)
     lex = reranker.WordNetLexicon.load(wordnet_dir)
-    cases = load_cases()
+    cases = cases_for("refinement")
 
     print("=== FORCED-BEAM K-OPT AUGMENTATION BUDGET A/B ===")
+    print(f"registry cases: {len(cases)}")
     configurations = (
         (1, 5, 2, 384),
         (2, 5, 2, 384),
