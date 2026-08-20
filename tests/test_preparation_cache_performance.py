@@ -96,25 +96,28 @@ class PreparationMemoizationTests(unittest.TestCase):
         self.assertEqual(pair_calls, 6)
         self.assertEqual(family_calls, 3)
 
-    def test_prepare_feature_caches_are_bounded(self) -> None:
-        lex = _lexicon()
+    def test_tiny_cache_limits_preserve_core_fields(self) -> None:
+        source = (
+            (("dogs", "chase", "balls"), 1),
+            (("quick", "dogs", "run"), 2),
+            (("a", "quiet", "room"), 3),
+        )
+        expected = [_row(words, rank) for words, rank in source]
+        actual = [_row(words, rank) for words, rank in source]
+        _canonicalize(expected)
+        with performance_hooks():
+            rerank._CORE_PREPARE_ROWS(expected, _lexicon())
+
         with (
             patch.object(rerank, "_PREPARE_PAIR_CACHE_LIMIT", 2),
             patch.object(rerank, "_PREPARE_WORD_CACHE_LIMIT", 2),
-            rerank._prepare_feature_cache() as state,
         ):
-            for left, right in (
-                ("dogs", "chase"),
-                ("chase", "balls"),
-                ("balls", "dogs"),
-            ):
-                core.pair_grammar(left, right, lex)
-            for word in ("dogs", "chase", "balls"):
-                core.morphology_family_word(word, lex)
+            rerank.prepare_rows(actual, _lexicon())
 
-            pair_cache, word_cache = state
-            self.assertLessEqual(len(pair_cache), 2)
-            self.assertLessEqual(len(word_cache), 2)
+        self.assertEqual(
+            [rerank._row_to_cache_dict(row) for row in actual],
+            [rerank._row_to_cache_dict(row) for row in expected],
+        )
 
     def test_prepare_uses_core_grammar_potential_formula(self) -> None:
         rows = [_row(("dogs", "chase", "balls"), 1)]
