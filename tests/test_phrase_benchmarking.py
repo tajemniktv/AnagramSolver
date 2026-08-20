@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import anagram_benchmark as benchmark
-from anagram_suite import case_by_id
+from anagram_suite import case_by_id, case_options, cases_for
 
 
 class _FakeReranker:
@@ -204,15 +204,19 @@ class PhraseBenchmarkTests(unittest.TestCase):
         self.assertEqual(pre.groups(), ("29", "5,696"))
         self.assertEqual(final.groups(), ("3", "5,696"))
 
-    def test_voldemort_benchmark_source_is_exact_anagram(self):
+    def test_voldemort_registry_source_is_exact_anagram_and_full_config_kept(self):
         case = case_by_id("voldemort_reveal")
+        options = case_options(case, "full")
 
         source_letters = sorted("".join(benchmark.tokens(str(case["source"]))))
         answer_letters = sorted("".join(benchmark.tokens(str(case["answer"]))))
         self.assertEqual(source_letters, answer_letters)
         self.assertEqual(case["answer"], "i am lord voldemort")
-        self.assertIn("voldemort", case["hints"])
-        self.assertTrue(case["full"])
+        self.assertIn("voldemort", options["hints"])
+        self.assertIn(
+            "voldemort_reveal",
+            {str(item["id"]) for item in cases_for("full")},
+        )
 
 
 if __name__ == "__main__":
