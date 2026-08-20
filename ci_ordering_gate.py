@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail CI when the fast ordering benchmark materially regresses."""
+"""Fail CI when registry-selected ordering cases materially regress."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import anagram_benchmark as benchmark
 import anagram_clause_validity as validity
 import anagram_rerank as rerank
 import anagram_rerank_core as core
-from anagram_suite import ORDERING_GATE, case_by_id, load_cases
+from anagram_suite import ORDERING_GATE, case_options, cases_for
 
 _GrammarFn = Callable[[Sequence[str], core.WordNetLexicon], float]
 _StructureFn = Callable[
@@ -20,14 +20,13 @@ _StructureFn = Callable[
 
 
 def main() -> int:
-    cases = load_cases()
+    cases = cases_for("ordering")
     wn_dir = rerank.ensure_wordnet(rerank.DEFAULT_WORDNET_DIR)
     print(f"Loading WordNet from {wn_dir} ...")
     lex = rerank.WordNetLexicon.load(wn_dir)
 
     # The facade annotations expose the optimized subclass, but both callbacks
     # implement the base WordNetLexicon protocol used by the shared objective.
-    # Widen only the static callable view here; no runtime conversion occurs.
     local_grammar_raw = cast(_GrammarFn, rerank.local_grammar_raw)
     phrase_structure = cast(_StructureFn, rerank.phrase_structure)
 
@@ -50,7 +49,16 @@ def main() -> int:
         if observed[name] + 1e-12 < minimum
     ]
 
-    intended_case = case_by_id(ORDERING_GATE.cross_bag_case_id)
+    reference_cases = [
+        case
+        for case in cases
+        if case_options(case, "ordering").get("cross_bag_reference") is True
+    ]
+    if len(reference_cases) != 1:
+        raise RuntimeError(
+            "Ordering registry must select exactly one cross-bag reference case"
+        )
+    intended_case = reference_cases[0]
     intended_words = benchmark.tokens(str(intended_case["answer"]))
     intended_objective = validity.grammar_structure_objective(
         intended_words,
@@ -80,8 +88,14 @@ def main() -> int:
         )
 
     result_by_id = {result.case_id: result for result in results}
+    rank_limits: list[tuple[str, int]] = []
+    for case in cases:
+        maximum = case_options(case, "ordering").get("max_rank")
+        if isinstance(maximum, int) and not isinstance(maximum, bool):
+            rank_limits.append((str(case["id"]), maximum))
+
     target_ranks: dict[str, int | None] = {}
-    for case_id, maximum in ORDERING_GATE.target_max_ranks:
+    for case_id, maximum in rank_limits:
         result = result_by_id.get(case_id)
         rank = None if result is None else result.exact_rank
         target_ranks[case_id] = rank
@@ -96,8 +110,9 @@ def main() -> int:
         f"{cross_bag_margin:.3f}  minimum margin "
         f"{ORDERING_GATE.min_cross_bag_margin:.3f}"
     )
-    for case_id, maximum in ORDERING_GATE.target_max_ranks:
-        print(f"  {case_id:<13} rank={target_ranks[case_id]!r}  maximum {maximum}")
+    for case_id, maximum in rank_limits:
+        print(f"  {case_id:<24} rank={target_ranks[case_id]!r}  maximum {maximum}")
+    print(f"  registry cases {len(cases)}")
     print(f"  wall time {time.perf_counter() - t0:.2f}s")
 
     if failures:
