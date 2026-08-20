@@ -124,15 +124,32 @@ def _deep_work(
     return elapsed, canonical
 
 
-def main() -> int:
-    wn_dir = core.ensure_wordnet(core.DEFAULT_WORDNET_DIR)
-    lex = rerank.WordNetLexicon.load(wn_dir)
-    performance_cases = cases_for("performance")
+def _registry_order_bags(
+    performance_cases: list[dict[str, object]],
+) -> tuple[tuple[str, ...], ...]:
     order_bags = tuple(
         benchmark.tokens(str(case["answer"])) for case in performance_cases
     )
     if not order_bags:
         raise RuntimeError("Performance registry selected no ordering bags")
+    empty_case_ids = [
+        str(case["id"])
+        for case, bag in zip(performance_cases, order_bags, strict=True)
+        if not bag
+    ]
+    if empty_case_ids:
+        raise RuntimeError(
+            "Performance registry case(s) produced empty ordering bags: "
+            + ", ".join(empty_case_ids)
+        )
+    return order_bags
+
+
+def main() -> int:
+    wn_dir = core.ensure_wordnet(core.DEFAULT_WORDNET_DIR)
+    lex = rerank.WordNetLexicon.load(wn_dir)
+    performance_cases = cases_for("performance")
+    order_bags = _registry_order_bags(performance_cases)
     print(
         "PERF registry cases   "
         + ", ".join(str(case["id"]) for case in performance_cases)
