@@ -1204,8 +1204,8 @@ def main() -> int:
         raise SystemExit("--deep-per-group must be >= 1")
     if args.top_per_group < 1:
         raise SystemExit("--top-per-group must be >= 1")
-    if args.min_zipf < 0:
-        raise SystemExit("--min-zipf must be >= 0")
+    if not math.isfinite(args.min_zipf) or args.min_zipf < 0:
+        raise SystemExit("--min-zipf must be finite and >= 0")
 
     target = counts(args.text)
     if sum(target) == 0:
@@ -1249,11 +1249,21 @@ def main() -> int:
 
     forbid_chars = set(normalize_letters(args.forbid_chars))
 
+    conflicting_required = sorted({
+        word for word in required_words
+        if word in excluded_words
+        or any(rx.search(word) for rx in exclude_regexes)
+        or forbid_chars.intersection(word)
+    })
+    if conflicting_required:
+        raise SystemExit("Required words conflict with exclusions: " + ", ".join(conflicting_required))
+
     contains_any = {
         normalize_token(x)
         for x in split_values(args.contains_any)
         if normalize_token(x)
     }
+    requested_hints = bool(split_values(args.contains_any))
     contains_any.difference_update(excluded_words)
 
     required_word_set = set(required_words)
@@ -1268,6 +1278,9 @@ def main() -> int:
             file=sys.stderr,
         )
         contains_any.difference_update(impossible_hints)
+
+    if requested_hints and not contains_any:
+        raise SystemExit("No supplied clue word can satisfy the target and exclusions.")
 
     extra_short = {
         normalize_token(x)

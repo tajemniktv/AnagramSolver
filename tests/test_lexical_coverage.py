@@ -354,7 +354,7 @@ class LexicalCoverageTests(unittest.TestCase):
             captured[separator - 4:separator],
             [
                 "--dict",
-                "/tmp/augmented.txt",
+                str(user_lexicon.dictionary),
                 "--extra-short-words",
                 "hi,we",
             ],

@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import subprocess
 import sys
@@ -244,10 +245,10 @@ def parse_results(path: Path, top: int) -> list[Result]:
                 continue
             if current_word_count is None or line.startswith("---"):
                 continue
+            if shown_by_count.get(current_word_count, 0) >= top:
+                continue
             match = _RESULT_RE.match(line)
             if not match:
-                continue
-            if shown_by_count.get(current_word_count, 0) >= top:
                 continue
             results.append(
                 Result(
@@ -355,6 +356,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _validate_args(args: argparse.Namespace) -> None:
+    if not _normalized_target(args.text):
+        raise SystemExit("Target contains no A-Z letters.")
     if args.words is not None:
         if args.words < 1:
             raise SystemExit("--words must be >= 1")
@@ -364,8 +367,8 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("Invalid --min-words/--max-words range")
     if args.min_word_len < 1:
         raise SystemExit("--min-word-len must be >= 1")
-    if args.min_zipf < 0:
-        raise SystemExit("--min-zipf must be >= 0")
+    if not math.isfinite(args.min_zipf) or args.min_zipf < 0:
+        raise SystemExit("--min-zipf must be finite and >= 0")
     if args.top < 1:
         raise SystemExit("--top must be >= 1")
     if args.workers < 0:
@@ -466,9 +469,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if not args.json:
         print("Ranking candidate phrases ...")
-    _run(build_reranker_command(args, candidates, reranked), verbose=args.verbose)
-
-    results = parse_results(reranked, args.top)
+    # Ranking options are deliberately absent from the candidate cache key.
+    # Read our private export before publishing so simultaneous runs cannot
+    # return each other's results (or consume a partially written export).
+    temporary = reranked.with_name(f".{reranked.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        _run(build_reranker_command(args, candidates, temporary), verbose=args.verbose)
+        if not temporary.is_file():
+            raise SystemExit("Reranker completed without writing its result export.")
+        results = parse_results(temporary, args.top)
+        temporary.replace(reranked)
+    finally:
+        temporary.unlink(missing_ok=True)
     _print_results(args, results, run_dir)
     return 0
 
