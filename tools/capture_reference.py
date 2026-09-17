@@ -32,7 +32,8 @@ def verify_reference_source(reference, name):
         expected = expected.replace('DEFAULT_CASES = HERE / "anagram_benchmarks.json"',
                                     'DEFAULT_CASES = HERE.parent / "anagram_benchmarks.json"')
     path = reference_source_path(name)
-    assert path.read_text(encoding="utf-8") == expected, f"Reference source differs: {path}"
+    if path.read_text(encoding="utf-8") != expected:
+        raise RuntimeError(f"Reference source differs: {path}")
 
 
 def identity(path):

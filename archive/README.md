@@ -7,6 +7,13 @@ repository's `.anagram_data/`, not a second copy inside this directory. The shar
 case registry remains at `../anagram_benchmarks.json`. Explicit relative data paths
 in historical examples below must therefore be prefixed with `../`.
 
+The Python source is a pinned historical oracle, not a maintained fallback.
+Known historical limitations include oversized integer scores in damaged ranking
+caches raising `OverflowError`, and the shallow grammar heuristic penalizing
+some valid cleft clauses (for example, “what he was was a fool”). These are not
+claims of full English grammatical correctness. Use the native app for normal
+work; do not silently repair archived behavior and call it the same oracle.
+
 A multi-word exact anagram solver that combines exact letter matching with lexical frequency, WordNet grammar/valency, retained word-order candidates, positive bigram evidence, and optional Wikimedia phrase evidence.
 
 The normal user-facing entry point is `anagram_solver.py`. The lower-level generator, reranker, corpus builder, and benchmark scripts remain available for research and debugging.
@@ -118,7 +125,7 @@ python build_wikimedia_phrase_index.py --include-wikipedia --rebuild
 Then use it while solving:
 
 ```powershell
-python anagram_solver.py "ODITIHNSLSHEEEPT" --phrase-db .anagram_data/phrase_indexes/wikimedia_phrases.db
+python anagram_solver.py "ODITIHNSLSHEEEPT" --phrase-db ../.anagram_data/phrase_indexes/wikimedia_phrases.db
 ```
 
 The combined Wikipedia build is large and intentionally not performed automatically by the normal solver.

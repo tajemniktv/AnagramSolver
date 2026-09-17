@@ -43,7 +43,7 @@ jobs:
         with:
           path: |
             .anagram_data
-            archive/.ci_phrase_cache
+            .ci_phrase_cache
           key: phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-${{ hashFiles('phrase_index_schema.txt') }}
           restore-keys: |
             phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-
@@ -55,7 +55,7 @@ jobs:
         with:
           path: |
             ~/.multi_anagram
-            archive/.ci_phrase_cache
+            .ci_phrase_cache
           key: legacy-phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}
           restore-keys: |
             phrase-corpora-${{ runner.os }}-${{ steps.corpus-key.outputs.month }}-
@@ -77,10 +77,10 @@ jobs:
       - name: Build Wiktionary phrase index
         shell: bash
         run: |
-          mkdir -p .ci_phrase_cache
-          if [ ! -s .ci_phrase_cache/wiktionary.db ]; then
+          mkdir -p ../.ci_phrase_cache
+          if [ ! -s ../.ci_phrase_cache/wiktionary.db ]; then
             python build_wikimedia_phrase_index.py \
-              --output .ci_phrase_cache/wiktionary.db \
+              --output ../.ci_phrase_cache/wiktionary.db \
               --rebuild
           else
             echo "Using cached Wiktionary phrase index"
@@ -89,10 +89,10 @@ jobs:
       - name: Build Wiktionary + Wikipedia phrase index
         shell: bash
         run: |
-          if [ ! -s .ci_phrase_cache/wiktionary-wikipedia.db ]; then
+          if [ ! -s ../.ci_phrase_cache/wiktionary-wikipedia.db ]; then
             python build_wikimedia_phrase_index.py \
               --include-wikipedia \
-              --output .ci_phrase_cache/wiktionary-wikipedia.db \
+              --output ../.ci_phrase_cache/wiktionary-wikipedia.db \
               --rebuild
           else
             echo "Using cached Wiktionary + Wikipedia phrase index"
@@ -102,8 +102,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           python ci_phrase_matrix.py \
-            --wiktionary-db .ci_phrase_cache/wiktionary.db \
-            --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --wiktionary-db ../.ci_phrase_cache/wiktionary.db \
+            --wikipedia-db ../.ci_phrase_cache/wiktionary-wikipedia.db \
             --workers 8 \
             --order-only
 
@@ -115,7 +115,7 @@ jobs:
         continue-on-error: true
         run: |
           python train_feature_ranker.py \
-            --phrase-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --phrase-db ../.ci_phrase_cache/wiktionary-wikipedia.db \
             --order-candidates 56 \
             --folds 5
 
@@ -123,8 +123,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           python ci_phrase_matrix.py \
-            --wiktionary-db .ci_phrase_cache/wiktionary.db \
-            --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --wiktionary-db ../.ci_phrase_cache/wiktionary.db \
+            --wikipedia-db ../.ci_phrase_cache/wiktionary-wikipedia.db \
             --workers 8
 
       - name: Monthly corpus cache refresh only
@@ -142,5 +142,5 @@ jobs:
         with:
           path: |
             .anagram_data
-            archive/.ci_phrase_cache
+            .ci_phrase_cache
           key: ${{ steps.corpus-cache.outputs.cache-primary-key }}
