@@ -203,6 +203,20 @@ impl WordNet {
         (third, past, ing)
     }
 
+    pub fn morphology_family_word(&self, raw: &str) -> String {
+        let word = normalize_letters(raw);
+        if let Some(base) = self.plural_bases(&word).into_iter().next() {
+            return base;
+        }
+        let (third, past, ing) = self.verb_bases(&word);
+        third
+            .into_iter()
+            .chain(past)
+            .chain(ing)
+            .min()
+            .unwrap_or(word)
+    }
+
     pub fn verb_base_lemmas(&self, raw: &str) -> BTreeSet<String> {
         let word = normalize_letters(raw);
         let (mut out, past, ing) = self.verb_bases(&word);

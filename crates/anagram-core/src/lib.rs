@@ -5,6 +5,7 @@ use unicode_normalization::UnicodeNormalization;
 
 pub mod auxiliary;
 pub mod clause;
+pub mod cohesion;
 pub mod comparative;
 pub mod diversity;
 pub mod generation;
@@ -12,6 +13,8 @@ pub mod grammar;
 pub mod lexicon;
 pub mod ordering;
 pub mod phrase;
+pub mod phrase_evidence;
+pub mod ranking;
 pub mod refinement;
 pub mod request;
 pub mod scoring;

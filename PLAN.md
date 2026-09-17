@@ -69,8 +69,6 @@ Phases 4–6 remain future roadmap context and are not part of this active goal.
   k-opt refinement, final row scoring and corpus-based reranking remain separate
   unfinished steps; this does not complete phase 3.
 
-## Outcome
-
 Implementation update: native structural diversity passes 66 exact/beam order-pool
 comparisons, including widened 64/72-order pools. Standalone bounded k-opt refinement,
 refined endpoint pools and original-seed-preserving augmentation pass 160 differential
@@ -78,6 +76,19 @@ cases with exact order, evaluation-count and round-count checks. Strict Clippy p
 Refinement remains opt-in, matching the Python facade's current behavior; it is not
 silently enabled in default ranking. Final score assembly, optional corpus/model
 rescoring, caches and the remaining phase 0–3 gates are still incomplete.
+
+- Native prepared rows, WordNet morphology-family expansion, serial deep analysis
+  and final base-score buckets now match the active Python facade in 12 complete
+  pipeline cases (auto/exact/beam, empty/partial/all shortlists). Every row field,
+  selected index, retained alternative and final ordering is compared. The native
+  default retains 56 orders, matching the facade rather than the older layer.
+- Phrase hierarchy and non-overlapping corpus cohesion scoring pass 400 seeded
+  differential cases, including absent/negative counts, repeated/empty tokens and
+  overlapping spans. Strict Clippy passes. SQLite storage, corpus admission and
+  alternative-order rescoring are not yet connected; these component checks do
+  not prove the optional phrase path or full ranked CLI parity.
+
+## Outcome
 
 Build one behavior-tested Rust solver that powers a cross-platform local app
 and a page on tajemniktv.com. Share the solver controls and results UI, not the
