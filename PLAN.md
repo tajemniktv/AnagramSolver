@@ -29,6 +29,13 @@ requires explicit approval.
 - Next: generate schema/TypeScript contracts, complete corpus provenance/licensing
   and profile native generation before porting ranking. Neither small fixtures
   nor the eight corpus cases constitute the complete parity/performance gate.
+- Initial ranking primitives are now native: lexical penalties, bigram corpus
+  reading/edge evidence, pair potential, exact bigram order DP, morphology-family
+  inheritance, hint informativeness and per-word-count pre-score percentiles.
+  `python tests/parity/scoring.py` passes 200 seeded component/record comparisons
+  against Python with exact order/tie checks and 1e-12 numeric tolerance. Grammar,
+  retained-order/top-K and final ranking remain unported; the CLI still correctly
+  advertises generation-only output. No native speedup claim has been made.
 
 ## Outcome
 

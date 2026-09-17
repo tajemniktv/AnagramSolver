@@ -5,7 +5,7 @@ use std::io::{self, BufRead};
 
 // Python's corpus readers use UTF-8 errors="ignore". Preserve valid text while
 // dropping only malformed byte sequences, including errors inside count fields.
-fn decoded_lines(reader: impl BufRead) -> impl Iterator<Item = io::Result<String>> {
+pub(crate) fn decoded_lines(reader: impl BufRead) -> impl Iterator<Item = io::Result<String>> {
     reader.split(b'\n').map(|bytes| {
         let bytes = bytes?;
         let mut remaining = bytes.as_slice();

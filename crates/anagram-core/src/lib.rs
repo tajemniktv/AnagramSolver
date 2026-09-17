@@ -6,6 +6,7 @@ use unicode_normalization::UnicodeNormalization;
 pub mod generation;
 pub mod lexicon;
 pub mod request;
+pub mod scoring;
 
 /// Match Python's NFKD -> ASCII(ignore) -> lowercase -> [a-z] pipeline.
 /// In particular, do not transliterate letters such as ł or ß.
