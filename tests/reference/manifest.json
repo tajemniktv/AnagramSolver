@@ -1,0 +1,565 @@
+{
+  "schema_version": 1,
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "source_files": [
+    {
+      "path": "anagram_auxiliary_grammar.py",
+      "bytes": 23059,
+      "sha256": "f7cf59e5f028b9a1fa5b5869140fadea1451220b51c7ad3c8e8a2cea430eb904",
+      "git_blob": "91003213debe0e4058739673fb9186bfacc8ee82"
+    },
+    {
+      "path": "anagram_benchmark.py",
+      "bytes": 29979,
+      "sha256": "0507aff515c855fa65035db2405043c16eaddf503739dc8b7a83ce384fc64d49",
+      "git_blob": "74c56d05e672dae3a8a0835776a20a1f5edfdc28"
+    },
+    {
+      "path": "anagram_benchmarks.json",
+      "bytes": 7712,
+      "sha256": "1461670fb9921b0b4606802e9291ed603c30d61d443aa1e17c18f11c5dfefded",
+      "git_blob": "79445cfb058d03a2e84d429830188b00f0c5a2ed"
+    },
+    {
+      "path": "anagram_cache_io.py",
+      "bytes": 1431,
+      "sha256": "676d915c6a8132c4593dfe275bd587824f9d070226be3eccd7790b08c8d97e7d",
+      "git_blob": "fbd7c150fed726c72dc0fc01e165a9b8c057b554"
+    },
+    {
+      "path": "anagram_clause_validity.py",
+      "bytes": 14903,
+      "sha256": "845216993bc7b7a3ad12ec1e7966e2caf339fcc87758c749320b070ea885f14c",
+      "git_blob": "6f8b7abb49f3ef715b1372922501601460afad6b"
+    },
+    {
+      "path": "anagram_comparative_grammar.py",
+      "bytes": 6208,
+      "sha256": "e430ca070acd22d3f9ef75304806a92811e309feb52eda9acd306a17e347a5d3",
+      "git_blob": "580453ae0840145dc7278806cb837f4f2832c187"
+    },
+    {
+      "path": "anagram_corpus_cohesion.py",
+      "bytes": 6841,
+      "sha256": "95fbd84ffe2633fef5b0c4cae88e9168f93347fead89cf37b3b79c43d8c4e174",
+      "git_blob": "380dfc288afbed982602597450c1b261d8c4e33a"
+    },
+    {
+      "path": "anagram_feature_ranker.py",
+      "bytes": 12012,
+      "sha256": "d122c6edde9c93d62d49f07ae77840f46459a4ac2b27678931f90390436747a1",
+      "git_blob": "96ad7ad4ef681b3c0ac353eff0f35a7930b42581"
+    },
+    {
+      "path": "anagram_generate.py",
+      "bytes": 58036,
+      "sha256": "9327337b3cedd4d8914691aa911bde9883198bb74f5e5cc1537862e01c457e18",
+      "git_blob": "97e728c036ae10bd4afbff92804b084b7df227d8"
+    },
+    {
+      "path": "anagram_order_diversity.py",
+      "bytes": 13963,
+      "sha256": "c6219ab12971c097aa79a4d7f6631c5fc26cebcb97890600452570f889786f5b",
+      "git_blob": "00ca72ff9b3d57602c4fe331b239637b89d6d180"
+    },
+    {
+      "path": "anagram_order_refinement.py",
+      "bytes": 8650,
+      "sha256": "7186fc6ac082ec8a9c0a6b9752da23a1287a3310b7f338a5d316a681836d2465",
+      "git_blob": "17edb728222506be9b6b42d0deefc32b66e09315"
+    },
+    {
+      "path": "anagram_paths.py",
+      "bytes": 665,
+      "sha256": "3c3c2ba24d1ce7945248c78619ca09030d6ee3d3a219d85924e955299d333d94",
+      "git_blob": "6961e53db8776c0fea482485a27cd87910db6950"
+    },
+    {
+      "path": "anagram_performance.py",
+      "bytes": 9838,
+      "sha256": "c3974813fe174d89739c446251da682d38e4097c03726914d5f146838f03ae22",
+      "git_blob": "f668f95e9ff07341fcdc745a099329d7e2ea0278"
+    },
+    {
+      "path": "anagram_rerank.py",
+      "bytes": 22408,
+      "sha256": "f4e6132a8ba68d4b1f16f7ff6af4dff981b3fd45bbd94c152170f9c05d8f95e4",
+      "git_blob": "592d33aa4372d5d56f83be3ee86bc903ad04104a"
+    },
+    {
+      "path": "anagram_rerank_core.py",
+      "bytes": 101998,
+      "sha256": "30f65d5f9594f2beb5da02d37c32b71f75b25d381f2853ee2ed27895d03fbba8",
+      "git_blob": "55018cc6274f908b3eed7346b78d4551472819d8"
+    },
+    {
+      "path": "anagram_rerank_topk_impl.py",
+      "bytes": 24696,
+      "sha256": "964470622ea5ec2b489a520a2964c92f363f35b8b4e01e4e2d8b1346993d0a45",
+      "git_blob": "e4619df7f712b6a5790e9afe386e41c9b7b5f810"
+    },
+    {
+      "path": "anagram_run_cache.py",
+      "bytes": 3110,
+      "sha256": "294bfc2ff4f71ece8069d74bc136000182b2fb385cbb776b5c022a49cbf0781d",
+      "git_blob": "21a74de1871cfaf5f9f44452745e6fbb52618a1d"
+    },
+    {
+      "path": "anagram_solver.py",
+      "bytes": 23339,
+      "sha256": "17a696bf58564aa384ea1489ddf5ca65e386ec9d776902609e13530f4eb66b0a",
+      "git_blob": "086c80d79b644b58f1557e0f5d174363afee7b8e"
+    },
+    {
+      "path": "anagram_suite.py",
+      "bytes": 28002,
+      "sha256": "ab148a72b8bc1c35807b61758af23dbe4cc3f0f2b39e763af83bed714d38d9da",
+      "git_blob": "7cc93f1d6606dbfc000f439fbfdeaca1c0b5e165"
+    },
+    {
+      "path": "anagram_user_generate.py",
+      "bytes": 1872,
+      "sha256": "b9755f000869cbddb6aaa48451d5a9720d85da83f5bb01417f6158e101fedb3d",
+      "git_blob": "ec733d49cd13f226094803a1d27cb3a7d65164a8"
+    },
+    {
+      "path": "anagram_user_lexicon.py",
+      "bytes": 11349,
+      "sha256": "5135c37c0c3a4c20f3eac50f6c4412d270ca03d7eb17b3fa2ac2dc8821e9ccf5",
+      "git_blob": "9bd135ad778e9776ca338050a699af9d431db938"
+    },
+    {
+      "path": "benchmark_user_runs.py",
+      "bytes": 10127,
+      "sha256": "a57469008a83baabc492b0ac55396dfcbcc42198e30545753c4fe030757204f8",
+      "git_blob": "50f6226ff4333cfa763c3cf8670ef4829d613bf7"
+    },
+    {
+      "path": "build_wikimedia_phrase_index.py",
+      "bytes": 10250,
+      "sha256": "3410a99af99f89b88b3d1f9ba7ea94a18bd666f411399bf70a1792d18f2639f7",
+      "git_blob": "2ef41ef73ba452962a03cb65f05389028d4e2a39"
+    },
+    {
+      "path": "ci_order_refinement.py",
+      "bytes": 5272,
+      "sha256": "7afe65ac1bd25a35adc62ed1a7475d2b4322f76f5deba89da5bb598e12132f01",
+      "git_blob": "9daaa36c2946b93d92630a4208065b6e5d81eab9"
+    },
+    {
+      "path": "ci_ordering_gate.py",
+      "bytes": 4690,
+      "sha256": "edd2b645bb8b895751b6f616320318788a8e73dbb1a9cf79c66ee0581e2777b5",
+      "git_blob": "476be3f1795e8834fc6bfecfd61705fbd173ff16"
+    },
+    {
+      "path": "ci_performance_probe.py",
+      "bytes": 7759,
+      "sha256": "5f39c3df4b168e94e085de37fa859eb7a36b170914787c3775b6dea6171edd9f",
+      "git_blob": "d5e0c77542f9e90abfa0b52ea1bd5836e22aed03"
+    },
+    {
+      "path": "ci_phrase_matrix.py",
+      "bytes": 12359,
+      "sha256": "79f3ccf5822822abedc74e3b9c8bd9fd4bbce907ca609cad971224408e5a721c",
+      "git_blob": "4a072c5c5b939a15a97721f0db52b41e1b7f4beb"
+    },
+    {
+      "path": "ci_user_runs.py",
+      "bytes": 2987,
+      "sha256": "23c03f90fb20a862ce9fa58dd8bb639e58a201c6de366446c1b31b6d14a1824b",
+      "git_blob": "71b65f14b89c7925734c03faa984ac214818f1d5"
+    },
+    {
+      "path": "train_feature_ranker.py",
+      "bytes": 7915,
+      "sha256": "4744a5e866fbcc09d897a2ede6078e0b615d7b43d5f084ac518e5302a81b056f",
+      "git_blob": "ca1c231510a74128eb5a0700bbc46ddb6198cd81"
+    }
+  ],
+  "corpus_files": [
+    {
+      "path": ".anagram_data/dictionary/large.txt",
+      "bytes": 1839094,
+      "sha256": "1a92993c6db1e33f9f4c62cb0e41513777eba96fe4f8def15d6515692e63a01c"
+    },
+    {
+      "path": ".anagram_data/dictionary/normal_user_v2.json",
+      "bytes": 398,
+      "sha256": "17b0e494366e8ca60598422403cc97625983642abab604ebe4512066953a9234"
+    },
+    {
+      "path": ".anagram_data/dictionary/normal_user_v2.txt",
+      "bytes": 1839180,
+      "sha256": "49f34d7a7b5d4f7b5d88255a1963d582a8095c1c363d66cd535e597d02c4b7e5"
+    },
+    {
+      "path": ".anagram_data/ngrams/count_1w.txt",
+      "bytes": 4956241,
+      "sha256": "51df159fd3de12b20e403c108f526e96dbd723d9cabdd5f17955cdc16059e690"
+    },
+    {
+      "path": ".anagram_data/ngrams/count_2w.txt",
+      "bytes": 5566017,
+      "sha256": "781c0596c3eea532d30bef9f3dba1d5137d652f00376260822c761a7584dfb8c"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/adj.exc",
+      "bytes": 23019,
+      "sha256": "8824cc24bbedd797b9702316b27f07cd4c2b76b629539f0a1276f03926758016"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/adv.exc",
+      "bytes": 85,
+      "sha256": "e7291461b629abfe63301bbe1998cee09fd575ed7107abd7ea9763adb05bf0a8"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/cntlist",
+      "bytes": 911244,
+      "sha256": "2694cf6c60234cb5b997c5d02ce50663a73b3ad204afc59644d32451dd24fbf2"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/cntlist.rev",
+      "bytes": 911244,
+      "sha256": "a198580b8f705fa02797bba8b13e5cbe4a9f9f40cb1697e774c7fc6a5865b035"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/cousin.exc",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/data.adj",
+      "bytes": 3167437,
+      "sha256": "ca1033bf627eb95f6cbb2864f8990be8e6a01a3c182e7d7c7094ccf8ead242cc"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/data.adv",
+      "bytes": 520168,
+      "sha256": "aea301f39ac1b24be9a880dbc6cc6331bc5391f58c7525a1b298a13c922f2ed3"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/data.noun",
+      "bytes": 15325523,
+      "sha256": "2cad22fe43461ee7ae61a564ae6a518c57445c8597e53542caddb5c26a6a5d94"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/data.verb",
+      "bytes": 2778475,
+      "sha256": "eb1cf196dab6e1b815a1c86fa20c909fb7413b2f34250d7fe60a0fb35ef59e03"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/adj.all",
+      "bytes": 2034655,
+      "sha256": "6fe1a0238ec3b13c2982be155d3b6001dff63c4e91fae6c51c572580971f0890"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/adj.pert",
+      "bytes": 551434,
+      "sha256": "edd26fcd317671c380b754d3dae46198e55a065c10966c7e733e9d7ecc517a7f"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/adj.ppl",
+      "bytes": 7673,
+      "sha256": "f9ade7334683ae6fcec665b5afcf21af239e24371f1170d86d64b747554ab747"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/adv.all",
+      "bytes": 478142,
+      "sha256": "c3978e084a70ad8d3932ec72d15418a5dfe0f7205674a2553c6120b026a3dcbf"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/cntlist",
+      "bytes": 911244,
+      "sha256": "2694cf6c60234cb5b997c5d02ce50663a73b3ad204afc59644d32451dd24fbf2"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.act",
+      "bytes": 1011777,
+      "sha256": "87350673316d387ce233e1a95fbcda31105e160d2411c99aa2716ec3e6bd2c3a"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.animal",
+      "bytes": 933739,
+      "sha256": "c652bd10f24e44d18944c98135c3aeb542ca589fc3b9e9d8226707f3be4edda9"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.artifact",
+      "bytes": 1416396,
+      "sha256": "a1581a99972da8045cd83a43a31bae55cb38ea42dc23dd720e98fd763060548e"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.attribute",
+      "bytes": 506779,
+      "sha256": "592dec1c486f8b1de8106a66675b2cd6c554edcc66739eb84dcf3c3b4f6cd426"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.body",
+      "bytes": 286123,
+      "sha256": "1164f2e958e1406f56454c85cc9defeb7f86ea6a4ea3f8cecdc550e1f935ce9a"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.cognition",
+      "bytes": 486105,
+      "sha256": "3baecd81698acf54c280a80faae5d0fe9e24967767f9c8f5beafc8a333dc1ffd"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.communication",
+      "bytes": 777725,
+      "sha256": "ca1f5564871bdc6bc8e49f8fad03b3bf6ad939aca683556f80dfdd3c4acd28bf"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.event",
+      "bytes": 157756,
+      "sha256": "e0d9d96e9087407d0acabbbbc7f8c67fbf1d453c60990ad992efd2d1d41a1da0"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.feeling",
+      "bytes": 63940,
+      "sha256": "19b05ca50d8859cd63e207b9db52f56e68ff1d1d56d46dbf5971f74807996a09"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.food",
+      "bytes": 269371,
+      "sha256": "256a53392d16d7a30e560cf8527f815c4b04c39efa644d6c962d6ffdb0e8f827"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.group",
+      "bytes": 397164,
+      "sha256": "5151adb4128c497ef82c5de52b9481074740fe2e653dfd9313820ca97b575aaa"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.location",
+      "bytes": 449694,
+      "sha256": "4bcf0608b7c436e73f9182fc256047cec38b5dae96197709600362cf8e4caa58"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.motive",
+      "bytes": 6111,
+      "sha256": "2b0b70ad6c8f063a075d0d550aa25adfdde8e72c46df05a123cbef3bd8a7ed89"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.object",
+      "bytes": 215337,
+      "sha256": "207b7c6e26118941e906acbf7e3d918d308d5030e6a54f7de67b9ce6f74c402a"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.person",
+      "bytes": 1481893,
+      "sha256": "8fda967f1ccfd6fbb688284a6782d3c8e7c1f3e4a6b3fdcc08bd8f2d93809c17"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.phenomenon",
+      "bytes": 97387,
+      "sha256": "8ccb4a6c48c83aff05fa70a4a2657e03afea3ed051f2a946b3a61db4e52684e4"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.plant",
+      "bytes": 1263989,
+      "sha256": "04c17a08e5caf9a57a56c000846eb1f82d5c82ad45a1f4db74744e57fa0ca47a"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.possession",
+      "bytes": 139144,
+      "sha256": "7c52b8a61250599e4aeac7f343396cf166c44a1297b3ecce3c540eaad4cc8e32"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.process",
+      "bytes": 127393,
+      "sha256": "e4d05e7540a86edc2e48a5f66f8a5701294eb569d561a9c969b7637d41fcf703"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.quantity",
+      "bytes": 152470,
+      "sha256": "912799b97749241051e6be897ccefaf4dc4ecbbc48b512cbcdc265b1f07d416b"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.relation",
+      "bytes": 65623,
+      "sha256": "f87d0238fe4f7ddfb9e1600c4d201f9343972b1c96bedf11e644294332675b8e"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.shape",
+      "bytes": 46086,
+      "sha256": "c4b53dd91eb46b57818f3290db03bcc6e7049afc352ef367ef09f4c4a63005f3"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.state",
+      "bytes": 523910,
+      "sha256": "53f216ccc5ddf787cbfbfa2def0b5b824c1c3620ed1335b4ddb7d93dd570aeed"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.substance",
+      "bytes": 394810,
+      "sha256": "d58b19ea2707340c931e960df6fdd6433dc0c1219328668f143cfdb7f5e6d5c1"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.time",
+      "bytes": 137748,
+      "sha256": "fb108b7d5f889ed2c60885719ceded833e8ee5c84ac1f8a1c8ad182085486858"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/noun.Tops",
+      "bytes": 8519,
+      "sha256": "45e84b65785d244e495b90be950f13dd12fe7e9fd2b437dd8ee64391fba16f0e"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.body",
+      "bytes": 89102,
+      "sha256": "f09e449f77ab20c314db35db5eab8c8e86d85f4a7126b209858b0f51a2470f26"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.change",
+      "bytes": 387190,
+      "sha256": "240331fdf134e0db4c0070378c473ff0406ae5724c69b8f0ef69ff9c551700ee"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.cognition",
+      "bytes": 132943,
+      "sha256": "2cccd80506fcdb2ca9dc7f067245dda8a16a006a3b4121dd3b769c2ac295a2b1"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.communication",
+      "bytes": 288753,
+      "sha256": "7c5fa5f87efe32f06aa1cbf0f27a336d8a12d85b1ec494ae58b8e625774114f1"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.competition",
+      "bytes": 65810,
+      "sha256": "5c558961d447366be14e474c12cfc4c2c64d1b1fa5e2519b84e8f90d1ff2b158"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.consumption",
+      "bytes": 39416,
+      "sha256": "c0d184b6f6eab199f84520f99bb01478d5ec50e895443ab98ecc6537c20dcff8"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.contact",
+      "bytes": 323481,
+      "sha256": "583454fb3a41ffcdb4b652cee8250e5d114c3659a50e4cb17580f3724fdf0549"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.creation",
+      "bytes": 119022,
+      "sha256": "6f63a55571716189986ea142843893ddaedcd1207b9bc95e5c626cfb0f48d57f"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.emotion",
+      "bytes": 60848,
+      "sha256": "c43b53d9da1e1cfddbe1112add79243a48d2162d230188b824dde915104e2d1d"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.Framestext",
+      "bytes": 1125,
+      "sha256": "e7edc9055e1fafb77622e1df54cb22da82bf5853527687c2b1409acd9c0dc49b"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.motion",
+      "bytes": 210462,
+      "sha256": "908728aa356320fcf04a778baf2483dc2335eb37e767110f49433d1fb0ab832b"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.perception",
+      "bytes": 77010,
+      "sha256": "a3bbdf2f718949335f795abedc711cffb8612b5afaed53d3f368c73642743238"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.possession",
+      "bytes": 135168,
+      "sha256": "4ffc9d7711e03ec99cbaafe64f2ff50cd1fbd255f374ccef866fb06388e70d19"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.social",
+      "bytes": 201624,
+      "sha256": "16ff0e0b928357972a3e50b0996359c5714783a6f595f9c5cfa0fa3c8d205f6b"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.stative",
+      "bytes": 126021,
+      "sha256": "276604e91e1eaf3e47560105c2c0dcf3f510bacab48ef31be92d9efaab8f6ce6"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/dbfiles/verb.weather",
+      "bytes": 13569,
+      "sha256": "453fdd31b6aa64528d3d774ed9b9303473de8d9d6ce636463d6eeac6f5ad42e6"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/index.adj",
+      "bytes": 825353,
+      "sha256": "7d2b4d4037f0571ca309ce2ebadbe860a1607d494a70cd40f9bd61bc25a57016"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/index.adv",
+      "bytes": 162795,
+      "sha256": "0ea0811bb06eeeb973805ab0b066cb724ebc9dc01f07583582b59579a5b4a36c"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/index.noun",
+      "bytes": 4792749,
+      "sha256": "799fad7c8084eb0f6f2a32ec737a251c85f51adb8b2603eb02bfebc4ce5ffa3d"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/index.sense",
+      "bytes": 7304224,
+      "sha256": "a09db263da96dbb3273064c60546530dee5927a2e5a39c90fb576cdbebbb1a22"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/index.verb",
+      "bytes": 524435,
+      "sha256": "e65b2d67274c8a5f9ba6f696fdc73f4546db2a138b362a3be582e3787c879c7a"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/log.grind.3.1",
+      "bytes": 2511,
+      "sha256": "7449fca5a8d02910d9ad891ef87ca58c2b0f6b0a3fe84bdcb027d9ba4bbacf0a"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/noun.exc",
+      "bytes": 38301,
+      "sha256": "fbde4026e4732d8698ca605edfd18cc0274312cf3751513d182bd2d89e47ce34"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/sentidx.vrb",
+      "bytes": 73166,
+      "sha256": "129e267389fe88ea413b90addda3fcfb2a42b009339298b60711676b2b5d9bf0"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/sents.vrb",
+      "bytes": 5319,
+      "sha256": "6fb59507c96c4aeb267e016ce4a654a1791a438815de98c52e7975df20db15c9"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/verb.exc",
+      "bytes": 38033,
+      "sha256": "dbbcf9a601b2d77e934e413b91d90e88ec7f933a8b77cfc00602a923b891b42c"
+    },
+    {
+      "path": ".anagram_data/wordnet31/dict/verb.Framestext",
+      "bytes": 1125,
+      "sha256": "e7edc9055e1fafb77622e1df54cb22da82bf5853527687c2b1409acd9c0dc49b"
+    },
+    {
+      "path": ".anagram_data/wordnet31/wn3.1.dict.tar.gz",
+      "bytes": 16358468,
+      "sha256": "3f7d8be8ef6ecc7167d39b10d66954ec734280b5bdcd57f7d9eafe429d11c22a"
+    }
+  ],
+  "optional_inputs": {
+    "phrase_databases": [],
+    "ranker_models": [],
+    "empty_list_means": "not enabled in this captured baseline; synthetic fixtures are recorded separately"
+  },
+  "machine": {
+    "platform": "Windows-11-10.0.26220-SP0",
+    "architecture": "AMD64",
+    "python": "3.14.6",
+    "logical_cpus": 16,
+    "processor": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD"
+  },
+  "notes": [
+    "Snapshot of available corpora, not permission to redistribute them.",
+    "Oracle source files must match the pinned commit; capture fails on drift.",
+    "Worktree SHA-256 includes platform line endings; git_blob identifies canonical committed source.",
+    "Cache state, execution configuration, counts and timing belong to each benchmark report."
+  ]
+}

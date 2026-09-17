@@ -179,6 +179,10 @@ sub-items; its remaining scope is still required. No phase gate is passed yet.
         `tools/capture_reference.py` (21 source and 73 corpus files).
   - [ ] Complete durable pinned fixtures, optional input identities and machine/
         cache/budget metadata; the temporary manifest alone is insufficient.
+    - [x] Store `tests/reference/manifest.json` pinned to the Python reference,
+          covering 29 oracle/harness files and 73 corpus files. Capture now rejects
+          oracle source drift instead of labeling the current HEAD as the oracle.
+    - [ ] Finish behavior fixtures, licensing and measured cold/warm reports.
 - [ ] Inventory dictionary, frequency, WordNet, phrase SQLite and optional feature
       ranker inputs; document formats, licenses and redistribution requirements.
 - [ ] Extend the reference harness to cover letter normalization, punctuation and
