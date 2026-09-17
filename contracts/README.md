@@ -52,6 +52,43 @@ Stable codes currently include `unsupported_version`, `invalid_limits`,
 `impossible_hints`, `missing_frequency_data`, `corpus_error`, `invalid_search`,
 `usage`, `input_error`, `request_too_large`, and `invalid_json`.
 
-Still required before frontend adoption: generated schema/TypeScript types,
-ranked results, capability/job contracts, deployment limits and corpus provenance
-in responses. Do not infer those features from this preliminary operation.
+## Ranked development operation
+
+```text
+anagram-cli solve DICTIONARY UNIGRAMS BIGRAMS WORDNET [PHRASE_DB] < request.json
+```
+
+The request has a `generation` object containing the complete request above,
+plus these explicit fields:
+
+```json
+{
+  "deep_per_group": 5000,
+  "deep_all": false,
+  "order_mode": "auto",
+  "beam_width": 128,
+  "exact_max_words": 5,
+  "retained_orders": 56,
+  "phrase_rescore_top": 300,
+  "phrase_bonus_max": 5.0,
+  "positive_bigrams": true,
+  "result_limit_per_group": 20
+}
+```
+
+`order_mode` also accepts `exact` and `beam`. Word counts above 10 are rejected
+rather than silently approximated. The deep shortlist expands selected morphology
+families, so `deep_per_group` is not a hard work cap. Like the Python ranked
+frontend, this operation rejects required words that consume the entire target.
+
+Results use `kind: ranked`, separate `generated`, `deep_analyzed`, `shown`,
+`orders_evaluated` and `corpus_rescored` counts, `generation_stop`, and ranked
+`buckets` keyed by word count. Rows include lexical/grammar/structure/corpus score
+components. The generator's historical decimal export quantization is preserved
+before preparation because it affects ranking and ties.
+
+This is still a development interface: no persistent cache, corpus identities,
+job/progress contract or end-to-end cancellation yet. Python remains the default
+application. Still required before frontend adoption: generated schema/TypeScript
+types, capability/job contracts, deployment limits, corpus provenance and complete
+parity/performance acceptance gates.

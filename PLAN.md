@@ -188,6 +188,12 @@ sub-items; its remaining scope is still required. No phase gate is passed yet.
   - [x] Add learned-feature/model/ordering parity (`tests/parity/learned.py`,
         253 cases, including invalid and missing model inputs).
   - [ ] Complete default-path/end-to-end oracle coverage.
+    - [x] Verify native `solve` CLI against the real-corpus Python generator-export
+          and reranker pipeline on eight prefix/diverse cases, including required
+          words and hints (`tests/parity/solve.py`). All row components and counts
+          match, including historical export quantization.
+    - [ ] Expand to the full quality suites, optional phrase/model fixtures and
+          performance/cancellation/cache acceptance cases.
 - [ ] Benchmark generation and ranking separately, then actual end-to-end cold and
       warm CLI runs using `benchmark_user_runs.py` and the existing quality gates.
 
@@ -203,6 +209,10 @@ small sample. Distinguish empty puzzle caches from cold corpus/OS caches.
       generated or mechanically checked TypeScript types.
   - [x] Implement version-1 Rust generation request/result/errors and JSON CLI.
   - [ ] Complete ranked/job contracts, JSON schema and TypeScript parity checks.
+    - [x] Add a development ranked JSON CLI with separate generated/deep/shown
+          counts and per-word-count results. Document it in `contracts/README.md`.
+    - [ ] Stabilize unified defaults, budgets, progress/provenance and generated
+          cross-language schemas before treating it as the final public contract.
 - [ ] Separate semantic search options from deployment limits. Include input,
       hints/required/excluded words, word-count constraints, lexical options,
       generation strategy, candidate budget, deep-ranking budget and result limit.

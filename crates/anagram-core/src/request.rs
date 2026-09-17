@@ -56,6 +56,10 @@ pub struct Generated {
     pub vocabulary_size: usize,
     pub candidate_budget: usize,
     pub stop: Stop,
+    #[serde(skip)]
+    pub vocabulary: BTreeSet<String>,
+    #[serde(skip)]
+    pub short_whitelist: BTreeSet<String>,
 }
 
 fn words(values: &[String]) -> Result<Vec<String>, Error> {
@@ -151,6 +155,14 @@ pub fn generate(
     }
     let initial_clues: BTreeSet<_> = required_set.intersection(&hints).cloned().collect();
     let mut vocabulary_size = 0;
+    let mut vocabulary: BTreeSet<String> = required_set.union(&hints).cloned().collect();
+    let mut short_whitelist: BTreeSet<String> =
+        "a i am an as at be by do go he if in is it me my no of oh on or so to up us we"
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect();
+    short_whitelist.extend(vocabulary.iter().filter(|w| w.len() <= 2).cloned());
+    short_whitelist.retain(|w| !excluded.contains(w));
     let result = if remaining.is_empty() {
         let valid = required.len() >= request.min_words
             && required.len() <= request.max_words
@@ -169,19 +181,12 @@ pub fn generate(
             stop: Stop::Exhausted,
         }
     } else {
-        let mut short_whitelist: BTreeSet<String> =
-            "a i am an as at be by do go he if in is it me my no of oh on or so to up us we"
-                .split_whitespace()
-                .map(str::to_owned)
-                .collect();
-        short_whitelist.extend(hints.iter().filter(|w| w.len() <= 2).cloned());
-        short_whitelist.retain(|w| !excluded.contains(w));
         let policy = Admission {
             min_length: request.min_word_length,
             max_length: request.max_word_length,
             min_zipf: request.min_zipf,
             short_policy: ShortPolicy::Common,
-            short_whitelist,
+            short_whitelist: short_whitelist.clone(),
             forced: hints.clone(),
             excluded,
             forbidden: BTreeSet::new(),
@@ -189,6 +194,7 @@ pub fn generate(
         let candidates = lexicon::admit(dictionary, remaining, &policy, unigrams, |_| false)
             .map_err(|e| Error::new("corpus_error", e.to_string()))?;
         vocabulary_size = candidates.len();
+        vocabulary.extend(candidates.iter().map(|c| c.word.clone()));
         let options = Options {
             min_words: request.min_words.saturating_sub(required.len()).max(1),
             max_words: request.max_words - required.len(),
@@ -217,5 +223,7 @@ pub fn generate(
         vocabulary_size,
         candidate_budget: request.candidate_budget,
         stop: result.stop,
+        vocabulary,
+        short_whitelist,
     })
 }

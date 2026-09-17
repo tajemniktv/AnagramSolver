@@ -20,6 +20,46 @@ pub struct Input {
     pub hints: Vec<String>,
 }
 
+/// Preserve the frozen generator-to-reranker text boundary, including decimal
+/// quantization. Removing it would change rankings, not merely serialization.
+pub fn from_records(records: &[crate::scoring::PreRecord]) -> Vec<Input> {
+    fn rounded(value: f64, precision: usize) -> f64 {
+        format!("{value:.precision$}")
+            .parse()
+            .expect("finite score formatting")
+    }
+    let mut buckets: BTreeMap<usize, Vec<&crate::scoring::PreRecord>> = BTreeMap::new();
+    for record in records {
+        buckets.entry(record.words.len()).or_default().push(record);
+    }
+    let mut inputs = Vec::with_capacity(records.len());
+    for bucket in buckets.values_mut() {
+        bucket.sort_by(|a, b| {
+            b.pre_score
+                .total_cmp(&a.pre_score)
+                .then_with(|| b.lexical.lex_raw.total_cmp(&a.lexical.lex_raw))
+                .then_with(|| b.words.join(" ").cmp(&a.words.join(" ")))
+        });
+        for (i, record) in bucket.iter().enumerate() {
+            inputs.push(Input {
+                words: record.words.clone(),
+                word_count: record.words.len(),
+                old_rank: i + 1,
+                old_pre: rounded(record.pre_score, 2),
+                lex: rounded(record.lex_pct, 3),
+                fam: rounded(record.family_pct, 3),
+                old_pair: rounded(record.pair_pct, 3),
+                hint: rounded(record.hint_info, 3),
+                zavg: rounded(record.lexical.avg_zipf, 2),
+                zmin: rounded(record.lexical.min_zipf, 2),
+                old_pcov: rounded(record.pair_coverage, 2),
+                hints: record.matched_hints.clone(),
+            });
+        }
+    }
+    inputs
+}
+
 #[derive(Clone, Debug, Serialize)]
 pub struct Row {
     #[serde(flatten)]

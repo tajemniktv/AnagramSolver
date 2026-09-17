@@ -21,6 +21,7 @@ pub mod ranking;
 pub mod refinement;
 pub mod request;
 pub mod scoring;
+pub mod solve;
 pub mod structure;
 pub mod validity;
 pub mod wordnet;
