@@ -1,0 +1,9 @@
+[package]
+name = "anagram-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anagram-core = { path = "../anagram-core" }
+serde_json.workspace = true
