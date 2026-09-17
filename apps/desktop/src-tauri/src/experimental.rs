@@ -66,9 +66,15 @@ impl Desktop {
         };
         let control = inner.control.clone();
         let shared = self.inner.clone();
+        #[cfg(test)]
+        let worker_gate = inner.worker_gate.take();
         match std::thread::Builder::new()
             .name("experimental-training".into())
             .spawn(move || {
+                #[cfg(test)]
+                if let Some(gate) = worker_gate {
+                    gate.wait();
+                }
                 let result =
                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| work(&control)))
                         .unwrap_or_else(|_| Err("Training stopped unexpectedly".into()));

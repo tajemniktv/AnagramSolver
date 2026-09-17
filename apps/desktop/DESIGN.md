@@ -23,16 +23,4 @@ QA must compare the concept and actual app screenshot, including layout, type,
 palette, controls, spacing and responsive/keyboard behavior. The image is a design
 reference only, never an executable result fixture or a screenshot of the app.
 
-## Completed comparison, 2026-09-17
-
-Compared the generated concept with the user's maximized screenshots and native
-captures of the installed 1200px window. The graphite rail/canvas, violet action,
-Segoe UI typography, restrained borders, spacing and two-pane hierarchy match the
-direction. The implemented denser controls and extra word-count column are useful
-intentional deviations; result counts and scores are actual engine output.
-Light mode retains readable contrast; Follow Windows restores the dark palette on
-this PC. Keyboard zoom through 150% increases text and activates the compact
-stacked results toolbar without clipping controls horizontally. Independent pane
-scrolling keeps long advanced options and results accessible. Focus rings and
-keyboard select/submission were exercised. Reduced-motion behavior is provided
-by the CSS media rule; Windows accessibility settings were not changed for QA.
+Dated visual QA evidence is recorded in `VERIFICATION.md`.

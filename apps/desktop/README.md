@@ -18,6 +18,12 @@ verification. Test-only and failed builds retain scratch for inspection.
 `-KeepBuildCache` explicitly retains the build cache without changing installation
 or the one-backup retention policy.
 
+On a clean checkout, ignored corpus downloads are not bundled. The app still
+installs and starts: use Settings → Data to download/prepare a set, select it,
+then Save settings before solving. No large downloads start automatically.
+An immediate startup failure restores the verified previous executable when
+one exists; settings and corpora are not replaced during rollback.
+
 Development: `pnpm --dir apps/desktop tauri dev`. A browser-only Vite page cannot
 solve: desktop IPC deliberately has no mocked or browser-local fallback.
 
@@ -111,7 +117,7 @@ deep-analyzed and shown counts, exhaustion/cap/deadline outcomes, exact corpus
 identities and cache provenance. Completed results survive until the next accepted
 job, not across restart. Last submitted options and theme/corpus choices persist.
 
-Standard defaults: 40 normalized letters, 250,000 generated candidates, 10,000 deep analyses,
+Standard deployment limits: 40 normalized letters, 250,000 generated candidates, 10,000 deep analyses,
 512 beam width, 128 retained orders, 100 displayed rows per word-count group and
 120 seconds. Custom settings or Extended mode can change these deployment limits.
 UI/backend reject unsupported requests rather than silently clamp.

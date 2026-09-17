@@ -75,7 +75,18 @@ try {
     # This is the requested interactive app, not a background helper.
     $process = Start-Process -FilePath $exe -WorkingDirectory $install -WindowStyle Normal -PassThru
     Start-Sleep -Seconds 3
-    if ($process.HasExited) { throw 'Installed app exited during startup; backup retained.' }
+    if ($process.HasExited) {
+        if (Test-Path -LiteralPath $backup -PathType Leaf) {
+            $rollbackHash = (Get-FileHash -LiteralPath $backup).Hash
+            Copy-Item -LiteralPath $backup -Destination $staged
+            if ((Get-FileHash -LiteralPath $staged).Hash -ne $rollbackHash) { throw 'Startup failed and rollback staging verification failed; backup retained.' }
+            Move-Item -LiteralPath $staged -Destination $exe -Force
+            if ((Get-FileHash -LiteralPath $exe).Hash -ne $rollbackHash) { throw 'Startup failed and rollback verification failed; backup retained.' }
+            Start-Process -FilePath $exe -WorkingDirectory $install -WindowStyle Normal
+            throw 'New app exited during startup; restored the verified previous release and requested its restart.'
+        }
+        throw 'Installed app exited during startup; this first install has no previous release to restore.'
+    }
     Write-Output "Installed and started: $exe (PID $($process.Id), SHA256 $hash)"
     if ($KeepBuildCache) {
         Write-Output 'Build cache retained explicitly; installed release rotation is unchanged.'

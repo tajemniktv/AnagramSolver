@@ -24,7 +24,7 @@
     try { await bridge.train(dataset, epochs, folds, learningRate, l2); await refresh(); } catch(e) { error = message(e); busy = false; }
   }
   async function cancel() { try { await bridge.cancelTraining(); cancelling = true; } catch(e) { error = message(e); } }
-  async function build() { busy = true; error = ''; try { await bridge.manage({kind:'build_training',cases,corpora:$state.snapshot(corpora),options:{retained_orders:retainedOrders,phrase_bonus_max:phraseBonus}}); await refresh(); } catch(e) { error = message(e); busy = false; } }
+  async function build() { busy = true; error = ''; buildReport = null; try { await bridge.manage({kind:'build_training',cases,corpora:$state.snapshot(corpora),options:{retained_orders:retainedOrders,phrase_bonus_max:phraseBonus}}); await refresh(); } catch(e) { error = message(e); busy = false; } }
   async function rank() { busy = true; error = ''; rankingReport = null; try { await bridge.manage({kind:'rank_model',model,items}); await refresh(); } catch(e) { error = message(e); busy = false; } }
   async function browseItems() { try { items = await bridge.choose('training') ?? items; } catch(e) { error = message(e); } }
   async function browseCases() { try { cases = await bridge.choose('training') ?? cases; } catch(e) { error = message(e); } }

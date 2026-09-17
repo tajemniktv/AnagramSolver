@@ -74,12 +74,15 @@ fn experimental_training_publishes_small_model_without_enabling_it_and_joins_on_
     anagram_core::learned::Model::load(&model).unwrap();
     drop(inner);
     // A cancelled control before the worker can read must never publish a model.
+    let gate = std::sync::Arc::new(std::sync::Barrier::new(2));
+    app.inner.lock().unwrap().worker_gate = Some(gate.clone());
     app.train_model(data.to_string_lossy().into_owned(), 200, 10)
         .unwrap();
     {
         let inner = app.inner.lock().unwrap();
         inner.control.cancel();
     }
+    gate.wait();
     app.shutdown();
     let inner = app.inner.lock().unwrap();
     assert!(!inner.experiment.active);
@@ -161,12 +164,19 @@ fn generation_only_needs_no_ranking_corpora_and_exports_all_bags() {
     let app = Desktop::new(temp.path().join("settings")).unwrap();
     let mut inner = app.inner.lock().unwrap();
     inner.settings.corpora.dictionary = dictionary.to_string_lossy().into_owned();
-    inner.settings.corpora.unigrams.clear();
+    inner.settings.corpora.unigrams = temp
+        .path()
+        .join("missing-unigrams")
+        .to_string_lossy()
+        .into_owned();
     let mut request = inner.settings.request.clone();
     request["generation"]["text"] = "ate".into();
     request["generation"]["min_zipf"] = 0.into();
     request["generation"]["max_words"] = 11.into();
     drop(inner);
+    let mut invalid = request.clone();
+    invalid["result_limit_per_group"] = 0.into();
+    assert!(app.start_with_mode(invalid, false, false, true).is_err());
     let id = app.start_with_mode(request, false, false, true).unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     while app.inner.lock().unwrap().job.active {
@@ -194,6 +204,7 @@ fn generation_only_needs_no_ranking_corpora_and_exports_all_bags() {
     let request = inner.settings.request.clone();
     drop(inner);
     app.start_with_mode(request, false, false, true).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
     while app.inner.lock().unwrap().job.active {
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(5));
@@ -303,6 +314,7 @@ fn desktop_worker_completes_real_core_work_and_retains_no_queue() {
     exhaustive["generation"]["candidate_budget"] = 0.into();
     assert!(app.start(exhaustive.clone()).is_err());
     app.start_with_options(exhaustive, true, true).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
     while app.inner.lock().unwrap().job.active {
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(5));
@@ -319,6 +331,7 @@ fn desktop_worker_completes_real_core_work_and_retains_no_queue() {
         fs::read(app.data.join("settings.json")).unwrap()
     );
     app.start(request.clone()).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
     while app.inner.lock().unwrap().job.active {
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(5));
@@ -348,15 +361,49 @@ fn presentation_preserves_letters_without_guessing_ambiguous_contractions() {
 }
 
 #[test]
+fn panic_after_progress_publishes_failed_status_and_allows_retry() {
+    let temp = scratch();
+    let app = Desktop::new(temp.path().join("settings")).unwrap();
+    let request = {
+        let mut inner = app.inner.lock().unwrap();
+        inner.panic_after_progress = true;
+        let mut request = inner.settings.request.clone();
+        request["generation"]["text"] = "ate".into();
+        request
+    };
+    app.start_with_mode(request.clone(), false, false, true)
+        .unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while app.inner.lock().unwrap().job.active {
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(5));
+    }
+    let inner = app.inner.lock().unwrap();
+    let status = inner.job.status.as_ref().unwrap();
+    status.validate().unwrap();
+    assert_eq!(status.state, anagram_core::contracts::JobState::Failed);
+    assert_eq!(status.error.as_ref().unwrap().code, "worker_panic");
+    assert!(inner.job.result.is_none());
+    drop(inner);
+    app.start_with_mode(request, false, false, true).unwrap();
+    app.shutdown();
+}
+
+#[test]
+fn text_export_sorts_word_counts_numerically() {
+    let temp = scratch();
+    let app = Desktop::new(temp.path().join("settings")).unwrap();
+    app.inner.lock().unwrap().job.result = Some(serde_json::json!({"buckets": {
+        "10": [{"best_order": ["ten"]}], "2": [{"best_order": ["two"]}], "1": [{"best_order": ["one"]}]
+    }}));
+    assert_eq!(crate::result_text(&app, 0).unwrap(), "one\r\ntwo\r\nten");
+}
+
+#[test]
 fn shutdown_cancels_and_joins_an_active_worker() {
     let temp = scratch();
-    // Enough input to keep corpus loading active while the host exercises admission
-    // and shutdown; this is the actual engine, not a simulated worker.
-    fs::write(
-        temp.path().join("dictionary"),
-        "ate\neat\ntea\n".repeat(100_000),
-    )
-    .unwrap();
+    // Gate worker admission deterministically rather than relying on slow I/O.
+    fs::write(temp.path().join("dictionary"), "ate\neat\ntea\n").unwrap();
     for name in [
         "one",
         "two",
@@ -380,11 +427,21 @@ fn shutdown_cancels_and_joins_an_active_worker() {
     let mut request = inner.settings.request.clone();
     request["generation"]["text"] = "ate".into();
     request["generation"]["min_zipf"] = 0.into();
+    let gate = std::sync::Arc::new(std::sync::Barrier::new(2));
+    inner.worker_gate = Some(gate.clone());
     drop(inner);
     app.start(request.clone()).unwrap();
     assert!(app.start(request).unwrap_err().contains("already running"));
     let started = Instant::now();
-    app.shutdown();
+    thread::scope(|scope| {
+        let shutdown = scope.spawn(|| app.shutdown());
+        while !app.inner.lock().unwrap().closing {
+            assert!(started.elapsed() < Duration::from_secs(5));
+            thread::sleep(Duration::from_millis(1));
+        }
+        gate.wait();
+        shutdown.join().unwrap();
+    });
     assert!(started.elapsed() < Duration::from_secs(5));
     let inner = app.inner.lock().unwrap();
     assert!(!inner.job.active);

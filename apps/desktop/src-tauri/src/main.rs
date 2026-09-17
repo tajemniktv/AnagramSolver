@@ -213,11 +213,15 @@ fn result_text(state: &Desktop, id: u64) -> Result<String, String> {
         }
         return Ok(lines.join("\r\n"));
     }
-    for rows in result["buckets"]
+    let mut buckets: Vec<_> = result["buckets"]
         .as_object()
         .ok_or("Invalid result")?
-        .values()
-    {
+        .iter()
+        .map(|(count, rows)| count.parse::<usize>().map(|count| (count, rows)))
+        .collect::<Result<_, _>>()
+        .map_err(|_| "Invalid word count")?;
+    buckets.sort_by_key(|(count, _)| *count);
+    for (_, rows) in buckets {
         for row in rows.as_array().ok_or("Invalid rows")? {
             lines.push(anagram_core::format_phrase(
                 &row["best_order"]
