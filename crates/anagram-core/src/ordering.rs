@@ -52,7 +52,13 @@ struct State {
     paths: Vec<Path>,
 }
 
-fn kbest(pair: &[Vec<f64>], starts: &[f64], ends: &[f64], max_complete: usize) -> Vec<Vec<usize>> {
+fn kbest(
+    pair: &[Vec<f64>],
+    starts: &[f64],
+    ends: &[f64],
+    max_complete: usize,
+    control: &crate::control::Control,
+) -> Result<Vec<Vec<usize>>, &'static str> {
     let n = starts.len();
     let per_state = 2.max(max_complete.div_ceil(n));
     let mut states: Vec<_> = (0..n)
@@ -70,7 +76,9 @@ fn kbest(pair: &[Vec<f64>], starts: &[f64], ends: &[f64], max_complete: usize) -
         let mut next: Vec<State> = Vec::new();
         let mut lookup = HashMap::new();
         for state in states {
+            control.check()?;
             for path in state.paths {
+                control.check()?;
                 for (j, edge) in pair[state.last].iter().enumerate() {
                     if state.mask & (1 << j) != 0 {
                         continue;
@@ -110,21 +118,27 @@ fn kbest(pair: &[Vec<f64>], starts: &[f64], ends: &[f64], max_complete: usize) -
         .collect();
     complete.sort_by(|a, b| b.score.total_cmp(&a.score));
     complete.truncate(max_complete);
-    complete.into_iter().map(|p| p.indices).collect()
+    control.check()?;
+    Ok(complete.into_iter().map(|p| p.indices).collect())
 }
 
-fn permutations(n: usize, path: &mut Vec<usize>, used: usize, visit: &mut impl FnMut(&[usize])) {
+fn permutations(
+    n: usize,
+    path: &mut Vec<usize>,
+    used: usize,
+    visit: &mut impl FnMut(&[usize]) -> Result<(), &'static str>,
+) -> Result<(), &'static str> {
     if path.len() == n {
-        visit(path);
-        return;
+        return visit(path);
     }
     for i in 0..n {
         if used & (1 << i) == 0 {
             path.push(i);
-            permutations(n, path, used | (1 << i), visit);
+            permutations(n, path, used | (1 << i), visit)?;
             path.pop();
         }
     }
+    Ok(())
 }
 
 /// The initial native pool implementation. Final public ranking additionally
@@ -136,6 +150,25 @@ pub fn rank(
     beam_width: usize,
     top_k: usize,
 ) -> Result<(Vec<Candidate>, usize), &'static str> {
+    rank_controlled(
+        words,
+        lex,
+        exact,
+        beam_width,
+        top_k,
+        &crate::control::Control::default(),
+    )
+}
+
+pub fn rank_controlled(
+    words: &[String],
+    lex: &WordNet,
+    exact: bool,
+    beam_width: usize,
+    top_k: usize,
+    control: &crate::control::Control,
+) -> Result<(Vec<Candidate>, usize), &'static str> {
+    control.check()?;
     if top_k == 0 || beam_width == 0 {
         return Err("ordering budgets must be positive");
     }
@@ -174,24 +207,27 @@ pub fn rank(
     let mut seen = HashSet::new();
     let mut candidates = Vec::new();
     let mut visit = |indices: &[usize]| {
+        control.check()?;
         let order: Vec<_> = indices.iter().map(|i| words[*i].clone()).collect();
         if !seen.insert(order.clone()) {
-            return;
+            return Ok(());
         }
         let edge_sum = indices.windows(2).map(|p| pair[p[0]][p[1]]).sum::<f64>();
         let raw = (starts[indices[0]] + ends[*indices.last().unwrap()] + edge_sum) / (n - 1) as f64;
         candidates.push(score(order, raw, lex));
+        Ok(())
     };
     if exact {
-        permutations(n, &mut Vec::new(), 0, &mut visit);
+        permutations(n, &mut Vec::new(), 0, &mut visit)?;
     } else {
         let width = beam_width.max(top_k.checked_mul(8).ok_or("ordering budget overflow")?);
-        for order in kbest(&pair, &starts, &ends, width) {
-            visit(&order);
+        for order in kbest(&pair, &starts, &ends, width, control)? {
+            visit(&order)?;
         }
     }
     let evaluated = candidates.len();
     candidates.sort_by(compare);
     candidates.truncate(top_k);
+    control.check()?;
     Ok((candidates, evaluated))
 }

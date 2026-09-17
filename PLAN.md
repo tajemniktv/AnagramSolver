@@ -5,6 +5,9 @@ requires explicit approval.
 
 Current implementation goal: **phases 0–3 fully**, per the user's scope update.
 Phases 4–6 remain future roadmap context and are not part of this active goal.
+Execution priority updated by the user: **finish phases 0 and 1 fully before
+further phase-2/3 feature expansion**. Existing later-phase implementation stays
+in place, but is not a substitute for the missing earlier gates.
 
 ### Implementation evidence
 
@@ -250,6 +253,12 @@ replacement for the ranked solver.
   - [x] Check cancellation/deadlines inside generation DFS and expose stop reasons.
   - [ ] Propagate cancellation through corpus loading and all ranking loops;
         validate interrupted work and deadline probe semantics end-to-end.
+    - [x] Add explicit per-run control to corpus readers, WordNet parsing,
+          pre-scoring/preparation, exact/k-best ordering and corpus rescoring;
+          interrupt SQLite's VM and expose CLI `--timeout-ms`. Targeted tests and
+          unchanged ordering/WordNet/scoring parity pass.
+    - [ ] Finish cancellation coverage for remaining bulk sorts/refinement and
+          structured partial-progress outcomes; no full phase-2 gate claim.
 - [x] Differential-test full candidate sets for small exhaustive cases and ordered
       capped prefixes for bounded cases. Add seeded randomized small alphabets.
 - [ ] Benchmark serial first; introduce bounded parallelism only where it helps and

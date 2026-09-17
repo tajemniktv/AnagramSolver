@@ -5,10 +5,14 @@ use std::{
 };
 
 fn invoke(request: Value) -> (bool, Value) {
+    invoke_with_args(request, &[])
+}
+fn invoke_with_args(request: Value, args: &[&str]) -> (bool, Value) {
     let dictionary =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/parity/dictionary.txt");
     let mut child = Command::new(env!("CARGO_BIN_EXE_anagram-cli"))
         .args(["generate", dictionary.to_str().unwrap()])
+        .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
@@ -24,6 +28,16 @@ fn invoke(request: Value) -> (bool, Value) {
         output.status.success(),
         serde_json::from_slice(&output.stdout).unwrap(),
     )
+}
+
+#[test]
+fn expired_deadline_is_not_reported_as_corpus_failure() {
+    let (ok, output) = invoke_with_args(request(), &["--timeout-ms", "0"]);
+    assert!(!ok);
+    assert_eq!(output["error"]["code"], "timed_out");
+    let (ok, output) = invoke_with_args(request(), &["--timeout-ms", "bad"]);
+    assert!(!ok);
+    assert_eq!(output["error"]["code"], "invalid_timeout");
 }
 
 fn request() -> Value {

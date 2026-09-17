@@ -44,7 +44,9 @@ future public service. This CLI has no deployment policy; it is local-only.
 `exhausted`, `candidate_cap`, `cancelled`, or `timed_out`; only the first proves
 complete enumeration. The extra-bag probe distinguishes exact cap exhaustion
 from actual truncation. CLI cancellation/deadline configuration is not exposed
-yet; the engine accepts both controls.
+through the request yet; `--timeout-ms N` supplies a local execution deadline.
+The engine accepts an explicit shared cancellation control. A timeout in corpus
+loading is an error with code `timed_out`, not a false empty/exhausted result.
 
 Failures exit with status 2 and emit `{schema_version: 1, error: {code, message}}`.
 Stable codes currently include `unsupported_version`, `invalid_limits`,
@@ -88,7 +90,7 @@ components. The generator's historical decimal export quantization is preserved
 before preparation because it affects ranking and ties.
 
 This is still a development interface: no persistent cache, corpus identities,
-emitted job/progress events or end-to-end cancellation yet. Python remains the
+emitted job/progress events or complete interruption coverage yet. Python remains the
 default application. Still required before frontend adoption: semantic contract
 validation, deployment limits, corpus provenance and complete parity/performance
 acceptance gates.

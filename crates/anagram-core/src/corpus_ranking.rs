@@ -132,6 +132,24 @@ pub fn select(
     phrase: Option<&dyn PhraseCorpus>,
     top: usize,
 ) -> io::Result<(Vec<usize>, usize)> {
+    select_controlled(
+        rows,
+        bucket,
+        collocation,
+        phrase,
+        top,
+        &crate::control::Control::default(),
+    )
+}
+fn select_controlled(
+    rows: &[Row],
+    bucket: &[usize],
+    collocation: Option<&Collocation>,
+    phrase: Option<&dyn PhraseCorpus>,
+    top: usize,
+    control: &crate::control::Control,
+) -> io::Result<(Vec<usize>, usize)> {
+    control.check_io()?;
     let mut by_final = bucket.to_vec();
     by_final.sort_by(|&i, &j| {
         rows[j]
@@ -162,6 +180,7 @@ pub fn select(
     let mut scores: HashMap<usize, f64> = pool.iter().map(|&i| (i, 0.0)).collect();
     let mut owners: HashMap<String, Vec<usize>> = HashMap::new();
     for &i in &pool {
+        control.check_io()?;
         let orders = candidates(&rows[i]);
         if let Some(model) = collocation {
             scores.insert(i, 0.55 * model.score(&orders[0].order).0);
@@ -220,13 +239,30 @@ pub fn rescore(
     top: usize,
     bonus_max: f64,
 ) -> io::Result<usize> {
+    rescore_controlled(
+        rows,
+        collocation,
+        phrase,
+        top,
+        bonus_max,
+        &crate::control::Control::default(),
+    )
+}
+pub fn rescore_controlled(
+    rows: &mut [Row],
+    collocation: Option<&Collocation>,
+    phrase: Option<&dyn PhraseCorpus>,
+    top: usize,
+    bonus_max: f64,
+    control: &crate::control::Control,
+) -> io::Result<usize> {
     if !bonus_max.is_finite() || bonus_max < 0.0 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "phrase bonus must be finite and nonnegative",
         ));
     }
-    let result = rescore_inner(rows, collocation, phrase, top, bonus_max);
+    let result = rescore_inner(rows, collocation, phrase, top, bonus_max, control);
     // Retained-order memory is released even on corpus errors, like the facade.
     for row in rows {
         row.alternatives.clear();
@@ -239,9 +275,12 @@ fn rescore_inner(
     phrase: Option<&dyn PhraseCorpus>,
     top: usize,
     bonus_max: f64,
+    control: &crate::control::Control,
 ) -> io::Result<usize> {
+    control.check_io()?;
     let mut buckets: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for (i, row) in rows.iter_mut().enumerate() {
+        control.check_io()?;
         row.input.words.sort();
         if row.deep {
             buckets.entry(row.input.word_count).or_default().push(i);
@@ -249,11 +288,12 @@ fn rescore_inner(
     }
     let mut rescored = 0;
     for bucket in buckets.values() {
-        let (chosen, _) = select(rows, bucket, collocation, phrase, top)?;
+        let (chosen, _) = select_controlled(rows, bucket, collocation, phrase, top, control)?;
         for i in chosen {
             let row = &mut rows[i];
             let mut results = Vec::new();
             for candidate in candidates(row) {
+                control.check_io()?;
                 let colloc = collocation.map_or(0.0, |m| m.score(&candidate.order).0);
                 let attest = match phrase {
                     Some(p) => p.score(&candidate.order)?,

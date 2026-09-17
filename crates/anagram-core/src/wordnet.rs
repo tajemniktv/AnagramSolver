@@ -1,53 +1,66 @@
 //! Immutable WordNet tables and morphological features. Request owners may cache
 //! feature results without putting mutable state in the shared corpus.
-use crate::normalize_letters;
+use crate::{control::Control, normalize_letters};
 use serde::Serialize;
 use std::{
     collections::{BTreeSet, HashMap},
-    fs, io,
+    fs,
+    io::{self, Read},
     path::Path,
 };
 
-fn ascii(path: &Path) -> io::Result<String> {
-    Ok(fs::read(path)?
+fn ascii(path: &Path, control: &Control) -> io::Result<String> {
+    control.check_io()?;
+    let mut bytes = Vec::new();
+    control
+        .reader(fs::File::open(path)?)
+        .read_to_end(&mut bytes)?;
+    Ok(bytes
         .into_iter()
         .filter(u8::is_ascii)
         .map(char::from)
         .collect())
 }
 
-fn index(path: &Path) -> io::Result<BTreeSet<String>> {
-    Ok(ascii(path)?
-        .lines()
-        .filter(|line| !line.is_empty() && !line.starts_with(char::is_whitespace))
-        .map(|line| {
-            line.split(' ')
-                .next()
-                .unwrap()
-                .trim()
-                .to_ascii_lowercase()
-                .replace('_', " ")
-        })
-        .filter(|word| !word.is_empty() && word.bytes().all(|b| b.is_ascii_alphabetic()))
-        .collect())
+fn index(path: &Path, control: &Control) -> io::Result<BTreeSet<String>> {
+    let mut words = BTreeSet::new();
+    for line in ascii(path, control)?.lines() {
+        control.check_io()?;
+        if line.is_empty() || line.starts_with(char::is_whitespace) {
+            continue;
+        }
+        let word = line
+            .split(' ')
+            .next()
+            .unwrap()
+            .trim()
+            .to_ascii_lowercase()
+            .replace('_', " ");
+        if !word.is_empty() && word.bytes().all(|b| b.is_ascii_alphabetic()) {
+            words.insert(word);
+        }
+    }
+    Ok(words)
 }
 
-fn exceptions(path: &Path) -> io::Result<HashMap<String, BTreeSet<String>>> {
-    let text = match ascii(path) {
+fn exceptions(path: &Path, control: &Control) -> io::Result<HashMap<String, BTreeSet<String>>> {
+    let text = match ascii(path, control) {
         Ok(text) => text,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(HashMap::new()),
         Err(e) => return Err(e),
     };
-    Ok(text
-        .lines()
-        .filter_map(|line| {
-            let words: Vec<_> = line
-                .split_whitespace()
-                .map(str::to_ascii_lowercase)
-                .collect();
-            (words.len() >= 2).then(|| (words[0].clone(), words[1..].iter().cloned().collect()))
-        })
-        .collect())
+    let mut result = HashMap::new();
+    for line in text.lines() {
+        control.check_io()?;
+        let words: Vec<_> = line
+            .split_whitespace()
+            .map(str::to_ascii_lowercase)
+            .collect();
+        if words.len() >= 2 {
+            result.insert(words[0].clone(), words[1..].iter().cloned().collect());
+        }
+    }
+    Ok(result)
 }
 
 fn parse_frames(line: &str) -> Option<Vec<(String, u32)>> {
@@ -113,13 +126,17 @@ pub struct WordNet {
 
 impl WordNet {
     pub fn load(directory: &Path) -> io::Result<Self> {
+        Self::load_controlled(directory, &Control::default())
+    }
+    pub fn load_controlled(directory: &Path, control: &Control) -> io::Result<Self> {
         let mut frames: HashMap<String, BTreeSet<u32>> = HashMap::new();
-        let data = match ascii(&directory.join("data.verb")) {
+        let data = match ascii(&directory.join("data.verb"), control) {
             Ok(data) => data,
             Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
             Err(e) => return Err(e),
         };
         for line in data.lines() {
+            control.check_io()?;
             if let Some(entries) = parse_frames(line) {
                 for (word, frame) in entries {
                     frames.entry(word).or_default().insert(frame);
@@ -127,12 +144,12 @@ impl WordNet {
             }
         }
         Ok(Self {
-            nouns: index(&directory.join("index.noun"))?,
-            verbs: index(&directory.join("index.verb"))?,
-            adjs: index(&directory.join("index.adj"))?,
-            advs: index(&directory.join("index.adv"))?,
-            noun_exc: exceptions(&directory.join("noun.exc"))?,
-            verb_exc: exceptions(&directory.join("verb.exc"))?,
+            nouns: index(&directory.join("index.noun"), control)?,
+            verbs: index(&directory.join("index.verb"), control)?,
+            adjs: index(&directory.join("index.adj"), control)?,
+            advs: index(&directory.join("index.adv"), control)?,
+            noun_exc: exceptions(&directory.join("noun.exc"), control)?,
+            verb_exc: exceptions(&directory.join("verb.exc"), control)?,
             frames,
         })
     }

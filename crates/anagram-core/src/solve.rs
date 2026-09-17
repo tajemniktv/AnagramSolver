@@ -1,4 +1,5 @@
 //! Serial ranked vertical slice. Corpus paths are adapter-owned, not wire data.
+use crate::control::Control;
 use crate::{
     corpus_ranking::{self, Collocation},
     lexicon::Unigrams,
@@ -10,7 +11,7 @@ use crate::{
     wordnet::WordNet,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path, sync::atomic::AtomicBool};
+use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path};
 
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -56,6 +57,27 @@ fn open(path: &Path) -> std::result::Result<BufReader<File>, Error> {
 }
 
 pub fn solve(request: &Request, paths: Paths<'_>) -> std::result::Result<Result, Error> {
+    solve_controlled(request, paths, &Control::default())
+}
+pub fn solve_controlled(
+    request: &Request,
+    paths: Paths<'_>,
+    control: &Control,
+) -> std::result::Result<Result, Error> {
+    control
+        .check()
+        .map_err(|reason| Error::new(reason, reason))?;
+    let result = run(request, paths, control);
+    control
+        .check()
+        .map_err(|reason| Error::new(reason, reason))?;
+    result
+}
+fn run(
+    request: &Request,
+    paths: Paths<'_>,
+    control: &Control,
+) -> std::result::Result<Result, Error> {
     if request.generation.max_words > 10
         || request.deep_per_group == 0
         || request.beam_width == 0
@@ -89,32 +111,39 @@ pub fn solve(request: &Request, paths: Paths<'_>) -> std::result::Result<Result,
             "Required words consume the entire target; the reference ranked solver does not support zero-residual answers",
         ));
     }
-    let unigrams = Unigrams::load(open(paths.unigrams)?).map_err(corpus)?;
+    let unigrams = Unigrams::load(control.reader(open(paths.unigrams)?)).map_err(corpus)?;
     let generated = request::generate(
         &request.generation,
-        open(paths.dictionary)?,
+        control.reader(open(paths.dictionary)?),
         Some(&unigrams),
-        &AtomicBool::new(false),
-        None,
+        control.flag(),
+        control.deadline(),
     )?;
-    let bigrams =
-        Bigrams::load(open(paths.bigrams)?, &unigrams, &generated.vocabulary).map_err(corpus)?;
+    let bigrams = Bigrams::load(
+        control.reader(open(paths.bigrams)?),
+        &unigrams,
+        &generated.vocabulary,
+    )
+    .map_err(corpus)?;
     let hints = request
         .generation
         .hints
         .iter()
         .map(|w| normalize_letters(w))
         .collect();
-    let records = scoring::pre_rank(
+    let records = scoring::pre_rank_controlled(
         &generated.bags,
         &hints,
         Some(&unigrams),
         Some(&bigrams),
         &generated.vocabulary,
         &generated.short_whitelist,
-    );
-    let lex = WordNet::load(paths.wordnet).map_err(corpus)?;
-    let mut rows = ranking::prepare(ranking::from_records(&records), &lex);
+        control,
+    )
+    .map_err(|e| Error::new(e, e))?;
+    let lex = WordNet::load_controlled(paths.wordnet, control).map_err(corpus)?;
+    let mut rows = ranking::prepare_controlled(ranking::from_records(&records), &lex, control)
+        .map_err(|e| Error::new(e, e))?;
     let selected = ranking::choose_deep(&rows, request.deep_per_group, request.deep_all);
     let options = ranking::Options {
         mode: request.order_mode,
@@ -122,13 +151,14 @@ pub fn solve(request: &Request, paths: Paths<'_>) -> std::result::Result<Result,
         exact_max_words: request.exact_max_words,
         retained_orders: request.retained_orders,
     };
-    let orders_evaluated = ranking::deep_analyze(&mut rows, &selected, &lex, &options)
-        .map_err(|e| Error::new("ranking_error", e))?;
+    let orders_evaluated =
+        ranking::deep_analyze_controlled(&mut rows, &selected, &lex, &options, control)
+            .map_err(|e| Error::new("ranking_error", e))?;
     let positive = if request.positive_bigrams {
         Some(
             Collocation::load(
-                open(paths.unigrams)?,
-                open(paths.bigrams)?,
+                control.reader(open(paths.unigrams)?),
+                control.reader(open(paths.bigrams)?),
                 &generated.vocabulary,
             )
             .map_err(corpus)?,
@@ -138,10 +168,10 @@ pub fn solve(request: &Request, paths: Paths<'_>) -> std::result::Result<Result,
     };
     let phrase = paths
         .phrase
-        .map(PhraseIndex::open)
+        .map(|path| PhraseIndex::open_controlled(path, control))
         .transpose()
         .map_err(corpus)?;
-    let corpus_rescored = corpus_ranking::rescore(
+    let corpus_rescored = corpus_ranking::rescore_controlled(
         &mut rows,
         positive.as_ref(),
         phrase
@@ -149,6 +179,7 @@ pub fn solve(request: &Request, paths: Paths<'_>) -> std::result::Result<Result,
             .map(|p| p as &dyn corpus_ranking::PhraseCorpus),
         request.phrase_rescore_top,
         request.phrase_bonus_max,
+        control,
     )
     .map_err(corpus)?;
     let deep_analyzed = rows.iter().filter(|r| r.deep).count();

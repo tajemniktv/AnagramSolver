@@ -1,15 +1,46 @@
 use anagram_core::{
+    control::Control,
     lexicon::Unigrams,
     request::{Error, GenerateRequest, generate},
 };
 use std::{
     fs::File,
     io::{self, BufReader, Read},
-    sync::atomic::AtomicBool,
+    time::{Duration, Instant},
 };
 
 fn run() -> Result<serde_json::Value, Error> {
-    let args: Vec<_> = std::env::args_os().skip(1).collect();
+    let mut args: Vec<_> = std::env::args_os().skip(1).collect();
+    let control = if let Some(index) = args.iter().position(|a| a == "--timeout-ms") {
+        let millis = args
+            .get(index + 1)
+            .and_then(|v| v.to_str())
+            .and_then(|v| v.parse::<u64>().ok())
+            .ok_or_else(|| {
+                Error::new(
+                    "invalid_timeout",
+                    "--timeout-ms requires a nonnegative integer",
+                )
+            })?;
+        args.drain(index..=index + 1);
+        let deadline = Instant::now()
+            .checked_add(Duration::from_millis(millis))
+            .ok_or_else(|| {
+                Error::new("invalid_timeout", "Deadline exceeds platform clock range")
+            })?;
+        Control::with_deadline(deadline)
+    } else {
+        Control::default()
+    };
+    let result = run_inner(&args, &control);
+    if result.is_err() {
+        if let Err(reason) = control.check() {
+            return Err(Error::new(reason, reason));
+        }
+    }
+    result
+}
+fn run_inner(args: &[std::ffi::OsString], control: &Control) -> Result<serde_json::Value, Error> {
     let ranked = args.first().is_some_and(|a| a == "solve");
     if !(ranked && (args.len() == 5 || args.len() == 6)
         || !ranked && (args.len() == 2 || args.len() == 3) && args[0] == "generate")
@@ -33,7 +64,7 @@ fn run() -> Result<serde_json::Value, Error> {
     if ranked {
         let request =
             serde_json::from_str(&input).map_err(|e| Error::new("invalid_json", e.to_string()))?;
-        let result = anagram_core::solve::solve(
+        let result = anagram_core::solve::solve_controlled(
             &request,
             anagram_core::solve::Paths {
                 dictionary: std::path::Path::new(&args[1]),
@@ -42,6 +73,7 @@ fn run() -> Result<serde_json::Value, Error> {
                 wordnet: std::path::Path::new(&args[4]),
                 phrase: args.get(5).map(std::path::Path::new),
             },
+            control,
         )?;
         return serde_json::to_value(result)
             .map_err(|e| Error::new("serialization_error", e.to_string()));
@@ -53,16 +85,16 @@ fn run() -> Result<serde_json::Value, Error> {
         .get(2)
         .map(|path| {
             let file = File::open(path)?;
-            Unigrams::load(BufReader::new(file))
+            Unigrams::load(control.reader(BufReader::new(file)))
         })
         .transpose()
         .map_err(|e: io::Error| Error::new("corpus_error", e.to_string()))?;
     let result = generate(
         &request,
-        BufReader::new(dictionary),
+        control.reader(BufReader::new(dictionary)),
         unigrams.as_ref(),
-        &AtomicBool::new(false),
-        None,
+        control.flag(),
+        control.deadline(),
     )?;
     serde_json::to_value(result).map_err(|e| Error::new("serialization_error", e.to_string()))
 }

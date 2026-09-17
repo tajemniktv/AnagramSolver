@@ -117,9 +117,18 @@ pub fn score_final(row: &Row) -> f64 {
 }
 
 pub fn prepare(inputs: Vec<Input>, lex: &WordNet) -> Vec<Row> {
+    prepare_controlled(inputs, lex, &crate::control::Control::default()).expect("unlimited control")
+}
+pub fn prepare_controlled(
+    inputs: Vec<Input>,
+    lex: &WordNet,
+    control: &crate::control::Control,
+) -> Result<Vec<Row>, &'static str> {
+    control.check()?;
     let mut rows: Vec<_> = inputs
         .into_iter()
         .map(|mut input| {
+            control.check()?;
             input.words.sort();
             let mut family_key: Vec<_> = input
                 .words
@@ -150,16 +159,17 @@ pub fn prepare(inputs: Vec<Input>, lex: &WordNet) -> Vec<Row> {
                 alternatives: Vec::new(),
             };
             row.pre_score = score_pre(&row);
-            row
+            Ok(row)
         })
-        .collect();
+        .collect::<Result<_, &'static str>>()?;
     rows.sort_by(|a, b| {
         a.input
             .word_count
             .cmp(&b.input.word_count)
             .then_with(|| a.input.words.cmp(&b.input.words))
     });
-    rows
+    control.check()?;
+    Ok(rows)
 }
 
 /// `per_group` is the initial shortlist size, not a hard deployment work cap:
@@ -225,18 +235,41 @@ pub fn deep_analyze(
     lex: &WordNet,
     options: &Options,
 ) -> Result<usize, &'static str> {
+    deep_analyze_controlled(
+        rows,
+        selected,
+        lex,
+        options,
+        &crate::control::Control::default(),
+    )
+}
+pub fn deep_analyze_controlled(
+    rows: &mut [Row],
+    selected: &BTreeSet<usize>,
+    lex: &WordNet,
+    options: &Options,
+    control: &crate::control::Control,
+) -> Result<usize, &'static str> {
+    control.check()?;
     let raw_k = diversity::raw_pool_size(options.retained_orders)?;
     if options.beam_width == 0 || selected.iter().any(|i| *i >= rows.len()) {
         return Err("invalid deep-analysis options or row index");
     }
     let mut evaluated = 0;
     for &i in selected {
+        control.check()?;
         let row = &mut rows[i];
         let exact = matches!(options.mode, OrderMode::Exact)
             || (matches!(options.mode, OrderMode::Auto)
                 && row.input.words.len() <= options.exact_max_words);
-        let (orders, count) =
-            ordering::rank(&row.input.words, lex, exact, options.beam_width, raw_k)?;
+        let (orders, count) = ordering::rank_controlled(
+            &row.input.words,
+            lex,
+            exact,
+            options.beam_width,
+            raw_k,
+            control,
+        )?;
         let Some(winner) = orders.first() else {
             continue;
         };

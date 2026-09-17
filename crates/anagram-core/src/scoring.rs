@@ -338,16 +338,38 @@ pub fn pre_rank(
     vocabulary: &BTreeSet<String>,
     short: &BTreeSet<String>,
 ) -> Vec<PreRecord> {
+    pre_rank_controlled(
+        bags,
+        hints,
+        unigrams,
+        bigrams,
+        vocabulary,
+        short,
+        &crate::control::Control::default(),
+    )
+    .expect("unlimited control")
+}
+pub fn pre_rank_controlled(
+    bags: &[Vec<String>],
+    hints: &BTreeSet<String>,
+    unigrams: Option<&Unigrams>,
+    bigrams: Option<&Bigrams<'_>>,
+    vocabulary: &BTreeSet<String>,
+    short: &BTreeSet<String>,
+    control: &crate::control::Control,
+) -> Result<Vec<PreRecord>, &'static str> {
+    control.check()?;
     let mut records: Vec<_> = bags
         .iter()
         .map(|words| {
+            control.check()?;
             let mut family: Vec<_> = words
                 .iter()
                 .map(|w| morph_root(w, vocabulary, unigrams))
                 .collect();
             family.sort();
             let (pair_raw, pair_coverage) = bigrams.map_or((0.0, 0.0), |b| b.pair_potential(words));
-            PreRecord {
+            Ok(PreRecord {
                 words: words.clone(),
                 matched_hints: hints
                     .iter()
@@ -365,13 +387,14 @@ pub fn pre_rank(
                 family_pct: 0.0,
                 pair_pct: 0.0,
                 pre_score: 0.0,
-            }
+            })
         })
-        .collect();
+        .collect::<Result<_, &'static str>>()?;
     let mut families: HashMap<Vec<String>, (f64, usize)> = HashMap::new();
     let mut hint_counts: HashMap<&str, usize> = HashMap::new();
     let mut buckets: HashMap<usize, Vec<usize>> = HashMap::new();
     for (index, record) in records.iter().enumerate() {
+        control.check()?;
         let family = families
             .entry(record.family.clone())
             .or_insert((record.lexical.lex_raw, 0));
@@ -400,6 +423,7 @@ pub fn pre_rank(
         .filter(|v| *v != 0.0)
         .unwrap_or(1.0);
     for record in &mut records {
+        control.check()?;
         (record.family_best_lex, record.family_size) = families[&record.family];
         if !record.matched_hints.is_empty() {
             let best = record
@@ -413,6 +437,7 @@ pub fn pre_rank(
         }
     }
     for bucket in buckets.values() {
+        control.check()?;
         let lex = percentiles(
             &bucket
                 .iter()
@@ -432,6 +457,7 @@ pub fn pre_rank(
                 .collect::<Vec<_>>(),
         );
         for (position, index) in bucket.iter().enumerate() {
+            control.check()?;
             let record = &mut records[*index];
             record.lex_pct = lex[position];
             record.family_pct = fam[position];
@@ -443,5 +469,6 @@ pub fn pre_rank(
                     + 0.16 * record.hint_info);
         }
     }
-    records
+    control.check()?;
+    Ok(records)
 }

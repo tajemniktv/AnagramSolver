@@ -10,18 +10,27 @@ use std::{
 pub struct PhraseIndex {
     connection: Connection,
     max_n: usize,
+    control: crate::control::Control,
 }
 fn error(e: rusqlite::Error) -> io::Error {
     io::Error::other(e)
 }
 impl PhraseIndex {
     pub fn open(path: &Path) -> io::Result<Self> {
+        Self::open_controlled(path, &crate::control::Control::default())
+    }
+    pub fn open_controlled(path: &Path, control: &crate::control::Control) -> io::Result<Self> {
+        control.check_io()?;
         // Deliberately omit URI parsing: a user-supplied filename is a path.
         let connection = Connection::open_with_flags(
             path,
             OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
         .map_err(error)?;
+        let callback_control = control.clone();
+        connection
+            .progress_handler(1000, Some(move || callback_control.check().is_err()))
+            .map_err(error)?;
         let max_n: i64 = connection
             .query_row("SELECT COALESCE(MAX(n), 0) FROM ngrams", [], |row| {
                 row.get(0)
@@ -29,7 +38,11 @@ impl PhraseIndex {
             .map_err(error)?;
         let max_n = usize::try_from(max_n)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "negative phrase order"))?;
-        Ok(Self { connection, max_n })
+        Ok(Self {
+            connection,
+            max_n,
+            control: control.clone(),
+        })
     }
 }
 impl PhraseCorpus for PhraseIndex {
@@ -37,6 +50,7 @@ impl PhraseCorpus for PhraseIndex {
         self.max_n
     }
     fn counts(&self, phrases: &[String]) -> io::Result<HashMap<String, i64>> {
+        self.control.check_io()?;
         let mut seen = HashSet::new();
         let unique: Vec<_> = phrases
             .iter()
@@ -44,6 +58,7 @@ impl PhraseCorpus for PhraseIndex {
             .collect();
         let mut counts = HashMap::new();
         for batch in unique.chunks(200) {
+            self.control.check_io()?;
             let placeholders = vec!["?"; batch.len()].join(",");
             let mut statement = self
                 .connection

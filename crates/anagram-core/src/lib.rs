@@ -8,6 +8,7 @@ pub mod clause;
 pub mod cohesion;
 pub mod comparative;
 pub mod contracts;
+pub mod control;
 pub mod corpus_ranking;
 pub mod diversity;
 pub mod generation;
