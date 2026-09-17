@@ -22,7 +22,7 @@
   } catch(e) { error = message(e); } }
   async function cancel() { try { await bridge.cancelTraining(); cancelling = true; } catch(e) { error = message(e); } }
   function select() { if(report?.corpora) settings.corpora = structuredClone(report.corpora as Settings['corpora']); }
-  onMount(() => { if(diagnostics) inspect(); return () => {disposed = true; clearTimeout(timer);}; });
+  onMount(() => { if(diagnostics) inspect(); else refresh(); return () => {disposed = true; clearTimeout(timer);}; });
 </script>
 {#if diagnostics}
   <h3>Diagnostics</h3><p class="hint">Configured paths, last solve identities (SHA-256), timings in milliseconds, effective budgets and cache flags. Last-solve evidence may predate settings changes. Nothing is uploaded.</p>

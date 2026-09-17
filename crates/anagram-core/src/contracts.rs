@@ -189,6 +189,7 @@ impl JobStatus {
             || (matches!(self.stage, Stage::Generating | Stage::Preparing)
                 && (c.deep_analyzed != 0 || c.orders_evaluated != 0 || c.corpus_rescored != 0))
             || (self.stage == Stage::Generating && c.deep_selected != 0)
+            || (self.stage == Stage::DeepRanking && c.corpus_rescored != 0)
         {
             return Err("counts or exhaustion do not match the execution stage");
         }
@@ -284,6 +285,10 @@ mod tests {
         )
         .unwrap();
         assert!(valid.validate().is_ok());
+        let mut premature = valid.clone();
+        premature.stage = Stage::DeepRanking;
+        premature.counts.corpus_rescored = 1;
+        assert!(premature.validate().is_err());
         let mut bad = valid.clone();
         bad.error = None;
         assert!(bad.validate().is_err());

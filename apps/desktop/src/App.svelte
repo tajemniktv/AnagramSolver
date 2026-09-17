@@ -35,7 +35,7 @@
     try { await bridge.start($state.snapshot(settings.request), rebuild, extended, generationOnly); await refresh(); } catch (e) { error = message(e); } finally { busy = false; }
   }
   async function cancel() { try { if (job?.active) { await bridge.cancel(job.id); cancelling = true; } } catch (e) { error = message(e); } }
-  async function save(next: Settings) { await bridge.save($state.snapshot(next)); settings = next; applyTheme(next.theme); boot = await bridge.bootstrap(); error = boot.corpus_error ?? ''; toast = 'Settings saved'; }
+  async function save(next: Settings) { const saved = $state.snapshot(next); await bridge.save(saved); settings = saved; applyTheme(saved.theme); boot = await bridge.bootstrap(); error = boot.corpus_error ?? ''; toast = 'Settings saved'; }
   async function toggleTheme() { if (!settings) return; const next = structuredClone($state.snapshot(settings)); next.theme = next.theme === 'light' ? 'dark' : 'light'; try { await save(next); } catch (e) { error = message(e); } }
   async function copy() { try { if (job) { await bridge.copy(job.id); toast = 'Phrases copied to clipboard'; } } catch (e) { error = message(e); } }
   async function exportRows(format: 'txt' | 'json') { try { if (job) { const path = await bridge.export(job.id, format); if (path) toast = `Exported to ${path}`; } } catch (e) { error = message(e); } }
@@ -57,7 +57,7 @@
         </fieldset>
         <Advanced bind:request={settings.request} bind:extended bind:rebuild {generationOnly} custom={settings.runtime.custom_limits} disabled={active}/>
         <label class="check"><input disabled={active} type="checkbox" bind:checked={generationOnly}/>Generate word bags only (skip ranking)</label>
-        {#if active}<button class="primary solve" type="button" onclick={cancel}><Square size={16}/>Cancel solve</button>{:else}<button class="primary solve" type="submit" disabled={!letters || (!extended && !settings.runtime.custom_limits && letters > 40)}>{generationOnly ? 'Generate word bags' : 'Solve anagram'}</button>{/if}
+        {#if active}<button class="primary solve" type="button" disabled={busy || !job?.active || cancelling} onclick={cancel}><Square size={16}/>Cancel solve</button>{:else}<button class="primary solve" type="submit" disabled={!letters || (!extended && !settings.runtime.custom_limits && letters > 40)}>{generationOnly ? 'Generate word bags' : 'Solve anagram'}</button>{/if}
       </form>
       {:else}<p class="muted">Connecting to the local engine…</p>{/if}
     </aside>

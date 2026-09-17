@@ -24,6 +24,10 @@ pub struct Inner {
     pub control: Control,
     pub worker: Option<JoinHandle<()>>,
     pub closing: bool,
+    #[cfg(test)]
+    pub worker_gate: Option<Arc<std::sync::Barrier>>,
+    #[cfg(test)]
+    pub panic_after_progress: bool,
 }
 pub struct Desktop {
     pub inner: Arc<Mutex<Inner>>,
@@ -52,20 +56,31 @@ fn generate_only(
         let fail = |e: std::io::Error| Error::new("corpus_error", e.to_string());
         let dictionary =
             Snapshot::load(Path::new(&corpora.dictionary), "dictionary", &control).map_err(fail)?;
-        progress.status.versions.data.push(dictionary.identity);
-        let unigrams = if corpora.unigrams.is_empty() {
+        progress
+            .status
+            .versions
+            .data
+            .push(dictionary.identity().clone());
+        let unigrams = if request.generation.min_zipf <= 0.0 || corpora.unigrams.is_empty() {
             None
         } else {
             let source =
                 Snapshot::load(Path::new(&corpora.unigrams), "unigrams", &control).map_err(fail)?;
-            progress.status.versions.data.push(source.identity);
-            Some(Unigrams::load(control.reader(std::io::Cursor::new(source.bytes))).map_err(fail)?)
+            progress
+                .status
+                .versions
+                .data
+                .push(source.identity().clone());
+            Some(
+                Unigrams::load(control.reader(std::io::Cursor::new(source.bytes())))
+                    .map_err(fail)?,
+            )
         };
         progress.status.versions.data_complete = true;
         progress.stage(Stage::Generating);
         let generated = anagram_core::request::generate_controlled(
             &request.generation,
-            control.reader(std::io::Cursor::new(dictionary.bytes)),
+            control.reader(std::io::Cursor::new(dictionary.bytes())),
             unigrams.as_ref(),
             &control,
         )?;
@@ -88,9 +103,10 @@ fn generate_only(
         progress.status.counts.shown = 0;
     }
     progress.finish(result.as_ref().err());
-    result.map(|mut value| {
-        value["status"] = serde_json::to_value(progress.status).expect("serializable status");
-        value
+    result.and_then(|mut value| {
+        value["status"] = serde_json::to_value(progress.status)
+            .map_err(|e| Error::new("serialization_error", e.to_string()))?;
+        Ok(value)
     })
 }
 impl Desktop {
@@ -107,6 +123,10 @@ impl Desktop {
                 control: Control::default(),
                 worker: None,
                 closing: false,
+                #[cfg(test)]
+                worker_gate: None,
+                #[cfg(test)]
+                panic_after_progress: false,
             })),
         })
     }
@@ -133,6 +153,7 @@ impl Desktop {
         let request: solve::Request = serde_json::from_value(request).map_err(|e| e.to_string())?;
         if generation_only {
             anagram_core::request::validate(&request.generation).map_err(|e| e.message)?;
+            solve::validate_budgets(&request).map_err(|e| e.message)?;
         } else {
             solve::validate(&request).map_err(|e| e.message)?;
         }
@@ -180,9 +201,17 @@ impl Desktop {
         let control = inner.control.clone();
         let shared = self.inner.clone();
         let cache_path = settings.runtime.cache_path(&self.data);
+        #[cfg(test)]
+        let worker_gate = inner.worker_gate.take();
+        #[cfg(test)]
+        let panic_after_progress = std::mem::take(&mut inner.panic_after_progress);
         let spawn = std::thread::Builder::new()
             .name("TajsAnagrams-solver".into())
             .spawn(move || {
+                #[cfg(test)]
+                if let Some(gate) = worker_gate {
+                    gate.wait();
+                }
                 let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     let c = settings.corpora;
                     if generation_only {
@@ -195,6 +224,10 @@ impl Desktop {
                             &mut |status| {
                                 if let Ok(mut inner) = shared.lock() {
                                     inner.job.status = Some(status.clone());
+                                }
+                                #[cfg(test)]
+                                if panic_after_progress {
+                                    panic!("injected worker failure");
                                 }
                             },
                         );
@@ -228,15 +261,25 @@ impl Desktop {
                             anagram_core::request::Error::new("serialization_error", e.to_string())
                         })
                     })
-                }));
+                }))
+                .unwrap_or_else(|_| {
+                    Err(anagram_core::request::Error::new(
+                        "worker_panic",
+                        "Solver stopped unexpectedly. You can start a new solve.",
+                    ))
+                });
                 if let Ok(mut inner) = shared.lock() {
                     match outcome {
-                        Ok(Ok(result)) => match serde_json::to_value(result) {
-                            Ok(result) => inner.job.result = Some(result),
-                            Err(error) => inner.job.error = Some(error.to_string()),
-                        },
-                        Ok(Err(error)) => {
-                            if inner.job.status.is_none() {
+                        Ok(result) => inner.job.result = Some(result),
+                        Err(error) => {
+                            if inner.job.status.as_ref().is_none_or(|s| {
+                                matches!(
+                                    s.state,
+                                    anagram_core::contracts::JobState::Queued
+                                        | anagram_core::contracts::JobState::Running
+                                )
+                            }) {
+                                let previous = inner.job.status.clone();
                                 let mut publish =
                                     |status: &JobStatus| inner.job.status = Some(status.clone());
                                 let mut progress = anagram_core::progress::Progress::new(
@@ -246,14 +289,13 @@ impl Desktop {
                                     &format!("desktop-{id}"),
                                     &mut publish,
                                 );
+                                if let Some(previous) = previous {
+                                    progress.status = previous;
+                                }
+                                progress.status.counts.shown = 0;
                                 progress.finish(Some(&error));
                             }
                             inner.job.error = Some(format!("{}: {}", error.code, error.message))
-                        }
-                        Err(_) => {
-                            inner.job.error = Some(
-                                "Solver stopped unexpectedly. You can start a new solve.".into(),
-                            )
                         }
                     }
                     inner.job.active = false;

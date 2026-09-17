@@ -17,7 +17,7 @@
   const names: [CorpusKey, string][] = [['dictionary','Dictionary'],['unigrams','Unigram counts'],['bigrams','Bigram counts'],['wordnet','WordNet dict folder'],['phrase','Phrase database (optional)']];
   $effect(() => { dialog?.showModal(); });
   async function choose(key: CorpusKey) { try { const path = await bridge.choose(key); if (path) draft.corpora[key] = path; } catch (e) { error = message(e); } }
-  async function save() { busy = true; try { await onsave(draft); onclose(); } catch (e) { error = message(e); } finally { busy = false; } }
+  async function save() { busy = true; try { await onsave($state.snapshot(draft)); onclose(); } catch (e) { error = message(e); } finally { busy = false; } }
   let cacheMessage = $state('');
   const limitNames = ['max_input_bytes','max_normalized_letters','max_candidates','max_deep_analyzed','max_beam_width','max_retained_orders','timeout_ms'] as const;
   async function cachePath() { try { draft.runtime.cache_path = await bridge.choose('cache') ?? draft.runtime.cache_path; } catch(e) {error = message(e);} }

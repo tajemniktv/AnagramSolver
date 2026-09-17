@@ -184,3 +184,17 @@ The automated checks above separately establish clipboard, JSON and cancellation
 Build-cache removal was also rejected; the latest normal install deliberately used
 `-KeepBuildCache` to avoid retrying that denied deletion. The installed current/one
 backup retention is verified; project Cargo cache cleanup remains outstanding.
+
+## Completed visual comparison, 2026-09-17
+
+Compared the generated concept with the user's maximized screenshots and native
+captures of the installed 1200px window. The graphite rail/canvas, violet action,
+Segoe UI typography, restrained borders, spacing and two-pane hierarchy match the
+direction. The implemented denser controls and extra word-count column are useful
+intentional deviations; result counts and scores are actual engine output.
+Light mode retains readable contrast; Follow Windows restores the dark palette on
+this PC. Keyboard zoom through 150% increases text and activates the compact
+stacked results toolbar without clipping controls horizontally. Independent pane
+scrolling keeps long advanced options and results accessible. Focus rings and
+keyboard select/submission were exercised. Reduced-motion behavior is provided
+by the CSS media rule; Windows accessibility settings were not changed for QA.

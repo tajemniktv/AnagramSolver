@@ -729,7 +729,7 @@ for them until ported; do not declare the migration complete prematurely.
       behind a typed adapter so a future website does not require another solver.
       Do not build website theming/SEO/shared-package infrastructure prematurely.
 - [x] On successful normal local app builds, dogfood into
-      `%LOCALAPPDATA%\Programs\TajemnikTV\AnagramSolver` and restart the app.
+      `%LOCALAPPDATA%\Programs\TajemnikTV\TajsAnagrams` and restart the app.
       Keep one current release and one rotating rollback backup. Never dogfood
       CI or test-only builds. Verify installed startup, not only dev-mode startup.
 - [x] Exercise real solving, cancellation, missing corpora, restart/settings
@@ -748,7 +748,7 @@ pass. Current and single rollback executable hashes are verified. Original user
 preferences were restored. See `apps/desktop/VERIFICATION.md` for proof boundaries.
 
 Runtime-data follow-up: normal local installs now provision the ten required
-corpus files (20.52 MiB) into `%LOCALAPPDATA%\Programs\TajemnikTV\AnagramSolver\corpora`,
+corpus files (20.52 MiB) into `%LOCALAPPDATA%\Programs\TajemnikTV\TajsAnagrams\corpora`,
 shared across executable releases. First copies are hash-verified; existing data
 is preserved. Settings/cache/WebView state live in adjacent `user-data`, migrated
 from the old app-local profile. Default repository paths migrate automatically while custom paths

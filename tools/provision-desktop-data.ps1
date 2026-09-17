@@ -7,6 +7,9 @@ $source = Join-Path $project '.anagram_data'
 $localData = [Environment]::GetFolderPath('LocalApplicationData')
 $destination = [IO.Path]::GetFullPath((Join-Path $localData 'Programs/TajemnikTV/TajsAnagrams/corpora'))
 $previous = [IO.Path]::GetFullPath((Join-Path $localData 'tv.tajemnik.anagramsolver/corpora'))
+if ((Test-Path -LiteralPath $previous) -and (Test-Path -LiteralPath $destination)) {
+    throw "Both legacy and current corpus folders exist. Reconcile them before migration; neither has been changed: $previous; $destination"
+}
 # Move only this app's previously provisioned data, never settings/cache or a broad root.
 if ((Test-Path -LiteralPath $previous -PathType Container) -and -not (Test-Path -LiteralPath $destination)) {
     foreach ($path in @($previous, $destination)) {
@@ -36,7 +39,10 @@ foreach ($relative in $files) {
     # Existing provisioned corpora are user data, not overwritten on app upgrades.
     if (Test-Path -LiteralPath $target -PathType Leaf) { continue }
     $inputFile = Join-Path $source $relative
-    if (-not (Test-Path -LiteralPath $inputFile -PathType Leaf)) { throw "Initial desktop corpus missing: $inputFile" }
+    if (-not (Test-Path -LiteralPath $inputFile -PathType Leaf)) {
+        Write-Warning "Corpus not bundled: $relative. After launch, use Settings > Data to download/prepare a corpus set, select it, and save settings."
+        continue
+    }
     New-Item -ItemType Directory -Path (Split-Path -Parent $target) -Force | Out-Null
     $staged = "$target.installing"
     if (Test-Path -LiteralPath $staged) { throw "Previous incomplete corpus copy requires inspection: $staged" }
@@ -45,7 +51,7 @@ foreach ($relative in $files) {
     # No -Force: never replace data created by another installer in the meantime.
     Move-Item -LiteralPath $staged -Destination $target
 }
-Write-Output "Runtime corpora provisioned in: $destination"
+Write-Output "Available runtime corpora copied to: $destination. Missing corpora can be prepared in Settings > Data."
 $oldProfile = [IO.Path]::GetFullPath((Join-Path $localData 'tv.tajemnik.anagramsolver'))
 $newProfile = [IO.Path]::GetFullPath((Join-Path $localData 'Programs/TajemnikTV/TajsAnagrams/user-data'))
 # The build script closes the app before provisioning. Move the entire profile,

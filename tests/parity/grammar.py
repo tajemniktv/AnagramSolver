@@ -1,5 +1,6 @@
 """Local grammar parity against Python's actual WordNet-backed scorer."""
 import json
+import inspect
 from dataclasses import asdict
 from pathlib import Path
 import random
@@ -17,6 +18,19 @@ from scoring import close
 
 
 def main():
+    # Preserve the historical oracle on disk. These three reviewed bug fixes
+    # deliberately improve native behavior; adapt only those reference helpers
+    # for this differential gate, and include explicit regression phrases below.
+    reference._comparative_like = lambda word, lex: comparative.comparative_evidence(word, lex).confidence >= 0.9
+    edits = {
+        "_comparative_span_starting_at": ("or any(lex.features(w).adj or lex.features(w).adv for w in left)", ""),
+        "_np_span_starting_at": ("and words[i].endswith((\"ed\", \"en\")) and following_is_nominal", "and function_class(words[i]) is None and words[i].endswith((\"ed\", \"en\")) and following_is_nominal"),
+    }
+    for name, (before, after) in edits.items():
+        source = inspect.getsource(getattr(reference, name))
+        if before not in source:
+            raise RuntimeError(f"Reference correction no longer applies: {name}")
+        exec(compile(source.replace(before, after), f"<reviewed-reference-{name}>", "exec"), reference.__dict__)
     directory = ROOT / ".anagram_data/wordnet31/dict"
     lex = reference.WordNetLexicon.load(directory)
     rng = random.Random(917)
@@ -39,6 +53,7 @@ def main():
     cases.extend(phrase.split() for phrase in ["united we stand divided we fall", "actions speak louder than words",
                  "the engine is repaired by the mechanic quickly", "the engine is repaired by the mechanic dog",
                  "they have been being tested", "the birds are flying", "the bird are flying"])
+    cases.extend(phrase.split() for phrase in ["old than words", "silver than words", "older than words", "the been dog", "the broken window"])
     subprocess.run(["cargo", "build", "--locked", "--example", "grammar_probe"], cwd=ROOT, check=True)
     executable = ROOT / "target/debug/examples" / ("grammar_probe.exe" if sys.platform == "win32" else "grammar_probe")
     result = subprocess.run([str(executable), str(directory)], input="\n".join(map(json.dumps, cases)),
@@ -82,7 +97,7 @@ def main():
                                         ["am","is","are","was","were","has","have","had","hasnt","dont","can"]] for w in words])
         try:
             close(got, expected)
-        except AssertionError as error:
+        except (AssertionError, TypeError) as error:
             raise AssertionError((words, error)) from error
     print(f"Local grammar parity passed: {len(cases)} cases including all function-word pairs")
 

@@ -81,7 +81,7 @@ fn run() -> Result<serde_json::Value, Error> {
             .ok_or_else(|| Error::new("usage", "--limits requires a policy JSON file"))?;
         let mut input = String::new();
         File::open(path)
-            .and_then(|file| file.take(65_537).read_to_string(&mut input))
+            .and_then(|file| control.reader(file).take(65_537).read_to_string(&mut input))
             .map_err(|e| Error::new("invalid_deployment_limits", e.to_string()))?;
         if input.len() > 65_536 {
             return Err(Error::new(
@@ -153,10 +153,7 @@ fn run_inner(
             "anagram-cli generate DICTIONARY [UNIGRAMS] | solve DICTIONARY UNIGRAMS BIGRAMS WORDNET [PHRASE_DB|-] [MODEL] < request.json",
         ));
     }
-    let mut input = String::new();
-    io::stdin()
-        .take(1_048_577)
-        .read_to_string(&mut input)
+    let input = String::from_utf8(utilities::read_stdin(control, 1_048_576)?)
         .map_err(|e| Error::new("input_error", e.to_string()))?;
     if input.len() > 1_048_576 {
         return Err(Error::new(
