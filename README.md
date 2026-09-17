@@ -1,3 +1,12 @@
+# TajsAnagrams desktop app
+
+The current application is the native Rust/Svelte desktop app. See
+[desktop setup](apps/desktop/README.md), [native CLI tools](NATIVE_TOOLS.md),
+and the [implementation plan](PLAN.md). Python is not a runtime dependency.
+
+The historical Python reference instructions below remain available until
+the separate archival PR moves them into `archive/`.
+
 # AnagramSolver
 
 A multi-word exact anagram solver that combines exact letter matching with lexical frequency, WordNet grammar/valency, retained word-order candidates, positive bigram evidence, and optional Wikimedia phrase evidence.
