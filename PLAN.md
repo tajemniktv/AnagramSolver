@@ -49,7 +49,10 @@ Phases 4–6 remain future roadmap context and are not part of this active goal.
   compact noun-phrase spans are now native. `python tests/parity/grammar.py`
   passes 262 cases, including all function-word pairs and the audited ambiguous
   noun/adjective heads, participles and postnominal PPs. Strict Clippy passes.
-  Subject agreement, full clause/auxiliary/comparative structure, retained-order
+  Subject agreement, compact comparative/subordinate parsing, valency tails and
+  base phrase-structure selection are also now native, with 270 differential
+  cases covering every exposed helper plus final base structure fields.
+  Extended auxiliary-chain/clause-validity/comparative rules, retained-order
   search and final score assembly still need implementation and parity proof.
 
 ## Outcome

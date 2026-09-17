@@ -1,5 +1,6 @@
 """Local grammar parity against Python's actual WordNet-backed scorer."""
 import json
+from dataclasses import asdict
 from pathlib import Path
 import random
 import subprocess
@@ -22,7 +23,9 @@ def main():
     cases.append(vocabulary)
     cases.extend(phrase.split() for phrase in ["the young", "a professional", "the light faded",
                  "the repaired engine", "the mechanic repaired engines", "birds of a feather",
-                 "mother of invention", "these old sheep", "a dogs", "school bus", "less is more"])
+                 "mother of invention", "these old sheep", "a dogs", "school bus", "less is more",
+                 "better late than never", "louder than words", "before you leap", "the bird sings",
+                 "the pot boils", "turn red", "give him a book", "paint the wall red"])
     subprocess.run(["cargo", "build", "--locked", "--example", "grammar_probe"], cwd=ROOT, check=True)
     executable = ROOT / "target/debug/examples" / ("grammar_probe.exe" if sys.platform == "win32" else "grammar_probe")
     result = subprocess.run([str(executable), str(directory)], input="\n".join(map(json.dumps, cases)),
@@ -37,7 +40,15 @@ def main():
                         local=reference.local_grammar_raw(words,lex),
                         potential=reference.grammar_potential(words,lex), coverage=reference.content_coverage(words,lex),
                         np_start=[reference._np_span_starting_at(words,i,lex) for i in range(len(words))],
-                        np_end=[reference._np_span_ending_at(words,i,lex) for i in range(len(words))])
+                        np_end=[reference._np_span_ending_at(words,i,lex) for i in range(len(words))],
+                        comparative=[reference._comparative_span_starting_at(words,i,lex) for i in range(len(words))],
+                        simple=[reference._simple_clause_span_starting_at(words,i,lex) for i in range(len(words))],
+                        subordinate=[reference._subordinate_span_starting_at(words,i,lex) for i in range(len(words))],
+                        numbers=[reference._subject_number(w,lex) for w in words],
+                        agreement=[[reference._subject_agreement(w,v,lex,auxiliary=False) for v in
+                                    ["is","are","dont","doesnt","runs","run","stopped","have"]] for w in words],
+                        tails=[reference._valency_for_tail(v,words,lex) for v in ["run","give","speak","look","turn"]],
+                        structure=asdict(reference.phrase_structure(words,lex)))
         try:
             close(got, expected)
         except AssertionError as error:

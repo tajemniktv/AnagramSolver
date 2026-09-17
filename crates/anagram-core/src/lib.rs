@@ -3,6 +3,7 @@
 
 use unicode_normalization::UnicodeNormalization;
 
+pub mod clause;
 pub mod generation;
 pub mod grammar;
 pub mod lexicon;
