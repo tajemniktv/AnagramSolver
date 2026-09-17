@@ -1,0 +1,263 @@
+{
+  "$defs": {
+    "CacheFlags": {
+      "additionalProperties": false,
+      "properties": {
+        "corrupt_entry_ignored": {
+          "type": "boolean"
+        },
+        "hit": {
+          "type": "boolean"
+        },
+        "rebuilt": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hit",
+        "rebuilt",
+        "corrupt_entry_ignored"
+      ],
+      "type": "object"
+    },
+    "Counts": {
+      "additionalProperties": false,
+      "properties": {
+        "corpus_rescored": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "deep_analyzed": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "deep_selected": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "generated": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "orders_evaluated": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shown": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "generated",
+        "deep_selected",
+        "deep_analyzed",
+        "orders_evaluated",
+        "corpus_rescored",
+        "shown"
+      ],
+      "type": "object"
+    },
+    "DataIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "role": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "sha256",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "EffectiveBudgets": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_limit": {
+          "description": "None means unbounded, unlike a displayed result limit.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "deadline_ms": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "deep_limit": {
+          "description": "Hard work cap, separate from semantic family-expanding shortlist size.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "deep_per_group": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "result_limit_per_group": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deep_per_group",
+        "result_limit_per_group"
+      ],
+      "type": "object"
+    },
+    "Exhaustion": {
+      "enum": [
+        "exhausted",
+        "truncated",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "JobState": {
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "cancelled",
+        "timed_out",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "Stage": {
+      "enum": [
+        "queued",
+        "loading_corpora",
+        "generating",
+        "preparing",
+        "deep_ranking",
+        "corpus_ranking",
+        "finalizing",
+        "complete"
+      ],
+      "type": "string"
+    },
+    "Versions": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "items": {
+            "$ref": "#/$defs/DataIdentity"
+          },
+          "type": "array"
+        },
+        "engine": {
+          "type": "string"
+        },
+        "ranking": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "engine",
+        "ranking",
+        "data"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "budgets": {
+      "$ref": "#/$defs/EffectiveBudgets"
+    },
+    "cache": {
+      "$ref": "#/$defs/CacheFlags"
+    },
+    "counts": {
+      "$ref": "#/$defs/Counts"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Failure"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "exhaustion": {
+      "$ref": "#/$defs/Exhaustion"
+    },
+    "job_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "stage": {
+      "$ref": "#/$defs/Stage"
+    },
+    "state": {
+      "$ref": "#/$defs/JobState"
+    },
+    "versions": {
+      "$ref": "#/$defs/Versions"
+    }
+  },
+  "required": [
+    "schema_version",
+    "job_id",
+    "state",
+    "stage",
+    "counts",
+    "budgets",
+    "versions",
+    "cache",
+    "exhaustion"
+  ],
+  "title": "JobStatus",
+  "type": "object"
+}

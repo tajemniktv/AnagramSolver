@@ -1,0 +1,70 @@
+{
+  "$defs": {
+    "Stop": {
+      "enum": [
+        "exhausted",
+        "candidate_cap",
+        "cancelled",
+        "timed_out"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "bags": {
+      "items": {
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "candidate_budget": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "engine_version": {
+      "type": "string"
+    },
+    "generated": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "normalized_input": {
+      "type": "string"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "stop": {
+      "$ref": "#/$defs/Stop"
+    },
+    "vocabulary_size": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "engine_version",
+    "normalized_input",
+    "bags",
+    "generated",
+    "vocabulary_size",
+    "candidate_budget",
+    "stop"
+  ],
+  "title": "Generated",
+  "type": "object"
+}

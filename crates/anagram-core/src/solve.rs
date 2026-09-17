@@ -12,7 +12,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path, sync::atomic::AtomicBool};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub generation: GenerateRequest,
@@ -27,7 +27,7 @@ pub struct Request {
     pub positive_bigrams: bool,
     pub result_limit_per_group: usize,
 }
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub struct Result {
     pub schema_version: u32,
     pub kind: &'static str,

@@ -209,6 +209,8 @@ small sample. Distinguish empty puzzle caches from cold corpus/OS caches.
       generated or mechanically checked TypeScript types.
   - [x] Implement version-1 Rust generation request/result/errors and JSON CLI.
   - [ ] Complete ranked/job contracts, JSON schema and TypeScript parity checks.
+    - [x] Derive structural JSON Schema and TypeScript from Rust; add drift checks,
+          shared Rust/Python/JavaScript fixtures and TypeScript negative type checks.
     - [x] Add a development ranked JSON CLI with separate generated/deep/shown
           counts and per-word-count results. Document it in `contracts/README.md`.
     - [ ] Stabilize unified defaults, budgets, progress/provenance and generated
@@ -220,6 +222,10 @@ small sample. Distinguish empty puzzle caches from cold corpus/OS caches.
       Reject non-finite values and contradictory constraints; never relax silently.
 - [ ] Define job states: queued, running, succeeded, cancelled, timed_out, failed.
       Include stage, counts, effective budgets, engine/data versions and cache flags.
+  - [x] Define transport-neutral job/progress data and terminal-state transition
+        rules, including unknown exhaustion and semantic versus hard deep budgets.
+  - [ ] Populate progress/provenance from the running engine and finish semantic
+        validation; definitions alone do not prove runtime behavior.
 - [ ] Preserve the distinction between generated bags, deep-analyzed bags and shown
       rows. Distinguish exhausted search, generation cap and deadline termination;
       report unknown exhaustion when a deadline prevents the extra-candidate probe.

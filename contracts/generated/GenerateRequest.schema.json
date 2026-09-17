@@ -1,0 +1,104 @@
+{
+  "$defs": {
+    "HintMode": {
+      "enum": [
+        "any",
+        "exactly_one"
+      ],
+      "type": "string"
+    },
+    "Strategy": {
+      "enum": [
+        "prefix",
+        "diverse"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "allow_repeat": {
+      "type": "boolean"
+    },
+    "candidate_budget": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "excluded": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "hint_mode": {
+      "$ref": "#/$defs/HintMode"
+    },
+    "hints": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "max_word_length": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "max_words": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "min_word_length": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "min_words": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "min_zipf": {
+      "format": "double",
+      "type": "number"
+    },
+    "required": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "strategy": {
+      "$ref": "#/$defs/Strategy"
+    },
+    "text": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "text",
+    "min_words",
+    "max_words",
+    "min_word_length",
+    "max_word_length",
+    "min_zipf",
+    "candidate_budget",
+    "allow_repeat",
+    "strategy",
+    "hint_mode"
+  ],
+  "title": "GenerateRequest",
+  "type": "object"
+}

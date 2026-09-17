@@ -88,7 +88,39 @@ components. The generator's historical decimal export quantization is preserved
 before preparation because it affects ranking and ties.
 
 This is still a development interface: no persistent cache, corpus identities,
-job/progress contract or end-to-end cancellation yet. Python remains the default
-application. Still required before frontend adoption: generated schema/TypeScript
-types, capability/job contracts, deployment limits, corpus provenance and complete
-parity/performance acceptance gates.
+emitted job/progress events or end-to-end cancellation yet. Python remains the
+default application. Still required before frontend adoption: semantic contract
+validation, deployment limits, corpus provenance and complete parity/performance
+acceptance gates.
+
+## Generated types and checks
+
+Rust structs are the structural source of truth. `tools/generate_contracts.py`
+uses Schemars' Serde-compatible derivation to produce checked-in JSON Schema
+2020-12 and TypeScript files in `contracts/generated/`. Do not edit generated
+files. Schema validation covers wire shape; cross-field constraints and version
+acceptance remain engine validation, not TypeScript refinements.
+
+```text
+python tools/generate_contracts.py
+python tools/generate_contracts.py --check
+npm --prefix contracts ci --ignore-scripts
+npm --prefix contracts run check
+python -m pip install --target .codex/temp/schema-python jsonschema==4.26.0
+python tests/parity/contracts.py
+cargo test --workspace --locked
+```
+
+`JobStatus` defines queued/running/succeeded/cancelled/timed_out/failed states,
+stage, counts, effective budgets, version identities, cache flags and exhaustion.
+Terminal states cannot restart or change outcome. `unknown` exhaustion is required
+when interruption prevents proving exhaustion, even if the number collected equals
+the candidate cap. Family-expanded shortlist size and a deployment hard deep limit
+are separate fields. These are transport-neutral definitions; the current CLI does
+not yet emit progress events, enforce those deployment limits or create jobs.
+
+Scalars in generation/ranking requests remain explicit (no hidden defaults);
+constraint arrays default to empty. The fixtures check Rust deserialization and
+independent Python/JavaScript schema consumers; TypeScript includes negative type
+checks. Runtime validation, numeric wire bounds and provenance population still
+need completion before the phase-1 gate is passed.

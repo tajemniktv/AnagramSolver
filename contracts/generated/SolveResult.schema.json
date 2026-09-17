@@ -1,0 +1,250 @@
+{
+  "$defs": {
+    "Row": {
+      "properties": {
+        "base_final": {
+          "format": "double",
+          "type": "number"
+        },
+        "best_order": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "colloc_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "deep": {
+          "type": "boolean"
+        },
+        "fam": {
+          "format": "double",
+          "type": "number"
+        },
+        "family_key": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "final": {
+          "format": "double",
+          "type": "number"
+        },
+        "grammar_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "grammar_potential": {
+          "format": "double",
+          "type": "number"
+        },
+        "grammar_potential_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "grammar_raw": {
+          "format": "double",
+          "type": "number"
+        },
+        "hint": {
+          "format": "double",
+          "type": "number"
+        },
+        "hints": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "lex": {
+          "format": "double",
+          "type": "number"
+        },
+        "old_pair": {
+          "format": "double",
+          "type": "number"
+        },
+        "old_pcov": {
+          "format": "double",
+          "type": "number"
+        },
+        "old_pre": {
+          "format": "double",
+          "type": "number"
+        },
+        "old_rank": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "phrase_attest_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "phrase_bonus": {
+          "format": "double",
+          "type": "number"
+        },
+        "phrase_kind": {
+          "type": "string"
+        },
+        "pre_score": {
+          "format": "double",
+          "type": "number"
+        },
+        "structure_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "syntax_coverage": {
+          "format": "double",
+          "type": "number"
+        },
+        "valency_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "wn_coverage": {
+          "format": "double",
+          "type": "number"
+        },
+        "word_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "words": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "zavg": {
+          "format": "double",
+          "type": "number"
+        },
+        "zmin": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "words",
+        "word_count",
+        "old_rank",
+        "old_pre",
+        "lex",
+        "fam",
+        "old_pair",
+        "hint",
+        "zavg",
+        "zmin",
+        "old_pcov",
+        "hints",
+        "wn_coverage",
+        "grammar_potential",
+        "grammar_potential_norm",
+        "pre_score",
+        "deep",
+        "best_order",
+        "grammar_raw",
+        "grammar_norm",
+        "structure_norm",
+        "valency_norm",
+        "syntax_coverage",
+        "phrase_kind",
+        "base_final",
+        "colloc_norm",
+        "phrase_attest_norm",
+        "phrase_bonus",
+        "final",
+        "family_key"
+      ],
+      "type": "object"
+    },
+    "Stop": {
+      "enum": [
+        "exhausted",
+        "candidate_cap",
+        "cancelled",
+        "timed_out"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "buckets": {
+      "additionalProperties": false,
+      "patternProperties": {
+        "^\\d+$": {
+          "items": {
+            "$ref": "#/$defs/Row"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "corpus_rescored": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "deep_analyzed": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "engine_version": {
+      "type": "string"
+    },
+    "generated": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "generation_stop": {
+      "$ref": "#/$defs/Stop"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "normalized_input": {
+      "type": "string"
+    },
+    "orders_evaluated": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "shown": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "engine_version",
+    "normalized_input",
+    "generated",
+    "deep_analyzed",
+    "shown",
+    "orders_evaluated",
+    "corpus_rescored",
+    "generation_stop",
+    "buckets"
+  ],
+  "title": "Result",
+  "type": "object"
+}

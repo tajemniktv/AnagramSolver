@@ -4,7 +4,7 @@ use crate::{diversity, grammar, ordering, wordnet::WordNet};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct Input {
     pub words: Vec<String>,
     pub word_count: usize,
@@ -60,7 +60,7 @@ pub fn from_records(records: &[crate::scoring::PreRecord]) -> Vec<Input> {
     inputs
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, schemars::JsonSchema)]
 pub struct Row {
     #[serde(flatten)]
     pub input: Input,
@@ -195,7 +195,7 @@ pub fn choose_deep(rows: &[Row], per_group: usize, deep_all: bool) -> BTreeSet<u
         .collect()
 }
 
-#[derive(Clone, Copy, Deserialize)]
+#[derive(Clone, Copy, Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum OrderMode {
     Auto,

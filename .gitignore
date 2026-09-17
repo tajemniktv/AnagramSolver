@@ -11,3 +11,4 @@ __pycache__/
 *.db-wal
 .codex/temp/
 target/
+node_modules/

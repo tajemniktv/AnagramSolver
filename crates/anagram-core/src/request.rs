@@ -8,7 +8,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, io::BufRead, sync::atomic::AtomicBool, time::Instant};
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GenerateRequest {
     pub schema_version: u32,
@@ -30,7 +30,7 @@ pub struct GenerateRequest {
     pub hint_mode: HintMode,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, schemars::JsonSchema)]
 pub struct Error {
     pub code: &'static str,
     pub message: String,
@@ -45,7 +45,7 @@ impl Error {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, schemars::JsonSchema)]
 pub struct Generated {
     pub schema_version: u32,
     pub kind: &'static str,
