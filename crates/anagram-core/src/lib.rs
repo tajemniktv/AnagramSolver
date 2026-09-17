@@ -7,6 +7,7 @@ pub mod generation;
 pub mod lexicon;
 pub mod request;
 pub mod scoring;
+pub mod wordnet;
 
 /// Match Python's NFKD -> ASCII(ignore) -> lowercase -> [a-z] pipeline.
 /// In particular, do not transliterate letters such as ł or ß.

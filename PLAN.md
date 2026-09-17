@@ -3,6 +3,9 @@
 Status: implementation in progress, 2026-09-17. Production deployment still
 requires explicit approval.
 
+Current implementation goal: **phases 0–3 fully**, per the user's scope update.
+Phases 4–6 remain future roadmap context and are not part of this active goal.
+
 ### Implementation evidence
 
 - Python reference commit: `c12e3d5519d653fd65c7ffbbb2a1597941fedd2a`.
@@ -36,6 +39,12 @@ requires explicit approval.
   against Python with exact order/tie checks and 1e-12 numeric tolerance. Grammar,
   retained-order/top-K and final ranking remain unported; the CLI still correctly
   advertises generation-only output. No native speedup claim has been made.
+- Native immutable WordNet loading now includes POS indices, exception-based and
+  regular morphology, per-lemma verb frames, features and valency categories.
+  `python tests/parity/wordnet.py` matches Python on 6,483 words, including all
+  noun/verb exceptions, function words and seeded inflections. Eleven Rust tests
+  and strict Clippy pass. Phrase-structure grammar and final ranking are next;
+  lexical-data parity alone does not prove grammar parity.
 
 ## Outcome
 
