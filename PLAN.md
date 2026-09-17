@@ -45,6 +45,12 @@ Phases 4–6 remain future roadmap context and are not part of this active goal.
   noun/verb exceptions, function words and seeded inflections. Eleven Rust tests
   and strict Clippy pass. Phrase-structure grammar and final ranking are next;
   lexical-data parity alone does not prove grammar parity.
+- Local grammatical classification/adjacency/start/end/potential/coverage and
+  compact noun-phrase spans are now native. `python tests/parity/grammar.py`
+  passes 262 cases, including all function-word pairs and the audited ambiguous
+  noun/adjective heads, participles and postnominal PPs. Strict Clippy passes.
+  Subject agreement, full clause/auxiliary/comparative structure, retained-order
+  search and final score assembly still need implementation and parity proof.
 
 ## Outcome
 

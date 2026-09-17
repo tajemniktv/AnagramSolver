@@ -4,7 +4,9 @@
 use unicode_normalization::UnicodeNormalization;
 
 pub mod generation;
+pub mod grammar;
 pub mod lexicon;
+pub mod phrase;
 pub mod request;
 pub mod scoring;
 pub mod wordnet;
