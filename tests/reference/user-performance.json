@@ -1,0 +1,55 @@
+{
+  "platform": "Windows-11-10.0.26220-SP0",
+  "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
+  "source_sha256": "3a699b2852e62624c79edb5e4ee4e225a6b304688958041b319a9e4b8a599837",
+  "cold_definition": "fresh candidate, prepared, and ranking caches; runtime corpora and OS caches warm",
+  "memory_definition": "peak sampled sum of root and descendant RSS every 20ms; shared pages can be counted more than once",
+  "cap": 2000,
+  "workers": 2,
+  "runs": [
+    {
+      "case": "actions_words",
+      "strategy": "prefix",
+      "sample": 1,
+      "phase": "cold",
+      "seconds": 157.95807160000004,
+      "peak_tree_rss_bytes": 10223185920,
+      "expected_bag_generated": false,
+      "displayed_answer_rank": null,
+      "search": {
+        "cap": 2000,
+        "generated": 2000,
+        "seconds": 135.28080470000168,
+        "status": "ok",
+        "strategy": "prefix",
+        "truncated": true,
+        "vocabulary_size": 8165,
+        "generation_cached": false,
+        "deep_analyzed": 2000,
+        "ranking_cached": false
+      }
+    },
+    {
+      "case": "actions_words",
+      "strategy": "prefix",
+      "sample": 1,
+      "phase": "warm",
+      "seconds": 0.4756521999988763,
+      "peak_tree_rss_bytes": 35700736,
+      "expected_bag_generated": false,
+      "displayed_answer_rank": null,
+      "search": {
+        "cap": 2000,
+        "generated": 2000,
+        "seconds": 135.28080470000168,
+        "status": "ok",
+        "strategy": "prefix",
+        "truncated": true,
+        "vocabulary_size": 8165,
+        "generation_cached": true,
+        "deep_analyzed": 2000,
+        "ranking_cached": true
+      }
+    }
+  ]
+}

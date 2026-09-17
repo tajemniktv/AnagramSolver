@@ -1,0 +1,762 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "machine": "Windows-11-10.0.26220-SP0",
+  "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
+  "cpu": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+  "native_sha256": "79457a9fc7170da49d65ca1fd1669e6090221cb1c784515d164062ce8a24c427",
+  "registry_sha256": "e99e4c3affbd5d8577c83ba93f7ecb3d200025262a1728439a9fd8a82a567735",
+  "methodology": "Serial fresh processes, alternating engine order per sample; Python workers=1; cold means fresh puzzle caches, not cold OS/corpus pages. Warm native reuses ranking only; Python reuses generation and ranking. Elapsed time includes startup, parsing and JSON transport. Sampled summed process-tree RSS may double-count shared pages. No parallel speedup claim.",
+  "samples": 3,
+  "cases": [
+    "cli_so_cozy",
+    "cli_hi_everyone",
+    "cli_proper_name_control",
+    "shakira_control",
+    "user_testing_anagrams"
+  ],
+  "complete": true,
+  "runs": [
+    {
+      "case": "cli_so_cozy",
+      "sample": 0,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 2.4637306000004173,
+      "sampled_peak_rss_bytes": 123752448
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 0,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.28371530000003986,
+      "sampled_peak_rss_bytes": 34779136
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.8712229000011575,
+      "sampled_peak_rss_bytes": 61804544
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.5617020999998203,
+      "sampled_peak_rss_bytes": 61689856
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.7686219999995956,
+      "sampled_peak_rss_bytes": 61571072
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.5500546000002942,
+      "sampled_peak_rss_bytes": 64233472
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 1,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 2.417921000000206,
+      "sampled_peak_rss_bytes": 124235776
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 1,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.3246015000004263,
+      "sampled_peak_rss_bytes": 34738176
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 2,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 2.5523653000018385,
+      "sampled_peak_rss_bytes": 124157952
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 2,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.29301980000309413,
+      "sampled_peak_rss_bytes": 34684928
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.7817478999968444,
+      "sampled_peak_rss_bytes": 61313024
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.5549532000004547,
+      "sampled_peak_rss_bytes": 62291968
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 0,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 2.8851233999994292,
+      "sampled_peak_rss_bytes": 124338176
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 0,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.28212970000095083,
+      "sampled_peak_rss_bytes": 34967552
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 1.044483500001661,
+      "sampled_peak_rss_bytes": 63041536
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.5829990999991423,
+      "sampled_peak_rss_bytes": 62144512
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.9959606999982498,
+      "sampled_peak_rss_bytes": 62570496
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.578663600001164,
+      "sampled_peak_rss_bytes": 61136896
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 1,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 2.8919018999986292,
+      "sampled_peak_rss_bytes": 127135744
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 1,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.2760347000003094,
+      "sampled_peak_rss_bytes": 34783232
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 2,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 2.883523000000423,
+      "sampled_peak_rss_bytes": 124243968
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 2,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.2869800000007672,
+      "sampled_peak_rss_bytes": 34590720
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 1.0299574000018765,
+      "sampled_peak_rss_bytes": 62595072
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.5805947999979253,
+      "sampled_peak_rss_bytes": 62324736
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 0,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 3.2317958000021463,
+      "sampled_peak_rss_bytes": 124276736
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 0,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.2780835000012303,
+      "sampled_peak_rss_bytes": 34615296
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 1.5748587000016414,
+      "sampled_peak_rss_bytes": 65966080
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.6301282999993418,
+      "sampled_peak_rss_bytes": 63201280
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 1.61147229999915,
+      "sampled_peak_rss_bytes": 65650688
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.6145216000004439,
+      "sampled_peak_rss_bytes": 63201280
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 1,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 3.2863528999987466,
+      "sampled_peak_rss_bytes": 124248064
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 1,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.2977259999970556,
+      "sampled_peak_rss_bytes": 34680832
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 2,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 3.3979204999996,
+      "sampled_peak_rss_bytes": 123629568
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 2,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.2907567000002018,
+      "sampled_peak_rss_bytes": 34611200
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 1.5895768999980646,
+      "sampled_peak_rss_bytes": 65294336
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.6030195999992429,
+      "sampled_peak_rss_bytes": 62906368
+    },
+    {
+      "case": "shakira_control",
+      "sample": 0,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 52.07600359999924,
+      "sampled_peak_rss_bytes": 375083008
+    },
+    {
+      "case": "shakira_control",
+      "sample": 0,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 0.3565640999986499,
+      "sampled_peak_rss_bytes": 39440384
+    },
+    {
+      "case": "shakira_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 81.14993409999806,
+      "sampled_peak_rss_bytes": 367120384
+    },
+    {
+      "case": "shakira_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 10.951195800000278,
+      "sampled_peak_rss_bytes": 220725248
+    },
+    {
+      "case": "shakira_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 80.81043750000026,
+      "sampled_peak_rss_bytes": 366772224
+    },
+    {
+      "case": "shakira_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 11.054509400000825,
+      "sampled_peak_rss_bytes": 220999680
+    },
+    {
+      "case": "shakira_control",
+      "sample": 1,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 52.607101200002944,
+      "sampled_peak_rss_bytes": 374591488
+    },
+    {
+      "case": "shakira_control",
+      "sample": 1,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 0.3604315000011411,
+      "sampled_peak_rss_bytes": 39071744
+    },
+    {
+      "case": "shakira_control",
+      "sample": 2,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 53.1094817000012,
+      "sampled_peak_rss_bytes": 374603776
+    },
+    {
+      "case": "shakira_control",
+      "sample": 2,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 0.3550243000026967,
+      "sampled_peak_rss_bytes": 38801408
+    },
+    {
+      "case": "shakira_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 81.11193400000047,
+      "sampled_peak_rss_bytes": 366751744
+    },
+    {
+      "case": "shakira_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 10.910037400000874,
+      "sampled_peak_rss_bytes": 220884992
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 0,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 23.2803548999982,
+      "sampled_peak_rss_bytes": 305709056
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 0,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 0.34309189999839873,
+      "sampled_peak_rss_bytes": 35950592
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 27.304505500000232,
+      "sampled_peak_rss_bytes": 257773568
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 10.62334280000141,
+      "sampled_peak_rss_bytes": 217944064
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 27.351893499999278,
+      "sampled_peak_rss_bytes": 257880064
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 10.766263299999991,
+      "sampled_peak_rss_bytes": 217915392
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 1,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 23.437589299999672,
+      "sampled_peak_rss_bytes": 306421760
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 1,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 0.3433871999986877,
+      "sampled_peak_rss_bytes": 36859904
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 2,
+      "engine": "python",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 23.2146685000007,
+      "sampled_peak_rss_bytes": 305713152
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 2,
+      "engine": "python",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 0.33541820000027656,
+      "sampled_peak_rss_bytes": 35905536
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 27.3166369999999,
+      "sampled_peak_rss_bytes": 257949696
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 10.755393999999797,
+      "sampled_peak_rss_bytes": 218075136
+    }
+  ],
+  "summary": [
+    {
+      "case": "cli_so_cozy",
+      "engine": "python",
+      "mode": "cold",
+      "median_seconds": 2.4637306000004173,
+      "peak_tree_rss_bytes": 124235776
+    },
+    {
+      "case": "cli_so_cozy",
+      "engine": "python",
+      "mode": "warm",
+      "median_seconds": 0.29301980000309413,
+      "peak_tree_rss_bytes": 34779136
+    },
+    {
+      "case": "cli_so_cozy",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 0.7817478999968444,
+      "peak_tree_rss_bytes": 61804544
+    },
+    {
+      "case": "cli_so_cozy",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 0.5549532000004547,
+      "peak_tree_rss_bytes": 64233472
+    },
+    {
+      "case": "cli_hi_everyone",
+      "engine": "python",
+      "mode": "cold",
+      "median_seconds": 2.8851233999994292,
+      "peak_tree_rss_bytes": 127135744
+    },
+    {
+      "case": "cli_hi_everyone",
+      "engine": "python",
+      "mode": "warm",
+      "median_seconds": 0.28212970000095083,
+      "peak_tree_rss_bytes": 34967552
+    },
+    {
+      "case": "cli_hi_everyone",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 1.0299574000018765,
+      "peak_tree_rss_bytes": 63041536
+    },
+    {
+      "case": "cli_hi_everyone",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 0.5805947999979253,
+      "peak_tree_rss_bytes": 62324736
+    },
+    {
+      "case": "cli_proper_name_control",
+      "engine": "python",
+      "mode": "cold",
+      "median_seconds": 3.2863528999987466,
+      "peak_tree_rss_bytes": 124276736
+    },
+    {
+      "case": "cli_proper_name_control",
+      "engine": "python",
+      "mode": "warm",
+      "median_seconds": 0.2907567000002018,
+      "peak_tree_rss_bytes": 34680832
+    },
+    {
+      "case": "cli_proper_name_control",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 1.5895768999980646,
+      "peak_tree_rss_bytes": 65966080
+    },
+    {
+      "case": "cli_proper_name_control",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 0.6145216000004439,
+      "peak_tree_rss_bytes": 63201280
+    },
+    {
+      "case": "shakira_control",
+      "engine": "python",
+      "mode": "cold",
+      "median_seconds": 52.607101200002944,
+      "peak_tree_rss_bytes": 375083008
+    },
+    {
+      "case": "shakira_control",
+      "engine": "python",
+      "mode": "warm",
+      "median_seconds": 0.3565640999986499,
+      "peak_tree_rss_bytes": 39440384
+    },
+    {
+      "case": "shakira_control",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 81.11193400000047,
+      "peak_tree_rss_bytes": 367120384
+    },
+    {
+      "case": "shakira_control",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 10.951195800000278,
+      "peak_tree_rss_bytes": 220999680
+    },
+    {
+      "case": "user_testing_anagrams",
+      "engine": "python",
+      "mode": "cold",
+      "median_seconds": 23.2803548999982,
+      "peak_tree_rss_bytes": 306421760
+    },
+    {
+      "case": "user_testing_anagrams",
+      "engine": "python",
+      "mode": "warm",
+      "median_seconds": 0.34309189999839873,
+      "peak_tree_rss_bytes": 36859904
+    },
+    {
+      "case": "user_testing_anagrams",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 27.3166369999999,
+      "peak_tree_rss_bytes": 257949696
+    },
+    {
+      "case": "user_testing_anagrams",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 10.755393999999797,
+      "peak_tree_rss_bytes": 218075136
+    }
+  ]
+}

@@ -1,0 +1,1825 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "ordering": [
+    {
+      "case_id": "shakira_control",
+      "answer": "these hips dont lie",
+      "category": "title/control",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "these hips dont lie",
+      "exact_best": true,
+      "answer_objective": 0.9912685994341903,
+      "best_objective": 0.9912685994341903
+    },
+    {
+      "case_id": "voldemort_reveal",
+      "answer": "i am lord voldemort",
+      "category": "title/anagram",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "i am lord voldemort",
+      "exact_best": true,
+      "answer_objective": 0.7380591105538205,
+      "best_objective": 0.7380591105538205
+    },
+    {
+      "case_id": "knowledge_power",
+      "answer": "knowledge is power",
+      "category": "aphorism",
+      "word_count": 3,
+      "exact_rank": 1,
+      "total_orders": 6,
+      "best_order": "knowledge is power",
+      "exact_best": true,
+      "answer_objective": 0.9013140426156225,
+      "best_objective": 0.9013140426156225
+    },
+    {
+      "case_id": "better_late",
+      "answer": "better late than never",
+      "category": "proverb",
+      "word_count": 4,
+      "exact_rank": 6,
+      "total_orders": 24,
+      "best_order": "late better than never",
+      "exact_best": false,
+      "answer_objective": 0.7082330577907121,
+      "best_objective": 0.8112145458567048
+    },
+    {
+      "case_id": "practice_perfect",
+      "answer": "practice makes perfect",
+      "category": "proverb",
+      "word_count": 3,
+      "exact_rank": 2,
+      "total_orders": 6,
+      "best_order": "makes perfect practice",
+      "exact_best": false,
+      "answer_objective": 0.9464382972449186,
+      "best_objective": 0.9552059904484875
+    },
+    {
+      "case_id": "less_more",
+      "answer": "less is more",
+      "category": "aphorism",
+      "word_count": 3,
+      "exact_rank": 2,
+      "total_orders": 6,
+      "best_order": "more is less",
+      "exact_best": false,
+      "answer_objective": 0.8012759535911997,
+      "best_objective": 0.908630481746856
+    },
+    {
+      "case_id": "haste_waste",
+      "answer": "haste makes waste",
+      "category": "proverb",
+      "word_count": 3,
+      "exact_rank": 2,
+      "total_orders": 6,
+      "best_order": "makes waste haste",
+      "exact_best": false,
+      "answer_objective": 0.928804961995177,
+      "best_objective": 0.9437703628973324
+    },
+    {
+      "case_id": "still_waters",
+      "answer": "still waters run deep",
+      "category": "proverb",
+      "word_count": 4,
+      "exact_rank": 2,
+      "total_orders": 24,
+      "best_order": "deep run still waters",
+      "exact_best": false,
+      "answer_objective": 0.9376195170298294,
+      "best_objective": 0.9478566622944582
+    },
+    {
+      "case_id": "look_leap",
+      "answer": "look before you leap",
+      "category": "proverb",
+      "word_count": 4,
+      "exact_rank": 3,
+      "total_orders": 24,
+      "best_order": "you look before leap",
+      "exact_best": false,
+      "answer_objective": 0.759382183622384,
+      "best_objective": 0.8321007420565529
+    },
+    {
+      "case_id": "actions_words",
+      "answer": "actions speak louder than words",
+      "category": "proverb",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "actions speak louder than words",
+      "exact_best": true,
+      "answer_objective": 0.7898379033229093,
+      "best_objective": 0.7898379033229093
+    },
+    {
+      "case_id": "birds_feather",
+      "answer": "birds of a feather",
+      "category": "phrase",
+      "word_count": 4,
+      "exact_rank": 3,
+      "total_orders": 24,
+      "best_order": "a feather birds of",
+      "exact_best": false,
+      "answer_objective": 0.7587917422092878,
+      "best_objective": 0.825368742056553
+    },
+    {
+      "case_id": "roads_rome",
+      "answer": "all roads lead to rome",
+      "category": "proverb",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "all roads lead to rome",
+      "exact_best": true,
+      "answer_objective": 0.7535637612293915,
+      "best_objective": 0.7535637612293915
+    },
+    {
+      "case_id": "time_arrow",
+      "answer": "time flies like an arrow",
+      "category": "proverb",
+      "word_count": 5,
+      "exact_rank": 2,
+      "total_orders": 120,
+      "best_order": "an arrow flies like time",
+      "exact_best": false,
+      "answer_objective": 0.8624787049471934,
+      "best_objective": 0.8676752708383353
+    },
+    {
+      "case_id": "fortune_bold",
+      "answer": "fortune favors the bold",
+      "category": "proverb",
+      "word_count": 4,
+      "exact_rank": 4,
+      "total_orders": 24,
+      "best_order": "the bold favors fortune",
+      "exact_best": false,
+      "answer_objective": 0.8077840521748754,
+      "best_objective": 0.8803938691769253
+    },
+    {
+      "case_id": "honesty_policy",
+      "answer": "honesty is the best policy",
+      "category": "proverb",
+      "word_count": 5,
+      "exact_rank": 21,
+      "total_orders": 120,
+      "best_order": "the best honesty is policy",
+      "exact_best": false,
+      "answer_objective": 0.8354871873467553,
+      "best_objective": 0.9137135210944765
+    },
+    {
+      "case_id": "watched_pot",
+      "answer": "a watched pot never boils",
+      "category": "proverb",
+      "word_count": 5,
+      "exact_rank": 3,
+      "total_orders": 120,
+      "best_order": "a pot never watched boils",
+      "exact_best": false,
+      "answer_objective": 0.7738182051680462,
+      "best_objective": 0.8123831744448391
+    },
+    {
+      "case_id": "two_heads",
+      "answer": "two heads are better than one",
+      "category": "proverb",
+      "word_count": 6,
+      "exact_rank": 1,
+      "total_orders": 720,
+      "best_order": "two heads are better than one",
+      "exact_best": true,
+      "answer_objective": 0.9406213493626496,
+      "best_objective": 0.9406213493626496
+    },
+    {
+      "case_id": "silver_lining",
+      "answer": "every cloud has a silver lining",
+      "category": "proverb",
+      "word_count": 6,
+      "exact_rank": 9,
+      "total_orders": 720,
+      "best_order": "every cloud has silver a lining",
+      "exact_best": false,
+      "answer_objective": 0.8924674049141812,
+      "best_objective": 0.9029834049141812
+    },
+    {
+      "case_id": "still_waste",
+      "answer": "waste not want not",
+      "category": "proverb",
+      "word_count": 4,
+      "exact_rank": 9,
+      "total_orders": 12,
+      "best_order": "want not not waste",
+      "exact_best": false,
+      "answer_objective": 0.4071960464088003,
+      "best_objective": 0.48159604640880027
+    },
+    {
+      "case_id": "easy_go",
+      "answer": "easy come easy go",
+      "category": "proverb",
+      "word_count": 4,
+      "exact_rank": 11,
+      "total_orders": 12,
+      "best_order": "come easy easy go",
+      "exact_best": false,
+      "answer_objective": 0.6123148485731007,
+      "best_objective": 0.7827730407410471
+    },
+    {
+      "case_id": "pain_gain",
+      "answer": "no pain no gain",
+      "category": "proverb",
+      "word_count": 4,
+      "exact_rank": 3,
+      "total_orders": 12,
+      "best_order": "gain no no pain",
+      "exact_best": false,
+      "answer_objective": 0.7124623628973323,
+      "best_objective": 0.8086735887248249
+    },
+    {
+      "case_id": "curiosity_cat",
+      "answer": "curiosity killed the cat",
+      "category": "proverb",
+      "word_count": 4,
+      "exact_rank": 4,
+      "total_orders": 24,
+      "best_order": "the cat killed curiosity",
+      "exact_best": false,
+      "answer_objective": 0.7919440521748753,
+      "best_objective": 0.8443440123237893
+    },
+    {
+      "case_id": "early_bird",
+      "answer": "the early bird catches the worm",
+      "category": "proverb",
+      "word_count": 6,
+      "exact_rank": 1,
+      "total_orders": 360,
+      "best_order": "the early bird catches the worm",
+      "exact_best": true,
+      "answer_objective": 0.8245972784069555,
+      "best_objective": 0.8245972784069555
+    },
+    {
+      "case_id": "absence_fonder",
+      "answer": "absence makes the heart grow fonder",
+      "category": "proverb",
+      "word_count": 6,
+      "exact_rank": 35,
+      "total_orders": 720,
+      "best_order": "the absence makes grow heart fonder",
+      "exact_best": false,
+      "answer_objective": 0.6011801752307936,
+      "best_objective": 0.7181812423458106
+    },
+    {
+      "case_id": "united_stand",
+      "answer": "united we stand divided we fall",
+      "category": "aphorism",
+      "word_count": 6,
+      "exact_rank": 1,
+      "total_orders": 360,
+      "best_order": "divided we fall united we stand",
+      "exact_best": false,
+      "answer_objective": 0.8082920912419973,
+      "best_objective": 0.8082920912419973
+    },
+    {
+      "case_id": "necessity_invention",
+      "answer": "necessity is the mother of invention",
+      "category": "proverb",
+      "word_count": 6,
+      "exact_rank": 29,
+      "total_orders": 720,
+      "best_order": "the invention is mother of necessity",
+      "exact_best": false,
+      "answer_objective": 0.78864416,
+      "best_objective": 0.8569919758159295
+    },
+    {
+      "case_id": "dog_ball",
+      "answer": "the dog chased the ball",
+      "category": "ordinary-clause",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 60,
+      "best_order": "the ball chased the dog",
+      "exact_best": false,
+      "answer_objective": 0.8596863105780643,
+      "best_objective": 0.8596863105780643
+    },
+    {
+      "case_id": "birds_dawn",
+      "answer": "small birds sing at dawn",
+      "category": "ordinary-clause",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "small birds sing at dawn",
+      "exact_best": true,
+      "answer_objective": 0.8309391873467553,
+      "best_objective": 0.8309391873467553
+    },
+    {
+      "case_id": "phone_charge",
+      "answer": "my phone needs a charge",
+      "category": "ordinary-clause",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "my charge needs a phone",
+      "exact_best": false,
+      "answer_objective": 0.9039895210944764,
+      "best_objective": 0.9039895210944764
+    },
+    {
+      "case_id": "water_cold",
+      "answer": "the water feels cold",
+      "category": "ordinary-predicative",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "the water feels cold",
+      "exact_best": true,
+      "answer_objective": 0.9377073013097617,
+      "best_objective": 0.9377073013097617
+    },
+    {
+      "case_id": "reads_night",
+      "answer": "she reads books at night",
+      "category": "ordinary-clause",
+      "word_count": 5,
+      "exact_rank": 21,
+      "total_orders": 120,
+      "best_order": "she books at reads night",
+      "exact_best": false,
+      "answer_objective": 0.6094800891451704,
+      "best_objective": 0.8068395618820274
+    },
+    {
+      "case_id": "leave_sunrise",
+      "answer": "we should leave before sunrise",
+      "category": "ordinary-modal",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "we should leave before sunrise",
+      "exact_best": true,
+      "answer_objective": 0.834694096815864,
+      "best_objective": 0.834694096815864
+    },
+    {
+      "case_id": "red_car",
+      "answer": "the red car stopped suddenly",
+      "category": "ordinary-clause",
+      "word_count": 5,
+      "exact_rank": 9,
+      "total_orders": 120,
+      "best_order": "the car suddenly stopped red",
+      "exact_best": false,
+      "answer_objective": 0.6896936238613198,
+      "best_objective": 0.8080320075373797
+    },
+    {
+      "case_id": "keys_table",
+      "answer": "your keys are on the table",
+      "category": "ordinary-copula",
+      "word_count": 6,
+      "exact_rank": 2,
+      "total_orders": 720,
+      "best_order": "the keys are on your table",
+      "exact_best": false,
+      "answer_objective": 0.8993378776522611,
+      "best_objective": 0.903077877652261
+    },
+    {
+      "case_id": "machine_quietly",
+      "answer": "this machine runs quietly",
+      "category": "ordinary-predicative",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "this machine runs quietly",
+      "exact_best": true,
+      "answer_objective": 0.9359533493626497,
+      "best_objective": 0.9359533493626497
+    },
+    {
+      "case_id": "bridge_unsafe",
+      "answer": "the old bridge looks unsafe",
+      "category": "ordinary-predicative",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "the old bridge looks unsafe",
+      "exact_best": true,
+      "answer_objective": 0.904465260737348,
+      "best_objective": 0.904465260737348
+    },
+    {
+      "case_id": "never_answer",
+      "answer": "they never found the answer",
+      "category": "ordinary-adverb",
+      "word_count": 5,
+      "exact_rank": 3,
+      "total_orders": 120,
+      "best_order": "they never answer the found",
+      "exact_best": false,
+      "answer_objective": 0.7704595022458467,
+      "best_objective": 0.7862995022458468
+    },
+    {
+      "case_id": "quiet_focus",
+      "answer": "a quiet room helps focus",
+      "category": "ordinary-clause",
+      "word_count": 5,
+      "exact_rank": 4,
+      "total_orders": 120,
+      "best_order": "a quiet focus helps room",
+      "exact_best": false,
+      "answer_objective": 0.9239903009535846,
+      "best_objective": 0.9385354358475586
+    },
+    {
+      "case_id": "train_time",
+      "answer": "the train arrived on time",
+      "category": "ordinary-pp",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "the time arrived on train",
+      "exact_best": false,
+      "answer_objective": 0.8147331498517774,
+      "best_objective": 0.8147331498517774
+    },
+    {
+      "case_id": "rain_slippery",
+      "answer": "rain makes roads slippery",
+      "category": "ordinary-resultative",
+      "word_count": 4,
+      "exact_rank": 7,
+      "total_orders": 24,
+      "best_order": "rain makes slippery roads",
+      "exact_best": false,
+      "answer_objective": 0.796305665309486,
+      "best_objective": 0.8626553766241789
+    },
+    {
+      "case_id": "cats_places",
+      "answer": "cats sleep in warm places",
+      "category": "ordinary-pp",
+      "word_count": 5,
+      "exact_rank": 31,
+      "total_orders": 120,
+      "best_order": "warm sleep places in cats",
+      "exact_best": false,
+      "answer_objective": 0.7504024989409834,
+      "best_objective": 0.9160010467498785
+    },
+    {
+      "case_id": "package_yesterday",
+      "answer": "the package arrived yesterday",
+      "category": "ordinary-adverb",
+      "word_count": 4,
+      "exact_rank": 6,
+      "total_orders": 24,
+      "best_order": "the package yesterday arrived",
+      "exact_best": false,
+      "answer_objective": 0.6438642387706084,
+      "best_objective": 0.8529998519794939
+    },
+    {
+      "case_id": "choice_cost",
+      "answer": "every choice has a cost",
+      "category": "ordinary-clause",
+      "word_count": 5,
+      "exact_rank": 2,
+      "total_orders": 120,
+      "best_order": "a cost has every choice",
+      "exact_best": false,
+      "answer_objective": 0.8820797420021163,
+      "best_objective": 0.884238975541056
+    },
+    {
+      "case_id": "tools_time",
+      "answer": "good tools save time",
+      "category": "ordinary-clause",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "good save tools time",
+      "exact_best": false,
+      "answer_objective": 0.8889596950096987,
+      "best_objective": 0.8889596950096987
+    },
+    {
+      "case_id": "learn_mistakes",
+      "answer": "we learn by making mistakes",
+      "category": "ordinary-pp",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "we learn by making mistakes",
+      "exact_best": true,
+      "answer_objective": 0.7875618976582046,
+      "best_objective": 0.7875618976582046
+    },
+    {
+      "case_id": "coffee_hot",
+      "answer": "coffee tastes better hot",
+      "category": "ordinary-predicative",
+      "word_count": 4,
+      "exact_rank": 12,
+      "total_orders": 24,
+      "best_order": "hot tastes better coffee",
+      "exact_best": false,
+      "answer_objective": 0.7568437232066012,
+      "best_objective": 0.9079218227347408
+    },
+    {
+      "case_id": "user_testing_anagrams",
+      "answer": "i am testing anagrams",
+      "category": "ordinary-progressive",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "i am testing anagrams",
+      "exact_best": true,
+      "answer_objective": 0.9600739806809764,
+      "best_objective": 0.9600739806809764
+    },
+    {
+      "case_id": "reading_books_progressive",
+      "answer": "she is reading books",
+      "category": "ordinary-progressive",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "she is reading books",
+      "exact_best": true,
+      "answer_objective": 0.9397539187137087,
+      "best_objective": 0.9397539187137087
+    },
+    {
+      "case_id": "testing_systems_modal_progressive",
+      "answer": "we will be testing systems",
+      "category": "ordinary-modal-progressive",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "we will be testing systems",
+      "exact_best": true,
+      "answer_objective": 0.9539298570812251,
+      "best_objective": 0.9539298570812251
+    },
+    {
+      "case_id": "testing_systems_perfect_progressive",
+      "answer": "we have been testing systems",
+      "category": "ordinary-perfect-progressive",
+      "word_count": 5,
+      "exact_rank": 1,
+      "total_orders": 120,
+      "best_order": "we have been testing systems",
+      "exact_best": true,
+      "answer_objective": 0.9045005291788484,
+      "best_objective": 0.9045005291788484
+    },
+    {
+      "case_id": "anagrams_progressive_passive",
+      "answer": "anagrams are being tested",
+      "category": "ordinary-progressive-passive",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "anagrams are being tested",
+      "exact_best": true,
+      "answer_objective": 0.9564815311011394,
+      "best_objective": 0.9564815311011394
+    },
+    {
+      "case_id": "package_passive",
+      "answer": "the package was delivered",
+      "category": "ordinary-passive",
+      "word_count": 4,
+      "exact_rank": 1,
+      "total_orders": 24,
+      "best_order": "the package was delivered",
+      "exact_best": true,
+      "answer_objective": 0.9177719729866296,
+      "best_objective": 0.9177719729866296
+    }
+  ],
+  "normal_user_cli": [
+    {
+      "id": "cli_so_cozy",
+      "target": "YOSCOZ",
+      "options": [],
+      "expected_phrase": "so cozy",
+      "cold": {
+        "target": "YOSCOZ",
+        "search": {
+          "cap": 100000,
+          "generated": 2,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": false,
+          "vocabulary_size": 11,
+          "generation_cached": false,
+          "deep_analyzed": 2,
+          "ranking_cached": false
+        },
+        "results": [
+          {
+            "word_count": 2,
+            "rank": 1,
+            "score": 63.24,
+            "phrase": "so cozy"
+          },
+          {
+            "word_count": 2,
+            "rank": 2,
+            "score": 15.84,
+            "phrase": "coz soy"
+          }
+        ]
+      },
+      "warm": {
+        "target": "YOSCOZ",
+        "search": {
+          "cap": 100000,
+          "generated": 2,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": false,
+          "vocabulary_size": 11,
+          "generation_cached": true,
+          "deep_analyzed": 2,
+          "ranking_cached": true
+        },
+        "results": [
+          {
+            "word_count": 2,
+            "rank": 1,
+            "score": 63.24,
+            "phrase": "so cozy"
+          },
+          {
+            "word_count": 2,
+            "rank": 2,
+            "score": 15.84,
+            "phrase": "coz soy"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cli_hi_everyone",
+      "target": "OEEEVHYNRI",
+      "options": [],
+      "expected_phrase": "hi everyone",
+      "cold": {
+        "target": "OEEEVHYNRI",
+        "search": {
+          "cap": 100000,
+          "generated": 260,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": false,
+          "vocabulary_size": 89,
+          "generation_cached": false,
+          "deep_analyzed": 260,
+          "ranking_cached": false
+        },
+        "results": [
+          {
+            "word_count": 2,
+            "rank": 1,
+            "score": 43.41,
+            "phrase": "hi everyone"
+          },
+          {
+            "word_count": 3,
+            "rank": 1,
+            "score": 79.77,
+            "phrase": "every in hoe"
+          },
+          {
+            "word_count": 3,
+            "rank": 2,
+            "score": 78.98,
+            "phrase": "hone every i"
+          },
+          {
+            "word_count": 3,
+            "rank": 3,
+            "score": 77.99,
+            "phrase": "hover in eye"
+          },
+          {
+            "word_count": 3,
+            "rank": 4,
+            "score": 77.78,
+            "phrase": "every hi one"
+          },
+          {
+            "word_count": 3,
+            "rank": 5,
+            "score": 77.03,
+            "phrase": "every he ion"
+          },
+          {
+            "word_count": 3,
+            "rank": 6,
+            "score": 75.93,
+            "phrase": "one here ivy"
+          },
+          {
+            "word_count": 3,
+            "rank": 7,
+            "score": 75.14,
+            "phrase": "i veneer hoy"
+          },
+          {
+            "word_count": 3,
+            "rank": 8,
+            "score": 74.56,
+            "phrase": "every eon hi"
+          },
+          {
+            "word_count": 3,
+            "rank": 9,
+            "score": 73.54,
+            "phrase": "hive one rye"
+          },
+          {
+            "word_count": 3,
+            "rank": 10,
+            "score": 72.34,
+            "phrase": "eye her vino"
+          },
+          {
+            "word_count": 4,
+            "rank": 1,
+            "score": 79.1,
+            "phrase": "every i no he"
+          },
+          {
+            "word_count": 4,
+            "rank": 2,
+            "score": 77.31,
+            "phrase": "every i on he"
+          },
+          {
+            "word_count": 4,
+            "rank": 3,
+            "score": 76.0,
+            "phrase": "i yen over he"
+          },
+          {
+            "word_count": 4,
+            "rank": 4,
+            "score": 75.01,
+            "phrase": "i even hoy re"
+          },
+          {
+            "word_count": 4,
+            "rank": 5,
+            "score": 74.69,
+            "phrase": "every i en oh"
+          },
+          {
+            "word_count": 4,
+            "rank": 6,
+            "score": 73.92,
+            "phrase": "i even oh rye"
+          },
+          {
+            "word_count": 4,
+            "rank": 7,
+            "score": 73.39,
+            "phrase": "very i one he"
+          },
+          {
+            "word_count": 4,
+            "rank": 8,
+            "score": 71.83,
+            "phrase": "eye no hi rev"
+          },
+          {
+            "word_count": 4,
+            "rank": 9,
+            "score": 71.31,
+            "phrase": "i hoe very en"
+          },
+          {
+            "word_count": 4,
+            "rank": 10,
+            "score": 69.09,
+            "phrase": "i even or hey"
+          }
+        ]
+      },
+      "warm": {
+        "target": "OEEEVHYNRI",
+        "search": {
+          "cap": 100000,
+          "generated": 260,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": false,
+          "vocabulary_size": 89,
+          "generation_cached": true,
+          "deep_analyzed": 260,
+          "ranking_cached": true
+        },
+        "results": [
+          {
+            "word_count": 2,
+            "rank": 1,
+            "score": 43.41,
+            "phrase": "hi everyone"
+          },
+          {
+            "word_count": 3,
+            "rank": 1,
+            "score": 79.77,
+            "phrase": "every in hoe"
+          },
+          {
+            "word_count": 3,
+            "rank": 2,
+            "score": 78.98,
+            "phrase": "hone every i"
+          },
+          {
+            "word_count": 3,
+            "rank": 3,
+            "score": 77.99,
+            "phrase": "hover in eye"
+          },
+          {
+            "word_count": 3,
+            "rank": 4,
+            "score": 77.78,
+            "phrase": "every hi one"
+          },
+          {
+            "word_count": 3,
+            "rank": 5,
+            "score": 77.03,
+            "phrase": "every he ion"
+          },
+          {
+            "word_count": 3,
+            "rank": 6,
+            "score": 75.93,
+            "phrase": "one here ivy"
+          },
+          {
+            "word_count": 3,
+            "rank": 7,
+            "score": 75.14,
+            "phrase": "i veneer hoy"
+          },
+          {
+            "word_count": 3,
+            "rank": 8,
+            "score": 74.56,
+            "phrase": "every eon hi"
+          },
+          {
+            "word_count": 3,
+            "rank": 9,
+            "score": 73.54,
+            "phrase": "hive one rye"
+          },
+          {
+            "word_count": 3,
+            "rank": 10,
+            "score": 72.34,
+            "phrase": "eye her vino"
+          },
+          {
+            "word_count": 4,
+            "rank": 1,
+            "score": 79.1,
+            "phrase": "every i no he"
+          },
+          {
+            "word_count": 4,
+            "rank": 2,
+            "score": 77.31,
+            "phrase": "every i on he"
+          },
+          {
+            "word_count": 4,
+            "rank": 3,
+            "score": 76.0,
+            "phrase": "i yen over he"
+          },
+          {
+            "word_count": 4,
+            "rank": 4,
+            "score": 75.01,
+            "phrase": "i even hoy re"
+          },
+          {
+            "word_count": 4,
+            "rank": 5,
+            "score": 74.69,
+            "phrase": "every i en oh"
+          },
+          {
+            "word_count": 4,
+            "rank": 6,
+            "score": 73.92,
+            "phrase": "i even oh rye"
+          },
+          {
+            "word_count": 4,
+            "rank": 7,
+            "score": 73.39,
+            "phrase": "very i one he"
+          },
+          {
+            "word_count": 4,
+            "rank": 8,
+            "score": 71.83,
+            "phrase": "eye no hi rev"
+          },
+          {
+            "word_count": 4,
+            "rank": 9,
+            "score": 71.31,
+            "phrase": "i hoe very en"
+          },
+          {
+            "word_count": 4,
+            "rank": 10,
+            "score": 69.09,
+            "phrase": "i even or hey"
+          }
+        ]
+      }
+    },
+    {
+      "id": "cli_proper_name_control",
+      "target": "AHCWSOPSIO",
+      "options": [],
+      "expected_phrase": null,
+      "cold": {
+        "target": "AHCWSOPSIO",
+        "search": {
+          "cap": 100000,
+          "generated": 724,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": false,
+          "vocabulary_size": 141,
+          "generation_cached": false,
+          "deep_analyzed": 724,
+          "ranking_cached": false
+        },
+        "results": [
+          {
+            "word_count": 3,
+            "rank": 1,
+            "score": 82.44,
+            "phrase": "show is capo"
+          },
+          {
+            "word_count": 3,
+            "rank": 2,
+            "score": 82.02,
+            "phrase": "pooch is saw"
+          },
+          {
+            "word_count": 3,
+            "rank": 3,
+            "score": 81.95,
+            "phrase": "ship was coo"
+          },
+          {
+            "word_count": 3,
+            "rank": 4,
+            "score": 81.68,
+            "phrase": "i scoop wash"
+          },
+          {
+            "word_count": 3,
+            "rank": 5,
+            "score": 81.47,
+            "phrase": "wish a scoop"
+          },
+          {
+            "word_count": 3,
+            "rank": 6,
+            "score": 81.32,
+            "phrase": "coop is wash"
+          },
+          {
+            "word_count": 3,
+            "rank": 7,
+            "score": 81.08,
+            "phrase": "i cash swoop"
+          },
+          {
+            "word_count": 3,
+            "rank": 8,
+            "score": 81.07,
+            "phrase": "scoop was hi"
+          },
+          {
+            "word_count": 3,
+            "rank": 9,
+            "score": 80.67,
+            "phrase": "chow is soap"
+          },
+          {
+            "word_count": 3,
+            "rank": 10,
+            "score": 80.43,
+            "phrase": "coop is shaw"
+          },
+          {
+            "word_count": 4,
+            "rank": 1,
+            "score": 84.17,
+            "phrase": "a shop is cow"
+          },
+          {
+            "word_count": 4,
+            "rank": 2,
+            "score": 84.03,
+            "phrase": "a show is cop"
+          },
+          {
+            "word_count": 4,
+            "rank": 3,
+            "score": 82.86,
+            "phrase": "who is so cap"
+          },
+          {
+            "word_count": 4,
+            "rank": 4,
+            "score": 82.19,
+            "phrase": "who is as cop"
+          },
+          {
+            "word_count": 4,
+            "rank": 5,
+            "score": 81.8,
+            "phrase": "a show cops i"
+          },
+          {
+            "word_count": 4,
+            "rank": 6,
+            "score": 81.63,
+            "phrase": "a cop shows i"
+          },
+          {
+            "word_count": 4,
+            "rank": 7,
+            "score": 81.44,
+            "phrase": "a shop cows i"
+          },
+          {
+            "word_count": 4,
+            "rank": 8,
+            "score": 81.34,
+            "phrase": "a hop is cows"
+          },
+          {
+            "word_count": 4,
+            "rank": 9,
+            "score": 81.29,
+            "phrase": "a cow shops i"
+          },
+          {
+            "word_count": 4,
+            "rank": 10,
+            "score": 80.81,
+            "phrase": "a cow is hops"
+          }
+        ]
+      },
+      "warm": {
+        "target": "AHCWSOPSIO",
+        "search": {
+          "cap": 100000,
+          "generated": 724,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": false,
+          "vocabulary_size": 141,
+          "generation_cached": true,
+          "deep_analyzed": 724,
+          "ranking_cached": true
+        },
+        "results": [
+          {
+            "word_count": 3,
+            "rank": 1,
+            "score": 82.44,
+            "phrase": "show is capo"
+          },
+          {
+            "word_count": 3,
+            "rank": 2,
+            "score": 82.02,
+            "phrase": "pooch is saw"
+          },
+          {
+            "word_count": 3,
+            "rank": 3,
+            "score": 81.95,
+            "phrase": "ship was coo"
+          },
+          {
+            "word_count": 3,
+            "rank": 4,
+            "score": 81.68,
+            "phrase": "i scoop wash"
+          },
+          {
+            "word_count": 3,
+            "rank": 5,
+            "score": 81.47,
+            "phrase": "wish a scoop"
+          },
+          {
+            "word_count": 3,
+            "rank": 6,
+            "score": 81.32,
+            "phrase": "coop is wash"
+          },
+          {
+            "word_count": 3,
+            "rank": 7,
+            "score": 81.08,
+            "phrase": "i cash swoop"
+          },
+          {
+            "word_count": 3,
+            "rank": 8,
+            "score": 81.07,
+            "phrase": "scoop was hi"
+          },
+          {
+            "word_count": 3,
+            "rank": 9,
+            "score": 80.67,
+            "phrase": "chow is soap"
+          },
+          {
+            "word_count": 3,
+            "rank": 10,
+            "score": 80.43,
+            "phrase": "coop is shaw"
+          },
+          {
+            "word_count": 4,
+            "rank": 1,
+            "score": 84.17,
+            "phrase": "a shop is cow"
+          },
+          {
+            "word_count": 4,
+            "rank": 2,
+            "score": 84.03,
+            "phrase": "a show is cop"
+          },
+          {
+            "word_count": 4,
+            "rank": 3,
+            "score": 82.86,
+            "phrase": "who is so cap"
+          },
+          {
+            "word_count": 4,
+            "rank": 4,
+            "score": 82.19,
+            "phrase": "who is as cop"
+          },
+          {
+            "word_count": 4,
+            "rank": 5,
+            "score": 81.8,
+            "phrase": "a show cops i"
+          },
+          {
+            "word_count": 4,
+            "rank": 6,
+            "score": 81.63,
+            "phrase": "a cop shows i"
+          },
+          {
+            "word_count": 4,
+            "rank": 7,
+            "score": 81.44,
+            "phrase": "a shop cows i"
+          },
+          {
+            "word_count": 4,
+            "rank": 8,
+            "score": 81.34,
+            "phrase": "a hop is cows"
+          },
+          {
+            "word_count": 4,
+            "rank": 9,
+            "score": 81.29,
+            "phrase": "a cow shops i"
+          },
+          {
+            "word_count": 4,
+            "rank": 10,
+            "score": 80.81,
+            "phrase": "a cow is hops"
+          }
+        ]
+      }
+    },
+    {
+      "id": "shakira_control",
+      "target": "ODITIHNSLSHEEEPT",
+      "options": [
+        "--min-zipf",
+        "3.0"
+      ],
+      "expected_phrase": null,
+      "cold": {
+        "target": "ODITIHNSLSHEEEPT",
+        "search": {
+          "cap": 100000,
+          "generated": 100000,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": true,
+          "vocabulary_size": 619,
+          "generation_cached": false,
+          "deep_analyzed": 11951,
+          "ranking_cached": false
+        },
+        "results": [
+          {
+            "word_count": 3,
+            "rank": 1,
+            "score": 83.42,
+            "phrase": "this id telephones"
+          },
+          {
+            "word_count": 3,
+            "rank": 2,
+            "score": 83.05,
+            "phrase": "its dish telephone"
+          },
+          {
+            "word_count": 3,
+            "rank": 3,
+            "score": 82.43,
+            "phrase": "these dolphins tie"
+          },
+          {
+            "word_count": 3,
+            "rank": 4,
+            "score": 82.11,
+            "phrase": "this hope listened"
+          },
+          {
+            "word_count": 3,
+            "rank": 5,
+            "score": 81.84,
+            "phrase": "this hope enlisted"
+          },
+          {
+            "word_count": 3,
+            "rank": 6,
+            "score": 81.72,
+            "phrase": "the deletion ships"
+          },
+          {
+            "word_count": 3,
+            "rank": 7,
+            "score": 80.83,
+            "phrase": "the deletions ship"
+          },
+          {
+            "word_count": 3,
+            "rank": 8,
+            "score": 80.65,
+            "phrase": "dishes phone title"
+          },
+          {
+            "word_count": 3,
+            "rank": 9,
+            "score": 80.16,
+            "phrase": "hide phones titles"
+          },
+          {
+            "word_count": 3,
+            "rank": 10,
+            "score": 79.6,
+            "phrase": "hides title phones"
+          },
+          {
+            "word_count": 4,
+            "rank": 1,
+            "score": 85.99,
+            "phrase": "these points held i"
+          },
+          {
+            "word_count": 4,
+            "rank": 2,
+            "score": 85.49,
+            "phrase": "the ship doesn't lie"
+          },
+          {
+            "word_count": 4,
+            "rank": 3,
+            "score": 85.33,
+            "phrase": "this pile does then"
+          },
+          {
+            "word_count": 4,
+            "rank": 4,
+            "score": 85.28,
+            "phrase": "he is entitled shop"
+          },
+          {
+            "word_count": 4,
+            "rank": 5,
+            "score": 85.22,
+            "phrase": "the phone is listed"
+          },
+          {
+            "word_count": 4,
+            "rank": 6,
+            "score": 85.14,
+            "phrase": "she is titled phone"
+          },
+          {
+            "word_count": 4,
+            "rank": 7,
+            "score": 85.07,
+            "phrase": "this open let hides"
+          },
+          {
+            "word_count": 4,
+            "rank": 8,
+            "score": 85.05,
+            "phrase": "he is titled phones"
+          },
+          {
+            "word_count": 4,
+            "rank": 9,
+            "score": 85.05,
+            "phrase": "this phone lied set"
+          },
+          {
+            "word_count": 4,
+            "rank": 10,
+            "score": 85.05,
+            "phrase": "she is entitled hop"
+          },
+          {
+            "word_count": 5,
+            "rank": 1,
+            "score": 85.18,
+            "phrase": "the top line is shed"
+          },
+          {
+            "word_count": 5,
+            "rank": 2,
+            "score": 85.11,
+            "phrase": "the help is no diets"
+          },
+          {
+            "word_count": 5,
+            "rank": 3,
+            "score": 85.04,
+            "phrase": "the diet is no helps"
+          },
+          {
+            "word_count": 5,
+            "rank": 4,
+            "score": 85.0,
+            "phrase": "the post is lined he"
+          },
+          {
+            "word_count": 5,
+            "rank": 5,
+            "score": 84.91,
+            "phrase": "the help is no tides"
+          },
+          {
+            "word_count": 5,
+            "rank": 6,
+            "score": 84.72,
+            "phrase": "the split is done he"
+          },
+          {
+            "word_count": 5,
+            "rank": 7,
+            "score": 84.56,
+            "phrase": "the node is its help"
+          },
+          {
+            "word_count": 5,
+            "rank": 8,
+            "score": 84.56,
+            "phrase": "the need is lit shop"
+          },
+          {
+            "word_count": 5,
+            "rank": 9,
+            "score": 84.55,
+            "phrase": "the tide is no helps"
+          },
+          {
+            "word_count": 5,
+            "rank": 10,
+            "score": 84.49,
+            "phrase": "the depth is no lies"
+          }
+        ]
+      },
+      "warm": {
+        "target": "ODITIHNSLSHEEEPT",
+        "search": {
+          "cap": 100000,
+          "generated": 100000,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": true,
+          "vocabulary_size": 619,
+          "generation_cached": true,
+          "deep_analyzed": 11951,
+          "ranking_cached": true
+        },
+        "results": [
+          {
+            "word_count": 3,
+            "rank": 1,
+            "score": 83.42,
+            "phrase": "this id telephones"
+          },
+          {
+            "word_count": 3,
+            "rank": 2,
+            "score": 83.05,
+            "phrase": "its dish telephone"
+          },
+          {
+            "word_count": 3,
+            "rank": 3,
+            "score": 82.43,
+            "phrase": "these dolphins tie"
+          },
+          {
+            "word_count": 3,
+            "rank": 4,
+            "score": 82.11,
+            "phrase": "this hope listened"
+          },
+          {
+            "word_count": 3,
+            "rank": 5,
+            "score": 81.84,
+            "phrase": "this hope enlisted"
+          },
+          {
+            "word_count": 3,
+            "rank": 6,
+            "score": 81.72,
+            "phrase": "the deletion ships"
+          },
+          {
+            "word_count": 3,
+            "rank": 7,
+            "score": 80.83,
+            "phrase": "the deletions ship"
+          },
+          {
+            "word_count": 3,
+            "rank": 8,
+            "score": 80.65,
+            "phrase": "dishes phone title"
+          },
+          {
+            "word_count": 3,
+            "rank": 9,
+            "score": 80.16,
+            "phrase": "hide phones titles"
+          },
+          {
+            "word_count": 3,
+            "rank": 10,
+            "score": 79.6,
+            "phrase": "hides title phones"
+          },
+          {
+            "word_count": 4,
+            "rank": 1,
+            "score": 85.99,
+            "phrase": "these points held i"
+          },
+          {
+            "word_count": 4,
+            "rank": 2,
+            "score": 85.49,
+            "phrase": "the ship doesn't lie"
+          },
+          {
+            "word_count": 4,
+            "rank": 3,
+            "score": 85.33,
+            "phrase": "this pile does then"
+          },
+          {
+            "word_count": 4,
+            "rank": 4,
+            "score": 85.28,
+            "phrase": "he is entitled shop"
+          },
+          {
+            "word_count": 4,
+            "rank": 5,
+            "score": 85.22,
+            "phrase": "the phone is listed"
+          },
+          {
+            "word_count": 4,
+            "rank": 6,
+            "score": 85.14,
+            "phrase": "she is titled phone"
+          },
+          {
+            "word_count": 4,
+            "rank": 7,
+            "score": 85.07,
+            "phrase": "this open let hides"
+          },
+          {
+            "word_count": 4,
+            "rank": 8,
+            "score": 85.05,
+            "phrase": "he is titled phones"
+          },
+          {
+            "word_count": 4,
+            "rank": 9,
+            "score": 85.05,
+            "phrase": "this phone lied set"
+          },
+          {
+            "word_count": 4,
+            "rank": 10,
+            "score": 85.05,
+            "phrase": "she is entitled hop"
+          },
+          {
+            "word_count": 5,
+            "rank": 1,
+            "score": 85.18,
+            "phrase": "the top line is shed"
+          },
+          {
+            "word_count": 5,
+            "rank": 2,
+            "score": 85.11,
+            "phrase": "the help is no diets"
+          },
+          {
+            "word_count": 5,
+            "rank": 3,
+            "score": 85.04,
+            "phrase": "the diet is no helps"
+          },
+          {
+            "word_count": 5,
+            "rank": 4,
+            "score": 85.0,
+            "phrase": "the post is lined he"
+          },
+          {
+            "word_count": 5,
+            "rank": 5,
+            "score": 84.91,
+            "phrase": "the help is no tides"
+          },
+          {
+            "word_count": 5,
+            "rank": 6,
+            "score": 84.72,
+            "phrase": "the split is done he"
+          },
+          {
+            "word_count": 5,
+            "rank": 7,
+            "score": 84.56,
+            "phrase": "the node is its help"
+          },
+          {
+            "word_count": 5,
+            "rank": 8,
+            "score": 84.56,
+            "phrase": "the need is lit shop"
+          },
+          {
+            "word_count": 5,
+            "rank": 9,
+            "score": 84.55,
+            "phrase": "the tide is no helps"
+          },
+          {
+            "word_count": 5,
+            "rank": 10,
+            "score": 84.49,
+            "phrase": "the depth is no lies"
+          }
+        ]
+      }
+    },
+    {
+      "id": "user_testing_anagrams",
+      "target": "IAMTESTINGANAGRAMS",
+      "options": [
+        "--words",
+        "4",
+        "--min-zipf",
+        "2.7"
+      ],
+      "expected_phrase": "i am testing anagrams",
+      "cold": {
+        "target": "IAMTESTINGANAGRAMS",
+        "search": {
+          "cap": 100000,
+          "generated": 100000,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": true,
+          "vocabulary_size": 872,
+          "generation_cached": false,
+          "deep_analyzed": 6270,
+          "ranking_cached": false
+        },
+        "results": [
+          {
+            "word_count": 4,
+            "rank": 1,
+            "score": 85.25,
+            "phrase": "i am tasting managers"
+          },
+          {
+            "word_count": 4,
+            "rank": 2,
+            "score": 85.23,
+            "phrase": "i am testing anagrams"
+          },
+          {
+            "word_count": 4,
+            "rank": 3,
+            "score": 85.14,
+            "phrase": "i am setting anagrams"
+          },
+          {
+            "word_count": 4,
+            "rank": 4,
+            "score": 85.14,
+            "phrase": "a mean imaging starts"
+          },
+          {
+            "word_count": 4,
+            "rank": 5,
+            "score": 85.09,
+            "phrase": "its mats are managing"
+          },
+          {
+            "word_count": 4,
+            "rank": 6,
+            "score": 84.87,
+            "phrase": "mats are gaming saint"
+          },
+          {
+            "word_count": 4,
+            "rank": 7,
+            "score": 84.83,
+            "phrase": "a streaming mat gains"
+          },
+          {
+            "word_count": 4,
+            "rank": 8,
+            "score": 84.82,
+            "phrase": "a game straining mats"
+          },
+          {
+            "word_count": 4,
+            "rank": 9,
+            "score": 84.81,
+            "phrase": "a starting images man"
+          },
+          {
+            "word_count": 4,
+            "rank": 10,
+            "score": 84.8,
+            "phrase": "a game mating strains"
+          }
+        ]
+      },
+      "warm": {
+        "target": "IAMTESTINGANAGRAMS",
+        "search": {
+          "cap": 100000,
+          "generated": 100000,
+          "status": "ok",
+          "strategy": "prefix",
+          "truncated": true,
+          "vocabulary_size": 872,
+          "generation_cached": true,
+          "deep_analyzed": 6270,
+          "ranking_cached": true
+        },
+        "results": [
+          {
+            "word_count": 4,
+            "rank": 1,
+            "score": 85.25,
+            "phrase": "i am tasting managers"
+          },
+          {
+            "word_count": 4,
+            "rank": 2,
+            "score": 85.23,
+            "phrase": "i am testing anagrams"
+          },
+          {
+            "word_count": 4,
+            "rank": 3,
+            "score": 85.14,
+            "phrase": "i am setting anagrams"
+          },
+          {
+            "word_count": 4,
+            "rank": 4,
+            "score": 85.14,
+            "phrase": "a mean imaging starts"
+          },
+          {
+            "word_count": 4,
+            "rank": 5,
+            "score": 85.09,
+            "phrase": "its mats are managing"
+          },
+          {
+            "word_count": 4,
+            "rank": 6,
+            "score": 84.87,
+            "phrase": "mats are gaming saint"
+          },
+          {
+            "word_count": 4,
+            "rank": 7,
+            "score": 84.83,
+            "phrase": "a streaming mat gains"
+          },
+          {
+            "word_count": 4,
+            "rank": 8,
+            "score": 84.82,
+            "phrase": "a game straining mats"
+          },
+          {
+            "word_count": 4,
+            "rank": 9,
+            "score": 84.81,
+            "phrase": "a starting images man"
+          },
+          {
+            "word_count": 4,
+            "rank": 10,
+            "score": 84.8,
+            "phrase": "a game mating strains"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "machine": "Windows-11-10.0.26220-SP0",
+  "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
+  "cpu": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+  "native_sha256": "9b4c822354100eec7782eefae0dc5fcc350ac9d0b0bf18bdfefd3f50b4514bb3",
+  "registry_sha256": "e99e4c3affbd5d8577c83ba93f7ecb3d200025262a1728439a9fd8a82a567735",
+  "methodology": "Serial fresh processes, alternating engine order per sample; Python workers=1; cold means fresh puzzle caches, not cold OS/corpus pages. Warm native reuses ranking only; Python reuses generation and ranking. Elapsed time includes startup, parsing and JSON transport. Sampled summed process-tree RSS may double-count shared pages. No parallel speedup claim.",
+  "samples": 1,
+  "cases": [
+    "user_testing_anagrams"
+  ],
+  "complete": true,
+  "runs": [
+    {
+      "case": "user_testing_anagrams",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 30.251246700001502,
+      "sampled_peak_rss_bytes": 258134016
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 1.2050567000005685,
+      "sampled_peak_rss_bytes": 92225536
+    }
+  ],
+  "summary": [
+    {
+      "case": "user_testing_anagrams",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 30.251246700001502,
+      "peak_tree_rss_bytes": 258134016
+    },
+    {
+      "case": "user_testing_anagrams",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 1.2050567000005685,
+      "peak_tree_rss_bytes": 92225536
+    }
+  ]
+}

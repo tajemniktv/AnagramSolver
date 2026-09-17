@@ -1,6 +1,7 @@
 name: performance probe
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - "**/*.py"
@@ -13,6 +14,10 @@ permissions:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: archive
 
 jobs:
   hot-path-probe:
@@ -33,3 +38,28 @@ jobs:
         run: python -c "import anagram_rerank_core as c; print(c.ensure_wordnet(c.DEFAULT_WORDNET_DIR))"
       - name: Run repeatable hot-path probe
         run: python ci_performance_probe.py
+
+  user-cli-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .anagram_data/wordnet31
+            .anagram_data/dictionary
+            .anagram_data/ngrams
+          key: user-perf-corpora-${{ runner.os }}-v2-${{ hashFiles('**/anagram_user_lexicon.py', '**/anagram_generate.py', '**/anagram_rerank_core.py') }}
+      - name: Install memory sampler
+        run: python -m pip install psutil==7.2.2
+      - name: Compare cold and warm CLI runs at equal generation budgets
+        run: >-
+          python benchmark_user_runs.py
+          --case phone_charge --case user_testing_anagrams
+          --cap 2000 --samples 3

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "max_beam_width": {
+      "default": null,
+      "format": "uint",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "max_candidates": {
+      "default": null,
+      "format": "uint",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "max_deep_analyzed": {
+      "default": null,
+      "format": "uint",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "max_input_bytes": {
+      "default": null,
+      "format": "uint",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "max_normalized_letters": {
+      "default": null,
+      "format": "uint",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "max_retained_orders": {
+      "default": null,
+      "format": "uint",
+      "maximum": 9007199254740991,
+      "minimum": 1,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "timeout_ms": {
+      "default": null,
+      "format": "uint64",
+      "maximum": 9007199254740991,
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    }
+  },
+  "title": "DeploymentLimits",
+  "type": "object"
+}

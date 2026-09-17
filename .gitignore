@@ -9,3 +9,8 @@ __pycache__/
 *.sqlite3
 *.db-shm
 *.db-wal
+.codex/temp/
+target/
+node_modules/
+apps/desktop/dist/
+apps/desktop/src-tauri/gen/

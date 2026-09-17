@@ -1,0 +1,40 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "runs": [
+    {
+      "id": "cli_so_cozy",
+      "cold_seconds": 3.0326830000012706,
+      "warm_seconds": 0.3089860000000044,
+      "cold_peak_tree_rss_bytes": 140054528,
+      "warm_peak_tree_rss_bytes": 34529280
+    },
+    {
+      "id": "cli_hi_everyone",
+      "cold_seconds": 4.078591899999083,
+      "warm_seconds": 0.3652719000001525,
+      "cold_peak_tree_rss_bytes": 296603648,
+      "warm_peak_tree_rss_bytes": 34689024
+    },
+    {
+      "id": "cli_proper_name_control",
+      "cold_seconds": 5.0174633000006,
+      "warm_seconds": 0.3667791000007128,
+      "cold_peak_tree_rss_bytes": 402948096,
+      "warm_peak_tree_rss_bytes": 34594816
+    },
+    {
+      "id": "shakira_control",
+      "cold_seconds": 27.73650760000055,
+      "warm_seconds": 0.4813536000001477,
+      "cold_peak_tree_rss_bytes": 812593152,
+      "warm_peak_tree_rss_bytes": 39649280
+    },
+    {
+      "id": "user_testing_anagrams",
+      "cold_seconds": 22.054380699999456,
+      "warm_seconds": 0.38306720000036876,
+      "cold_peak_tree_rss_bytes": 668934144,
+      "warm_peak_tree_rss_bytes": 36212736
+    }
+  ]
+}

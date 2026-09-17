@@ -1,0 +1,2350 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "candidate_cap": 100,
+  "samples": 3,
+  "workers": 2,
+  "cold_definition": "fresh puzzle caches; provisioned corpora and warm OS caches",
+  "timing_definition": "Each actual generator/reranker subprocess, including its corpus loading; parent overhead separate. No RSS attribution per stage.",
+  "runs": [
+    {
+      "text": "knowledgeispower",
+      "strategy": "prefix",
+      "sample": 1,
+      "argv": [
+        "knowledgeispower",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "prefix",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 4.380745000000388,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 2.329569300000003,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "knowledgeispower",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "prefix",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\.candidates.txt.9b78474da28f4ddf9cabab7806d047a4.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.9691962000015337,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\.reranked.txt.3166b935b08c428d83ce9273748fd325.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 100,
+        "seconds": 0.04385749999892141,
+        "status": "ok",
+        "strategy": "prefix",
+        "truncated": true,
+        "vocabulary_size": 996,
+        "generation_cached": false,
+        "deep_analyzed": 100,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 3,
+          "rank": 1,
+          "score": 83.36,
+          "phrase": "knowledge is power"
+        },
+        {
+          "word_count": 3,
+          "rank": 2,
+          "score": 77.01,
+          "phrase": "powder low seeking"
+        },
+        {
+          "word_count": 3,
+          "rank": 3,
+          "score": 76.31,
+          "phrase": "work owned spiegel"
+        },
+        {
+          "word_count": 3,
+          "rank": 4,
+          "score": 76.25,
+          "phrase": "knowledge powers i"
+        },
+        {
+          "word_count": 3,
+          "rank": 5,
+          "score": 75.88,
+          "phrase": "spiegel worked now"
+        },
+        {
+          "word_count": 3,
+          "rank": 6,
+          "score": 74.86,
+          "phrase": "windows log keeper"
+        },
+        {
+          "word_count": 3,
+          "rank": 7,
+          "score": 74.05,
+          "phrase": "pedigree knows low"
+        },
+        {
+          "word_count": 3,
+          "rank": 8,
+          "score": 73.53,
+          "phrase": "look sweeping drew"
+        },
+        {
+          "word_count": 3,
+          "rank": 9,
+          "score": 73.34,
+          "phrase": "slow pedigree know"
+        },
+        {
+          "word_count": 3,
+          "rank": 10,
+          "score": 72.84,
+          "phrase": "looking sweep drew"
+        }
+      ]
+    },
+    {
+      "text": "knowledgeispower",
+      "strategy": "prefix",
+      "sample": 2,
+      "argv": [
+        "knowledgeispower",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "prefix",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 4.00481629999922,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 2.1081031000012445,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "knowledgeispower",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "prefix",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\.candidates.txt.82c82b123e5242968012d38ee9e3e8f6.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.8207750000001397,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\.reranked.txt.0ee9f847ab1d46ed890723ffa731117f.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 100,
+        "seconds": 0.0425850999999966,
+        "status": "ok",
+        "strategy": "prefix",
+        "truncated": true,
+        "vocabulary_size": 996,
+        "generation_cached": false,
+        "deep_analyzed": 100,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 3,
+          "rank": 1,
+          "score": 83.36,
+          "phrase": "knowledge is power"
+        },
+        {
+          "word_count": 3,
+          "rank": 2,
+          "score": 77.01,
+          "phrase": "powder low seeking"
+        },
+        {
+          "word_count": 3,
+          "rank": 3,
+          "score": 76.31,
+          "phrase": "work owned spiegel"
+        },
+        {
+          "word_count": 3,
+          "rank": 4,
+          "score": 76.25,
+          "phrase": "knowledge powers i"
+        },
+        {
+          "word_count": 3,
+          "rank": 5,
+          "score": 75.88,
+          "phrase": "spiegel worked now"
+        },
+        {
+          "word_count": 3,
+          "rank": 6,
+          "score": 74.86,
+          "phrase": "windows log keeper"
+        },
+        {
+          "word_count": 3,
+          "rank": 7,
+          "score": 74.05,
+          "phrase": "pedigree knows low"
+        },
+        {
+          "word_count": 3,
+          "rank": 8,
+          "score": 73.53,
+          "phrase": "look sweeping drew"
+        },
+        {
+          "word_count": 3,
+          "rank": 9,
+          "score": 73.34,
+          "phrase": "slow pedigree know"
+        },
+        {
+          "word_count": 3,
+          "rank": 10,
+          "score": 72.84,
+          "phrase": "looking sweep drew"
+        }
+      ]
+    },
+    {
+      "text": "knowledgeispower",
+      "strategy": "prefix",
+      "sample": 3,
+      "argv": [
+        "knowledgeispower",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "prefix",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 4.03934339999978,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 2.1316406999994797,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "knowledgeispower",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "prefix",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\.candidates.txt.1c682f3c26e7486582f0f8d8898e3523.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.8339611000010336,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\d130e3c07ed64324175a\\.reranked.txt.f5399b97e4624c0eba33c939cc65748e.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 100,
+        "seconds": 0.038269800001216936,
+        "status": "ok",
+        "strategy": "prefix",
+        "truncated": true,
+        "vocabulary_size": 996,
+        "generation_cached": false,
+        "deep_analyzed": 100,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 3,
+          "rank": 1,
+          "score": 83.36,
+          "phrase": "knowledge is power"
+        },
+        {
+          "word_count": 3,
+          "rank": 2,
+          "score": 77.01,
+          "phrase": "powder low seeking"
+        },
+        {
+          "word_count": 3,
+          "rank": 3,
+          "score": 76.31,
+          "phrase": "work owned spiegel"
+        },
+        {
+          "word_count": 3,
+          "rank": 4,
+          "score": 76.25,
+          "phrase": "knowledge powers i"
+        },
+        {
+          "word_count": 3,
+          "rank": 5,
+          "score": 75.88,
+          "phrase": "spiegel worked now"
+        },
+        {
+          "word_count": 3,
+          "rank": 6,
+          "score": 74.86,
+          "phrase": "windows log keeper"
+        },
+        {
+          "word_count": 3,
+          "rank": 7,
+          "score": 74.05,
+          "phrase": "pedigree knows low"
+        },
+        {
+          "word_count": 3,
+          "rank": 8,
+          "score": 73.53,
+          "phrase": "look sweeping drew"
+        },
+        {
+          "word_count": 3,
+          "rank": 9,
+          "score": 73.34,
+          "phrase": "slow pedigree know"
+        },
+        {
+          "word_count": 3,
+          "rank": 10,
+          "score": 72.84,
+          "phrase": "looking sweep drew"
+        }
+      ]
+    },
+    {
+      "text": "knowledgeispower",
+      "strategy": "diverse",
+      "sample": 1,
+      "argv": [
+        "knowledgeispower",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "diverse",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 4.895995099999709,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 2.2679250000001048,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "knowledgeispower",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "diverse",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\.candidates.txt.4eecd914a34c49da8c86abe39dfdb011.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 2.5558551000012812,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\.reranked.txt.feb0e2a4fc2f4eb08b7349d82296472e.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 100,
+        "seconds": 0.05359089999910793,
+        "status": "ok",
+        "strategy": "diverse",
+        "truncated": true,
+        "vocabulary_size": 996,
+        "generation_cached": false,
+        "deep_analyzed": 100,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 3,
+          "rank": 1,
+          "score": 83.36,
+          "phrase": "knowledge is power"
+        },
+        {
+          "word_count": 3,
+          "rank": 2,
+          "score": 75.42,
+          "phrase": "knowledge powers i"
+        },
+        {
+          "word_count": 3,
+          "rank": 3,
+          "score": 72.59,
+          "phrase": "spiegel worked now"
+        },
+        {
+          "word_count": 3,
+          "rank": 4,
+          "score": 71.54,
+          "phrase": "work owned spiegel"
+        },
+        {
+          "word_count": 3,
+          "rank": 5,
+          "score": 69.53,
+          "phrase": "knowledge wipes or"
+        },
+        {
+          "word_count": 3,
+          "rank": 6,
+          "score": 67.07,
+          "phrase": "sleeping work owed"
+        },
+        {
+          "word_count": 3,
+          "rank": 7,
+          "score": 66.58,
+          "phrase": "swipe or knowledge"
+        },
+        {
+          "word_count": 3,
+          "rank": 8,
+          "score": 66.48,
+          "phrase": "world keeping owes"
+        },
+        {
+          "word_count": 3,
+          "rank": 9,
+          "score": 65.43,
+          "phrase": "work sweeping dole"
+        },
+        {
+          "word_count": 3,
+          "rank": 10,
+          "score": 62.79,
+          "phrase": "gowns powered like"
+        },
+        {
+          "word_count": 4,
+          "rank": 1,
+          "score": 78.96,
+          "phrase": "we worked in gospel"
+        },
+        {
+          "word_count": 4,
+          "rank": 2,
+          "score": 76.94,
+          "phrase": "work in lodge sweep"
+        },
+        {
+          "word_count": 4,
+          "rank": 3,
+          "score": 76.28,
+          "phrase": "poker wedges in low"
+        },
+        {
+          "word_count": 4,
+          "rank": 4,
+          "score": 75.42,
+          "phrase": "power gold in weeks"
+        },
+        {
+          "word_count": 4,
+          "rank": 5,
+          "score": 75.01,
+          "phrase": "work in weed gospel"
+        },
+        {
+          "word_count": 4,
+          "rank": 6,
+          "score": 73.28,
+          "phrase": "work in wedge slope"
+        },
+        {
+          "word_count": 4,
+          "rank": 7,
+          "score": 71.85,
+          "phrase": "log skewed in power"
+        },
+        {
+          "word_count": 4,
+          "rank": 8,
+          "score": 71.75,
+          "phrase": "poles work in wedge"
+        },
+        {
+          "word_count": 4,
+          "rank": 9,
+          "score": 70.92,
+          "phrase": "wedges work in pole"
+        },
+        {
+          "word_count": 4,
+          "rank": 10,
+          "score": 69.58,
+          "phrase": "powders log in week"
+        },
+        {
+          "word_count": 5,
+          "rank": 1,
+          "score": 77.06,
+          "phrase": "wed keeps or in glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 2,
+          "score": 74.47,
+          "phrase": "keep wed or in glows"
+        },
+        {
+          "word_count": 5,
+          "rank": 3,
+          "score": 71.98,
+          "phrase": "weds keep or in glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 4,
+          "score": 69.62,
+          "phrase": "week sped in or glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 5,
+          "score": 69.38,
+          "phrase": "spew gold in or week"
+        },
+        {
+          "word_count": 5,
+          "rank": 6,
+          "score": 68.53,
+          "phrase": "peg skewed in or low"
+        },
+        {
+          "word_count": 5,
+          "rank": 7,
+          "score": 68.21,
+          "phrase": "wok pledges in or we"
+        },
+        {
+          "word_count": 5,
+          "rank": 8,
+          "score": 65.23,
+          "phrase": "skew deep in or glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 9,
+          "score": 64.14,
+          "phrase": "geeks plow wed in or"
+        },
+        {
+          "word_count": 5,
+          "rank": 10,
+          "score": 61.04,
+          "phrase": "glows keep or in dew"
+        },
+        {
+          "word_count": 6,
+          "rank": 1,
+          "score": 76.89,
+          "phrase": "we peg low in or desk"
+        },
+        {
+          "word_count": 6,
+          "rank": 2,
+          "score": 74.45,
+          "phrase": "we skew old in or peg"
+        },
+        {
+          "word_count": 6,
+          "rank": 3,
+          "score": 69.82,
+          "phrase": "we pled go in skew or"
+        },
+        {
+          "word_count": 6,
+          "rank": 4,
+          "score": 68.52,
+          "phrase": "we go in or weds kelp"
+        },
+        {
+          "word_count": 6,
+          "rank": 5,
+          "score": 67.52,
+          "phrase": "we log in or desk pew"
+        },
+        {
+          "word_count": 6,
+          "rank": 6,
+          "score": 65.86,
+          "phrase": "we sped in low or keg"
+        },
+        {
+          "word_count": 6,
+          "rank": 7,
+          "score": 65.32,
+          "phrase": "we spew in or dog elk"
+        },
+        {
+          "word_count": 6,
+          "rank": 8,
+          "score": 64.13,
+          "phrase": "we spew in god or elk"
+        },
+        {
+          "word_count": 6,
+          "rank": 9,
+          "score": 63.14,
+          "phrase": "we sew in or dog kelp"
+        },
+        {
+          "word_count": 6,
+          "rank": 10,
+          "score": 61.97,
+          "phrase": "we sew in god or kelp"
+        }
+      ]
+    },
+    {
+      "text": "knowledgeispower",
+      "strategy": "diverse",
+      "sample": 2,
+      "argv": [
+        "knowledgeispower",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "diverse",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 5.142071500000384,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 2.294406099999833,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "knowledgeispower",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "diverse",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\.candidates.txt.ef128317748c4257a249d3e2fa960916.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 2.7620745999993233,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\.reranked.txt.6f56a57a78be4802a5a89b7c8bf0600c.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 100,
+        "seconds": 0.06218339999941236,
+        "status": "ok",
+        "strategy": "diverse",
+        "truncated": true,
+        "vocabulary_size": 996,
+        "generation_cached": false,
+        "deep_analyzed": 100,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 3,
+          "rank": 1,
+          "score": 83.36,
+          "phrase": "knowledge is power"
+        },
+        {
+          "word_count": 3,
+          "rank": 2,
+          "score": 75.42,
+          "phrase": "knowledge powers i"
+        },
+        {
+          "word_count": 3,
+          "rank": 3,
+          "score": 72.59,
+          "phrase": "spiegel worked now"
+        },
+        {
+          "word_count": 3,
+          "rank": 4,
+          "score": 71.54,
+          "phrase": "work owned spiegel"
+        },
+        {
+          "word_count": 3,
+          "rank": 5,
+          "score": 69.53,
+          "phrase": "knowledge wipes or"
+        },
+        {
+          "word_count": 3,
+          "rank": 6,
+          "score": 67.07,
+          "phrase": "sleeping work owed"
+        },
+        {
+          "word_count": 3,
+          "rank": 7,
+          "score": 66.58,
+          "phrase": "swipe or knowledge"
+        },
+        {
+          "word_count": 3,
+          "rank": 8,
+          "score": 66.48,
+          "phrase": "world keeping owes"
+        },
+        {
+          "word_count": 3,
+          "rank": 9,
+          "score": 65.43,
+          "phrase": "work sweeping dole"
+        },
+        {
+          "word_count": 3,
+          "rank": 10,
+          "score": 62.79,
+          "phrase": "gowns powered like"
+        },
+        {
+          "word_count": 4,
+          "rank": 1,
+          "score": 78.96,
+          "phrase": "we worked in gospel"
+        },
+        {
+          "word_count": 4,
+          "rank": 2,
+          "score": 76.94,
+          "phrase": "work in lodge sweep"
+        },
+        {
+          "word_count": 4,
+          "rank": 3,
+          "score": 76.28,
+          "phrase": "poker wedges in low"
+        },
+        {
+          "word_count": 4,
+          "rank": 4,
+          "score": 75.42,
+          "phrase": "power gold in weeks"
+        },
+        {
+          "word_count": 4,
+          "rank": 5,
+          "score": 75.01,
+          "phrase": "work in weed gospel"
+        },
+        {
+          "word_count": 4,
+          "rank": 6,
+          "score": 73.28,
+          "phrase": "work in wedge slope"
+        },
+        {
+          "word_count": 4,
+          "rank": 7,
+          "score": 71.85,
+          "phrase": "log skewed in power"
+        },
+        {
+          "word_count": 4,
+          "rank": 8,
+          "score": 71.75,
+          "phrase": "poles work in wedge"
+        },
+        {
+          "word_count": 4,
+          "rank": 9,
+          "score": 70.92,
+          "phrase": "wedges work in pole"
+        },
+        {
+          "word_count": 4,
+          "rank": 10,
+          "score": 69.58,
+          "phrase": "powders log in week"
+        },
+        {
+          "word_count": 5,
+          "rank": 1,
+          "score": 77.06,
+          "phrase": "wed keeps or in glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 2,
+          "score": 74.47,
+          "phrase": "keep wed or in glows"
+        },
+        {
+          "word_count": 5,
+          "rank": 3,
+          "score": 71.98,
+          "phrase": "weds keep or in glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 4,
+          "score": 69.62,
+          "phrase": "week sped in or glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 5,
+          "score": 69.38,
+          "phrase": "spew gold in or week"
+        },
+        {
+          "word_count": 5,
+          "rank": 6,
+          "score": 68.53,
+          "phrase": "peg skewed in or low"
+        },
+        {
+          "word_count": 5,
+          "rank": 7,
+          "score": 68.21,
+          "phrase": "wok pledges in or we"
+        },
+        {
+          "word_count": 5,
+          "rank": 8,
+          "score": 65.23,
+          "phrase": "skew deep in or glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 9,
+          "score": 64.14,
+          "phrase": "geeks plow wed in or"
+        },
+        {
+          "word_count": 5,
+          "rank": 10,
+          "score": 61.04,
+          "phrase": "glows keep or in dew"
+        },
+        {
+          "word_count": 6,
+          "rank": 1,
+          "score": 76.89,
+          "phrase": "we peg low in or desk"
+        },
+        {
+          "word_count": 6,
+          "rank": 2,
+          "score": 74.45,
+          "phrase": "we skew old in or peg"
+        },
+        {
+          "word_count": 6,
+          "rank": 3,
+          "score": 69.82,
+          "phrase": "we pled go in skew or"
+        },
+        {
+          "word_count": 6,
+          "rank": 4,
+          "score": 68.52,
+          "phrase": "we go in or weds kelp"
+        },
+        {
+          "word_count": 6,
+          "rank": 5,
+          "score": 67.52,
+          "phrase": "we log in or desk pew"
+        },
+        {
+          "word_count": 6,
+          "rank": 6,
+          "score": 65.86,
+          "phrase": "we sped in low or keg"
+        },
+        {
+          "word_count": 6,
+          "rank": 7,
+          "score": 65.32,
+          "phrase": "we spew in or dog elk"
+        },
+        {
+          "word_count": 6,
+          "rank": 8,
+          "score": 64.13,
+          "phrase": "we spew in god or elk"
+        },
+        {
+          "word_count": 6,
+          "rank": 9,
+          "score": 63.14,
+          "phrase": "we sew in or dog kelp"
+        },
+        {
+          "word_count": 6,
+          "rank": 10,
+          "score": 61.97,
+          "phrase": "we sew in god or kelp"
+        }
+      ]
+    },
+    {
+      "text": "knowledgeispower",
+      "strategy": "diverse",
+      "sample": 3,
+      "argv": [
+        "knowledgeispower",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "diverse",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 5.125869499999681,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 2.3183043000008183,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "knowledgeispower",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "diverse",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\.candidates.txt.d6300afb6ab543cd94c868a77d7d61c7.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 2.720977299999504,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\dc171a8a9437569b7ec3\\.reranked.txt.fc8720b79e184880ad0b1fec1b6fbc26.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 100,
+        "seconds": 0.07186089999959222,
+        "status": "ok",
+        "strategy": "diverse",
+        "truncated": true,
+        "vocabulary_size": 996,
+        "generation_cached": false,
+        "deep_analyzed": 100,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 3,
+          "rank": 1,
+          "score": 83.36,
+          "phrase": "knowledge is power"
+        },
+        {
+          "word_count": 3,
+          "rank": 2,
+          "score": 75.42,
+          "phrase": "knowledge powers i"
+        },
+        {
+          "word_count": 3,
+          "rank": 3,
+          "score": 72.59,
+          "phrase": "spiegel worked now"
+        },
+        {
+          "word_count": 3,
+          "rank": 4,
+          "score": 71.54,
+          "phrase": "work owned spiegel"
+        },
+        {
+          "word_count": 3,
+          "rank": 5,
+          "score": 69.53,
+          "phrase": "knowledge wipes or"
+        },
+        {
+          "word_count": 3,
+          "rank": 6,
+          "score": 67.07,
+          "phrase": "sleeping work owed"
+        },
+        {
+          "word_count": 3,
+          "rank": 7,
+          "score": 66.58,
+          "phrase": "swipe or knowledge"
+        },
+        {
+          "word_count": 3,
+          "rank": 8,
+          "score": 66.48,
+          "phrase": "world keeping owes"
+        },
+        {
+          "word_count": 3,
+          "rank": 9,
+          "score": 65.43,
+          "phrase": "work sweeping dole"
+        },
+        {
+          "word_count": 3,
+          "rank": 10,
+          "score": 62.79,
+          "phrase": "gowns powered like"
+        },
+        {
+          "word_count": 4,
+          "rank": 1,
+          "score": 78.96,
+          "phrase": "we worked in gospel"
+        },
+        {
+          "word_count": 4,
+          "rank": 2,
+          "score": 76.94,
+          "phrase": "work in lodge sweep"
+        },
+        {
+          "word_count": 4,
+          "rank": 3,
+          "score": 76.28,
+          "phrase": "poker wedges in low"
+        },
+        {
+          "word_count": 4,
+          "rank": 4,
+          "score": 75.42,
+          "phrase": "power gold in weeks"
+        },
+        {
+          "word_count": 4,
+          "rank": 5,
+          "score": 75.01,
+          "phrase": "work in weed gospel"
+        },
+        {
+          "word_count": 4,
+          "rank": 6,
+          "score": 73.28,
+          "phrase": "work in wedge slope"
+        },
+        {
+          "word_count": 4,
+          "rank": 7,
+          "score": 71.85,
+          "phrase": "log skewed in power"
+        },
+        {
+          "word_count": 4,
+          "rank": 8,
+          "score": 71.75,
+          "phrase": "poles work in wedge"
+        },
+        {
+          "word_count": 4,
+          "rank": 9,
+          "score": 70.92,
+          "phrase": "wedges work in pole"
+        },
+        {
+          "word_count": 4,
+          "rank": 10,
+          "score": 69.58,
+          "phrase": "powders log in week"
+        },
+        {
+          "word_count": 5,
+          "rank": 1,
+          "score": 77.06,
+          "phrase": "wed keeps or in glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 2,
+          "score": 74.47,
+          "phrase": "keep wed or in glows"
+        },
+        {
+          "word_count": 5,
+          "rank": 3,
+          "score": 71.98,
+          "phrase": "weds keep or in glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 4,
+          "score": 69.62,
+          "phrase": "week sped in or glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 5,
+          "score": 69.38,
+          "phrase": "spew gold in or week"
+        },
+        {
+          "word_count": 5,
+          "rank": 6,
+          "score": 68.53,
+          "phrase": "peg skewed in or low"
+        },
+        {
+          "word_count": 5,
+          "rank": 7,
+          "score": 68.21,
+          "phrase": "wok pledges in or we"
+        },
+        {
+          "word_count": 5,
+          "rank": 8,
+          "score": 65.23,
+          "phrase": "skew deep in or glow"
+        },
+        {
+          "word_count": 5,
+          "rank": 9,
+          "score": 64.14,
+          "phrase": "geeks plow wed in or"
+        },
+        {
+          "word_count": 5,
+          "rank": 10,
+          "score": 61.04,
+          "phrase": "glows keep or in dew"
+        },
+        {
+          "word_count": 6,
+          "rank": 1,
+          "score": 76.89,
+          "phrase": "we peg low in or desk"
+        },
+        {
+          "word_count": 6,
+          "rank": 2,
+          "score": 74.45,
+          "phrase": "we skew old in or peg"
+        },
+        {
+          "word_count": 6,
+          "rank": 3,
+          "score": 69.82,
+          "phrase": "we pled go in skew or"
+        },
+        {
+          "word_count": 6,
+          "rank": 4,
+          "score": 68.52,
+          "phrase": "we go in or weds kelp"
+        },
+        {
+          "word_count": 6,
+          "rank": 5,
+          "score": 67.52,
+          "phrase": "we log in or desk pew"
+        },
+        {
+          "word_count": 6,
+          "rank": 6,
+          "score": 65.86,
+          "phrase": "we sped in low or keg"
+        },
+        {
+          "word_count": 6,
+          "rank": 7,
+          "score": 65.32,
+          "phrase": "we spew in or dog elk"
+        },
+        {
+          "word_count": 6,
+          "rank": 8,
+          "score": 64.13,
+          "phrase": "we spew in god or elk"
+        },
+        {
+          "word_count": 6,
+          "rank": 9,
+          "score": 63.14,
+          "phrase": "we sew in or dog kelp"
+        },
+        {
+          "word_count": 6,
+          "rank": 10,
+          "score": 61.97,
+          "phrase": "we sew in god or kelp"
+        }
+      ]
+    },
+    {
+      "text": "testing",
+      "strategy": "prefix",
+      "sample": 1,
+      "argv": [
+        "testing",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "prefix",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 3.3747613999985333,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 1.6526317999996536,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "testing",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "prefix",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\.candidates.txt.56f4e393196b45708c1209a903f724e3.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.6457112999996752,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\.reranked.txt.66f2617aadc843d3bca96872e945b040.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 27,
+        "seconds": 0.0014248999996198108,
+        "status": "ok",
+        "strategy": "prefix",
+        "truncated": false,
+        "vocabulary_size": 64,
+        "generation_cached": false,
+        "deep_analyzed": 27,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 2,
+          "rank": 1,
+          "score": 79.95,
+          "phrase": "tins get"
+        },
+        {
+          "word_count": 2,
+          "rank": 2,
+          "score": 79.18,
+          "phrase": "tin gets"
+        },
+        {
+          "word_count": 2,
+          "rank": 3,
+          "score": 76.41,
+          "phrase": "set ting"
+        },
+        {
+          "word_count": 2,
+          "rank": 4,
+          "score": 74.45,
+          "phrase": "its gent"
+        },
+        {
+          "word_count": 2,
+          "rank": 5,
+          "score": 71.8,
+          "phrase": "gin test"
+        },
+        {
+          "word_count": 2,
+          "rank": 6,
+          "score": 67.51,
+          "phrase": "sign tet"
+        },
+        {
+          "word_count": 2,
+          "rank": 7,
+          "score": 66.26,
+          "phrase": "nits get"
+        },
+        {
+          "word_count": 2,
+          "rank": 8,
+          "score": 66.24,
+          "phrase": "gents it"
+        },
+        {
+          "word_count": 2,
+          "rank": 9,
+          "score": 65.51,
+          "phrase": "net gist"
+        },
+        {
+          "word_count": 2,
+          "rank": 10,
+          "score": 64.73,
+          "phrase": "nit gets"
+        }
+      ]
+    },
+    {
+      "text": "testing",
+      "strategy": "prefix",
+      "sample": 2,
+      "argv": [
+        "testing",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "prefix",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 3.784088000000338,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 2.0248995999991166,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "testing",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "prefix",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\.candidates.txt.a3f196c3ee004bc4b5c93bba872edb47.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.676709600000322,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\.reranked.txt.8a25dba7a1fb42d1a5909676f71c4716.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 27,
+        "seconds": 0.001357000001007691,
+        "status": "ok",
+        "strategy": "prefix",
+        "truncated": false,
+        "vocabulary_size": 64,
+        "generation_cached": false,
+        "deep_analyzed": 27,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 2,
+          "rank": 1,
+          "score": 79.95,
+          "phrase": "tins get"
+        },
+        {
+          "word_count": 2,
+          "rank": 2,
+          "score": 79.18,
+          "phrase": "tin gets"
+        },
+        {
+          "word_count": 2,
+          "rank": 3,
+          "score": 76.41,
+          "phrase": "set ting"
+        },
+        {
+          "word_count": 2,
+          "rank": 4,
+          "score": 74.45,
+          "phrase": "its gent"
+        },
+        {
+          "word_count": 2,
+          "rank": 5,
+          "score": 71.8,
+          "phrase": "gin test"
+        },
+        {
+          "word_count": 2,
+          "rank": 6,
+          "score": 67.51,
+          "phrase": "sign tet"
+        },
+        {
+          "word_count": 2,
+          "rank": 7,
+          "score": 66.26,
+          "phrase": "nits get"
+        },
+        {
+          "word_count": 2,
+          "rank": 8,
+          "score": 66.24,
+          "phrase": "gents it"
+        },
+        {
+          "word_count": 2,
+          "rank": 9,
+          "score": 65.51,
+          "phrase": "net gist"
+        },
+        {
+          "word_count": 2,
+          "rank": 10,
+          "score": 64.73,
+          "phrase": "nit gets"
+        }
+      ]
+    },
+    {
+      "text": "testing",
+      "strategy": "prefix",
+      "sample": 3,
+      "argv": [
+        "testing",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "prefix",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 3.4535114000009344,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 1.6379136000014114,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "testing",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "prefix",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\.candidates.txt.f419208e69e0412d9903d26fbde7d70b.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.739572299999054,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\335655f870d9b919a104\\.reranked.txt.fbb38b0f6698498496696497c6f5c58d.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 27,
+        "seconds": 0.0020855999991908902,
+        "status": "ok",
+        "strategy": "prefix",
+        "truncated": false,
+        "vocabulary_size": 64,
+        "generation_cached": false,
+        "deep_analyzed": 27,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 2,
+          "rank": 1,
+          "score": 79.95,
+          "phrase": "tins get"
+        },
+        {
+          "word_count": 2,
+          "rank": 2,
+          "score": 79.18,
+          "phrase": "tin gets"
+        },
+        {
+          "word_count": 2,
+          "rank": 3,
+          "score": 76.41,
+          "phrase": "set ting"
+        },
+        {
+          "word_count": 2,
+          "rank": 4,
+          "score": 74.45,
+          "phrase": "its gent"
+        },
+        {
+          "word_count": 2,
+          "rank": 5,
+          "score": 71.8,
+          "phrase": "gin test"
+        },
+        {
+          "word_count": 2,
+          "rank": 6,
+          "score": 67.51,
+          "phrase": "sign tet"
+        },
+        {
+          "word_count": 2,
+          "rank": 7,
+          "score": 66.26,
+          "phrase": "nits get"
+        },
+        {
+          "word_count": 2,
+          "rank": 8,
+          "score": 66.24,
+          "phrase": "gents it"
+        },
+        {
+          "word_count": 2,
+          "rank": 9,
+          "score": 65.51,
+          "phrase": "net gist"
+        },
+        {
+          "word_count": 2,
+          "rank": 10,
+          "score": 64.73,
+          "phrase": "nit gets"
+        }
+      ]
+    },
+    {
+      "text": "testing",
+      "strategy": "diverse",
+      "sample": 1,
+      "argv": [
+        "testing",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "diverse",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 3.3016033000003517,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 1.6434885999988182,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "testing",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "diverse",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\.candidates.txt.46054341418c4cf392d7bdbff7fba7d9.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.575999700000466,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\.reranked.txt.fc7090b305624b66b4394059ef4483ec.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 27,
+        "seconds": 0.002760100000159582,
+        "status": "ok",
+        "strategy": "diverse",
+        "truncated": false,
+        "vocabulary_size": 64,
+        "generation_cached": false,
+        "deep_analyzed": 27,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 2,
+          "rank": 1,
+          "score": 79.95,
+          "phrase": "tins get"
+        },
+        {
+          "word_count": 2,
+          "rank": 2,
+          "score": 79.18,
+          "phrase": "tin gets"
+        },
+        {
+          "word_count": 2,
+          "rank": 3,
+          "score": 76.41,
+          "phrase": "set ting"
+        },
+        {
+          "word_count": 2,
+          "rank": 4,
+          "score": 74.45,
+          "phrase": "its gent"
+        },
+        {
+          "word_count": 2,
+          "rank": 5,
+          "score": 71.8,
+          "phrase": "gin test"
+        },
+        {
+          "word_count": 2,
+          "rank": 6,
+          "score": 67.51,
+          "phrase": "sign tet"
+        },
+        {
+          "word_count": 2,
+          "rank": 7,
+          "score": 66.26,
+          "phrase": "nits get"
+        },
+        {
+          "word_count": 2,
+          "rank": 8,
+          "score": 66.24,
+          "phrase": "gents it"
+        },
+        {
+          "word_count": 2,
+          "rank": 9,
+          "score": 65.51,
+          "phrase": "net gist"
+        },
+        {
+          "word_count": 2,
+          "rank": 10,
+          "score": 64.73,
+          "phrase": "nit gets"
+        }
+      ]
+    },
+    {
+      "text": "testing",
+      "strategy": "diverse",
+      "sample": 2,
+      "argv": [
+        "testing",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "diverse",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 3.2576676000007865,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 1.6050596999994013,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "testing",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "diverse",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\.candidates.txt.a7db26cf67ec439b8b1227e9603e8e9e.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.5777125000004162,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\.reranked.txt.a6b70acbfe6c429fa818c7e213066df4.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 27,
+        "seconds": 0.00177590000021155,
+        "status": "ok",
+        "strategy": "diverse",
+        "truncated": false,
+        "vocabulary_size": 64,
+        "generation_cached": false,
+        "deep_analyzed": 27,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 2,
+          "rank": 1,
+          "score": 79.95,
+          "phrase": "tins get"
+        },
+        {
+          "word_count": 2,
+          "rank": 2,
+          "score": 79.18,
+          "phrase": "tin gets"
+        },
+        {
+          "word_count": 2,
+          "rank": 3,
+          "score": 76.41,
+          "phrase": "set ting"
+        },
+        {
+          "word_count": 2,
+          "rank": 4,
+          "score": 74.45,
+          "phrase": "its gent"
+        },
+        {
+          "word_count": 2,
+          "rank": 5,
+          "score": 71.8,
+          "phrase": "gin test"
+        },
+        {
+          "word_count": 2,
+          "rank": 6,
+          "score": 67.51,
+          "phrase": "sign tet"
+        },
+        {
+          "word_count": 2,
+          "rank": 7,
+          "score": 66.26,
+          "phrase": "nits get"
+        },
+        {
+          "word_count": 2,
+          "rank": 8,
+          "score": 66.24,
+          "phrase": "gents it"
+        },
+        {
+          "word_count": 2,
+          "rank": 9,
+          "score": 65.51,
+          "phrase": "net gist"
+        },
+        {
+          "word_count": 2,
+          "rank": 10,
+          "score": 64.73,
+          "phrase": "nit gets"
+        }
+      ]
+    },
+    {
+      "text": "testing",
+      "strategy": "diverse",
+      "sample": 3,
+      "argv": [
+        "testing",
+        "--quick",
+        "--max-results",
+        "100",
+        "--workers",
+        "2",
+        "--search-strategy",
+        "diverse",
+        "--work-root",
+        "<fresh-puzzle-cache>",
+        "--json"
+      ],
+      "seconds": 3.1925350000001345,
+      "stages": [
+        {
+          "stage": "generation",
+          "seconds": 1.5345177999988664,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_user_generate.py",
+            "testing",
+            "--min-word-len",
+            "2",
+            "--min-words",
+            "2",
+            "--max-words",
+            "6",
+            "--min-zipf",
+            "2.7",
+            "--search-strategy",
+            "diverse",
+            "--short-word-policy",
+            "common",
+            "--show-components",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\.candidates.txt.553409f42d8d488499470ac57e2a702b.tmp",
+            "--max-results",
+            "100"
+          ]
+        },
+        {
+          "stage": "ranking",
+          "seconds": 1.582752199999959,
+          "command": [
+            "C:\\Users\\tajem\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+            "E:\\dev\\AnagramSolver\\anagram_rerank.py",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\candidates.txt",
+            "--backend",
+            "auto",
+            "--workers",
+            "2",
+            "--prepared-cache-dir",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\prepared",
+            "--deep-per-group",
+            "2000",
+            "--beam-width",
+            "128",
+            "--phrase-rescore-top",
+            "300",
+            "--order-candidates",
+            "56",
+            "--top-per-group",
+            "1",
+            "--export",
+            "<fresh-puzzle-cache>\\25f06e4d9b5ad7bd5e50\\.reranked.txt.17097fa79028442e8fb281f69a3c30bb.tmp"
+          ]
+        }
+      ],
+      "search": {
+        "cap": 100,
+        "generated": 27,
+        "seconds": 0.0018008000006375369,
+        "status": "ok",
+        "strategy": "diverse",
+        "truncated": false,
+        "vocabulary_size": 64,
+        "generation_cached": false,
+        "deep_analyzed": 27,
+        "ranking_cached": false
+      },
+      "results": [
+        {
+          "word_count": 2,
+          "rank": 1,
+          "score": 79.95,
+          "phrase": "tins get"
+        },
+        {
+          "word_count": 2,
+          "rank": 2,
+          "score": 79.18,
+          "phrase": "tin gets"
+        },
+        {
+          "word_count": 2,
+          "rank": 3,
+          "score": 76.41,
+          "phrase": "set ting"
+        },
+        {
+          "word_count": 2,
+          "rank": 4,
+          "score": 74.45,
+          "phrase": "its gent"
+        },
+        {
+          "word_count": 2,
+          "rank": 5,
+          "score": 71.8,
+          "phrase": "gin test"
+        },
+        {
+          "word_count": 2,
+          "rank": 6,
+          "score": 67.51,
+          "phrase": "sign tet"
+        },
+        {
+          "word_count": 2,
+          "rank": 7,
+          "score": 66.26,
+          "phrase": "nits get"
+        },
+        {
+          "word_count": 2,
+          "rank": 8,
+          "score": 66.24,
+          "phrase": "gents it"
+        },
+        {
+          "word_count": 2,
+          "rank": 9,
+          "score": 65.51,
+          "phrase": "net gist"
+        },
+        {
+          "word_count": 2,
+          "rank": 10,
+          "score": 64.73,
+          "phrase": "nit gets"
+        }
+      ]
+    }
+  ]
+}

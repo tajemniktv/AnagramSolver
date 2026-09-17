@@ -1,0 +1,93 @@
+[
+  { "schema": "ErrorResponse", "valid": true, "value": { "schema_version": 1, "error": { "code": "empty_input", "message": "No letters" } } },
+  { "schema": "ErrorResponse", "valid": false, "value": { "schema_version": 2, "error": { "code": "empty_input", "message": "No letters" } } },
+  { "schema": "DeploymentLimits", "valid": true, "value": {} },
+  { "schema": "DeploymentLimits", "valid": true, "value": { "max_candidates": 1, "timeout_ms": 0 } },
+  { "schema": "DeploymentLimits", "valid": false, "value": { "max_candidates": 0 } },
+  { "schema": "DeploymentLimits", "valid": false, "value": { "max_candidates": 9007199254740992 } },
+  {
+    "schema": "GenerateRequest",
+    "valid": true,
+    "value": {
+      "schema_version": 1, "text": "ate", "min_words": 1, "max_words": 3,
+      "min_word_length": 1, "max_word_length": 20, "min_zipf": 0,
+      "candidate_budget": 20, "allow_repeat": true, "strategy": "prefix", "hint_mode": "any"
+    }
+  },
+  { "schema": "GenerateRequest", "valid": false, "value": {} },
+  {
+    "schema": "GenerateRequest", "valid": false,
+    "value": {
+      "schema_version": 2, "text": "ate", "min_words": 1, "max_words": 3,
+      "min_word_length": 1, "max_word_length": 20, "min_zipf": 0,
+      "candidate_budget": 20, "allow_repeat": true, "strategy": "prefix", "hint_mode": "any"
+    }
+  },
+  {
+    "schema": "GenerateRequest", "valid": false,
+    "value": {
+      "schema_version": 1, "text": "ate", "min_words": 1, "max_words": 3,
+      "min_word_length": 1, "max_word_length": 20, "min_zipf": 0,
+      "candidate_budget": 9007199254740992, "allow_repeat": true, "strategy": "prefix", "hint_mode": "any"
+    }
+  },
+  {
+    "schema": "GenerateRequest", "valid": false,
+    "value": {
+      "schema_version": 1, "text": "ate", "min_words": 0, "max_words": 3,
+      "min_word_length": 1, "max_word_length": 20, "min_zipf": 0,
+      "candidate_budget": 20, "allow_repeat": true, "strategy": "prefix", "hint_mode": "any"
+    }
+  },
+  {
+    "schema": "Generated", "valid": true,
+    "value": {
+      "schema_version": 1, "kind": "generation_only", "engine_version": "0.1.0",
+      "normalized_input": "ate", "bags": [["ate"]], "generated": 1,
+      "vocabulary_size": 3, "candidate_budget": 1, "stop": "candidate_cap"
+    }
+  },
+  { "schema": "SolverError", "valid": true, "value": { "code": "empty_input", "message": "No letters" } },
+  { "schema": "SolverError", "valid": false, "value": { "code": 4, "message": "Bad type" } },
+  {
+    "schema": "SolveRequest", "valid": true,
+    "value": {
+      "generation": {
+        "schema_version": 1, "text": "ate", "min_words": 1, "max_words": 3,
+        "min_word_length": 1, "max_word_length": 20, "min_zipf": 0,
+        "candidate_budget": 20, "allow_repeat": true, "strategy": "prefix", "hint_mode": "any"
+      },
+      "deep_per_group": 100, "deep_all": false, "order_mode": "auto",
+      "beam_width": 128, "exact_max_words": 5, "retained_orders": 56,
+      "phrase_rescore_top": 300, "phrase_bonus_max": 5, "positive_bigrams": true,
+      "result_limit_per_group": 20
+    }
+  },
+  {
+    "schema": "SolveResult", "valid": true,
+    "value": {
+      "schema_version": 1, "kind": "ranked", "engine_version": "0.1.0",
+      "normalized_input": "ate", "generated": 0, "deep_analyzed": 0, "shown": 0,
+      "orders_evaluated": 0, "corpus_rescored": 0, "generation_stop": "exhausted", "buckets": {},
+      "status": {
+        "schema_version": 1, "job_id": "fixture", "state": "succeeded", "stage": "complete",
+        "counts": { "generated": 0, "deep_selected": 0, "deep_analyzed": 0, "orders_evaluated": 0, "corpus_rescored": 0, "shown": 0 },
+        "budgets": { "candidate_limit": 20, "deep_per_group": 100, "deep_limit": null, "result_limit_per_group": 20, "deadline_ms": null },
+        "versions": { "engine": "0.1.0", "ranking": "native-ranking-v1", "data": [], "data_complete": true },
+        "cache": { "hit": false, "rebuilt": false, "corrupt_entry_ignored": false },
+        "exhaustion": "exhausted", "error": null
+      }
+    }
+  },
+  {
+    "schema": "JobStatus", "valid": true,
+    "value": {
+      "schema_version": 1, "job_id": "fixture", "state": "timed_out", "stage": "generating",
+      "counts": { "generated": 20, "deep_selected": 0, "deep_analyzed": 0, "orders_evaluated": 0, "corpus_rescored": 0, "shown": 0 },
+      "budgets": { "candidate_limit": 20, "deep_per_group": 100, "deep_limit": null, "result_limit_per_group": 20, "deadline_ms": 1000 },
+      "versions": { "engine": "0.1.0", "ranking": "python-reference-v1", "data": [], "data_complete": false },
+      "cache": { "hit": false, "rebuilt": false, "corrupt_entry_ignored": false },
+      "exhaustion": "unknown", "error": { "code": "timed_out", "message": "timed_out" }
+    }
+  }
+]

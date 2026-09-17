@@ -14,6 +14,10 @@ concurrency:
   group: phrase-benchmarks-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    working-directory: archive
+
 jobs:
   corpus-matrix:
     name: phrase ordering A/B or manual full corpus matrix
@@ -61,22 +65,22 @@ jobs:
         shell: bash
         run: |
           if [ -d "$HOME/.multi_anagram" ]; then
-            mkdir -p .anagram_data
-            cp -a "$HOME/.multi_anagram/." .anagram_data/
+            mkdir -p ../.anagram_data
+            cp -a "$HOME/.multi_anagram/." ../.anagram_data/
             rm -rf "$HOME/.multi_anagram"
           fi
 
       - name: Drop code-sensitive prepared-feature cache
         shell: bash
-        run: rm -rf .anagram_data/prepared_cache
+        run: rm -rf ../.anagram_data/prepared_cache
 
       - name: Build Wiktionary phrase index
         shell: bash
         run: |
-          mkdir -p .ci_phrase_cache
-          if [ ! -s .ci_phrase_cache/wiktionary.db ]; then
+          mkdir -p ../.ci_phrase_cache
+          if [ ! -s ../.ci_phrase_cache/wiktionary.db ]; then
             python build_wikimedia_phrase_index.py \
-              --output .ci_phrase_cache/wiktionary.db \
+              --output ../.ci_phrase_cache/wiktionary.db \
               --rebuild
           else
             echo "Using cached Wiktionary phrase index"
@@ -85,10 +89,10 @@ jobs:
       - name: Build Wiktionary + Wikipedia phrase index
         shell: bash
         run: |
-          if [ ! -s .ci_phrase_cache/wiktionary-wikipedia.db ]; then
+          if [ ! -s ../.ci_phrase_cache/wiktionary-wikipedia.db ]; then
             python build_wikimedia_phrase_index.py \
               --include-wikipedia \
-              --output .ci_phrase_cache/wiktionary-wikipedia.db \
+              --output ../.ci_phrase_cache/wiktionary-wikipedia.db \
               --rebuild
           else
             echo "Using cached Wiktionary + Wikipedia phrase index"
@@ -98,8 +102,8 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           python ci_phrase_matrix.py \
-            --wiktionary-db .ci_phrase_cache/wiktionary.db \
-            --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --wiktionary-db ../.ci_phrase_cache/wiktionary.db \
+            --wikipedia-db ../.ci_phrase_cache/wiktionary-wikipedia.db \
             --workers 8 \
             --order-only
 
@@ -107,11 +111,11 @@ jobs:
       # regression threshold. A losing or temporarily broken experiment should
       # report diagnostics without turning otherwise-correct solver CI red.
       - name: Evaluate explicit-feature ranker with grouped held-out folds
-        if: github.event_name == 'pull_request' && hashFiles('train_feature_ranker.py') != ''
+        if: github.event_name == 'pull_request' && hashFiles('archive/train_feature_ranker.py') != ''
         continue-on-error: true
         run: |
           python train_feature_ranker.py \
-            --phrase-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --phrase-db ../.ci_phrase_cache/wiktionary-wikipedia.db \
             --order-candidates 56 \
             --folds 5
 
@@ -119,8 +123,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           python ci_phrase_matrix.py \
-            --wiktionary-db .ci_phrase_cache/wiktionary.db \
-            --wikipedia-db .ci_phrase_cache/wiktionary-wikipedia.db \
+            --wiktionary-db ../.ci_phrase_cache/wiktionary.db \
+            --wikipedia-db ../.ci_phrase_cache/wiktionary-wikipedia.db \
             --workers 8
 
       - name: Monthly corpus cache refresh only

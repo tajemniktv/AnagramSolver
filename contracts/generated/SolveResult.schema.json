@@ -1,0 +1,589 @@
+{
+  "$defs": {
+    "CacheFlags": {
+      "additionalProperties": false,
+      "properties": {
+        "corrupt_entry_ignored": {
+          "type": "boolean"
+        },
+        "hit": {
+          "type": "boolean"
+        },
+        "rebuilt": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "hit",
+        "rebuilt",
+        "corrupt_entry_ignored"
+      ],
+      "type": "object"
+    },
+    "Counts": {
+      "additionalProperties": false,
+      "properties": {
+        "corpus_rescored": {
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "deep_analyzed": {
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "deep_selected": {
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "generated": {
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "orders_evaluated": {
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shown": {
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "generated",
+        "deep_selected",
+        "deep_analyzed",
+        "orders_evaluated",
+        "corpus_rescored",
+        "shown"
+      ],
+      "type": "object"
+    },
+    "DataIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "bytes": {
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "present": {
+          "type": "boolean"
+        },
+        "representation": {
+          "$ref": "#/$defs/DataRepresentation"
+        },
+        "role": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sha256": {
+          "maxLength": 64,
+          "minLength": 64,
+          "type": "string"
+        }
+      },
+      "required": [
+        "role",
+        "representation",
+        "present",
+        "sha256",
+        "bytes"
+      ],
+      "type": "object"
+    },
+    "DataRepresentation": {
+      "enum": [
+        "file_bytes",
+        "phrase_rows_v1"
+      ],
+      "type": "string"
+    },
+    "EffectiveBudgets": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_limit": {
+          "description": "None means unbounded, unlike a displayed result limit.",
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "deadline_ms": {
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "deep_limit": {
+          "description": "Hard work cap, separate from semantic family-expanding shortlist size.",
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "deep_per_group": {
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "result_limit_per_group": {
+          "format": "uint",
+          "maximum": 9007199254740991,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "deep_per_group",
+        "result_limit_per_group"
+      ],
+      "type": "object"
+    },
+    "Exhaustion": {
+      "enum": [
+        "exhausted",
+        "truncated",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "Failure": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "type": "object"
+    },
+    "JobState": {
+      "enum": [
+        "queued",
+        "running",
+        "succeeded",
+        "cancelled",
+        "timed_out",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "JobStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "budgets": {
+          "$ref": "#/$defs/EffectiveBudgets"
+        },
+        "cache": {
+          "$ref": "#/$defs/CacheFlags"
+        },
+        "counts": {
+          "$ref": "#/$defs/Counts"
+        },
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Failure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exhaustion": {
+          "$ref": "#/$defs/Exhaustion"
+        },
+        "job_id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "format": "uint32",
+          "maximum": 1,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "stage": {
+          "$ref": "#/$defs/Stage"
+        },
+        "state": {
+          "$ref": "#/$defs/JobState"
+        },
+        "versions": {
+          "$ref": "#/$defs/Versions"
+        }
+      },
+      "required": [
+        "schema_version",
+        "job_id",
+        "state",
+        "stage",
+        "counts",
+        "budgets",
+        "versions",
+        "cache",
+        "exhaustion"
+      ],
+      "type": "object"
+    },
+    "Row": {
+      "properties": {
+        "base_final": {
+          "format": "double",
+          "type": "number"
+        },
+        "best_order": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "colloc_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "deep": {
+          "type": "boolean"
+        },
+        "display_phrase": {
+          "default": "",
+          "type": "string"
+        },
+        "fam": {
+          "format": "double",
+          "type": "number"
+        },
+        "family_key": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "final": {
+          "format": "double",
+          "type": "number"
+        },
+        "grammar_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "grammar_potential": {
+          "format": "double",
+          "type": "number"
+        },
+        "grammar_potential_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "grammar_raw": {
+          "format": "double",
+          "type": "number"
+        },
+        "hint": {
+          "format": "double",
+          "type": "number"
+        },
+        "hints": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "lex": {
+          "format": "double",
+          "type": "number"
+        },
+        "old_pair": {
+          "format": "double",
+          "type": "number"
+        },
+        "old_pcov": {
+          "format": "double",
+          "type": "number"
+        },
+        "old_pre": {
+          "format": "double",
+          "type": "number"
+        },
+        "old_rank": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "phrase_attest_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "phrase_bonus": {
+          "format": "double",
+          "type": "number"
+        },
+        "phrase_kind": {
+          "type": "string"
+        },
+        "pre_score": {
+          "format": "double",
+          "type": "number"
+        },
+        "structure_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "syntax_coverage": {
+          "format": "double",
+          "type": "number"
+        },
+        "valency_norm": {
+          "format": "double",
+          "type": "number"
+        },
+        "wn_coverage": {
+          "format": "double",
+          "type": "number"
+        },
+        "word_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "words": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "zavg": {
+          "format": "double",
+          "type": "number"
+        },
+        "zmin": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "words",
+        "word_count",
+        "old_rank",
+        "old_pre",
+        "lex",
+        "fam",
+        "old_pair",
+        "hint",
+        "zavg",
+        "zmin",
+        "old_pcov",
+        "hints",
+        "wn_coverage",
+        "grammar_potential",
+        "grammar_potential_norm",
+        "pre_score",
+        "deep",
+        "best_order",
+        "grammar_raw",
+        "grammar_norm",
+        "structure_norm",
+        "valency_norm",
+        "syntax_coverage",
+        "phrase_kind",
+        "base_final",
+        "colloc_norm",
+        "phrase_attest_norm",
+        "phrase_bonus",
+        "final",
+        "family_key"
+      ],
+      "type": "object"
+    },
+    "Stage": {
+      "enum": [
+        "queued",
+        "loading_corpora",
+        "generating",
+        "preparing",
+        "deep_ranking",
+        "corpus_ranking",
+        "finalizing",
+        "complete"
+      ],
+      "type": "string"
+    },
+    "Stop": {
+      "enum": [
+        "exhausted",
+        "candidate_cap",
+        "cancelled",
+        "timed_out"
+      ],
+      "type": "string"
+    },
+    "Timings": {
+      "properties": {
+        "execution_ms": {
+          "description": "Current solve invocation, excluding adapter JSON input/output transport.",
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ranking_computation_ms": {
+          "description": "Deep/corpus ranking and final bucket assembly, excluding cache writes.\nOn a cache hit this belongs to the original computation.",
+          "format": "uint64",
+          "maximum": 9007199254740991,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "execution_ms",
+        "ranking_computation_ms"
+      ],
+      "type": "object"
+    },
+    "Versions": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "items": {
+            "$ref": "#/$defs/DataIdentity"
+          },
+          "type": "array"
+        },
+        "data_complete": {
+          "type": "boolean"
+        },
+        "engine": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "ranking": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "engine",
+        "ranking",
+        "data",
+        "data_complete"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "properties": {
+    "buckets": {
+      "additionalProperties": false,
+      "patternProperties": {
+        "^\\d+$": {
+          "items": {
+            "$ref": "#/$defs/Row"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "corpus_rescored": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "deep_analyzed": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "engine_version": {
+      "type": "string"
+    },
+    "generated": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "generation_stop": {
+      "$ref": "#/$defs/Stop"
+    },
+    "kind": {
+      "type": "string"
+    },
+    "normalized_input": {
+      "type": "string"
+    },
+    "orders_evaluated": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "schema_version": {
+      "format": "uint32",
+      "maximum": 1,
+      "minimum": 1,
+      "type": "integer"
+    },
+    "shown": {
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "status": {
+      "$ref": "#/$defs/JobStatus"
+    },
+    "timings": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Timings"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "kind",
+    "engine_version",
+    "normalized_input",
+    "generated",
+    "deep_analyzed",
+    "shown",
+    "orders_evaluated",
+    "corpus_rescored",
+    "generation_stop",
+    "buckets",
+    "status"
+  ],
+  "title": "Result",
+  "type": "object"
+}

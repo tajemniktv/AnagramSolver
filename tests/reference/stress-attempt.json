@@ -1,0 +1,16 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "command": "python benchmark_user_runs.py --output tests/reference/user-performance.json",
+  "status": "incomplete_timeout",
+  "timeout_seconds": 180,
+  "failed_case": "actions_words",
+  "failed_strategy": "prefix",
+  "failed_sample": 2,
+  "failed_phase": "cold",
+  "completed_runs": "user-performance.json",
+  "notes": [
+    "The original harness aborts on timeout. No timings, memory peaks or quality results are invented for the timed-out or unattempted cases.",
+    "First cold and warm result arrays matched exactly. The intended answer bag was absent at the 2000-candidate cap.",
+    "This is a censored stress measurement, not a passing full performance-suite gate."
+  ]
+}
