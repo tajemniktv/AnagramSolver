@@ -186,6 +186,13 @@ pub fn rank_observed(
     if words.len() > 10 {
         return Err("native order pool currently supports at most ten words");
     }
+    if exact && words.len() > 8 {
+        return Err("exact ordering supports at most eight words; use beam mode");
+    }
+    let width = beam_width.max(top_k.checked_mul(8).ok_or("ordering budget overflow")?);
+    if width > 4096 || (!exact && width * words.len() * (1usize << words.len()) > 5_000_000) {
+        return Err("ordering width exceeds the engine memory budget");
+    }
     let mut words = words.to_vec();
     words.sort();
     let n = words.len();
@@ -238,7 +245,6 @@ pub fn rank_observed(
     if exact {
         permutations(n, &mut Vec::new(), 0, &mut visit)?;
     } else {
-        let width = beam_width.max(top_k.checked_mul(8).ok_or("ordering budget overflow")?);
         for order in kbest(&pair, &starts, &ends, width, control)? {
             visit(&order)?;
         }

@@ -46,6 +46,12 @@ def main():
         for key,value in sorted(schema.get("$defs",{}).items()):lines.append(f"export type {key} = {typescript(value)};")
         lines.append(f"export type {name} = {typescript(schema)};")
         outputs[ROOT/"contracts/generated"/f"{name}.ts"]="\n\n".join(lines)+"\n"
+    directory = ROOT / "contracts/generated"
+    stale = set(directory.glob("*.schema.json")) | set(directory.glob("*.ts"))
+    stale -= set(outputs)
+    if stale:
+        raise SystemExit("Stale generated artifacts; remove obsolete files explicitly: " +
+                         ", ".join(str(path.relative_to(ROOT)) for path in sorted(stale)))
     for path,content in outputs.items():
         if args.check:
             if not path.exists() or path.read_text(encoding="utf-8")!=content:raise SystemExit(f"Generated contract drift: {path}")

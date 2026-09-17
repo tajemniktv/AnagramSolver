@@ -5,7 +5,7 @@
   "cpu": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
   "native_sha256": "4a0f53cc065f64824c3abf8f28c621b19414f91ccfd4d35656f3211b04901631",
   "registry_sha256": "e99e4c3affbd5d8577c83ba93f7ecb3d200025262a1728439a9fd8a82a567735",
-  "methodology": "Serial fresh processes, alternating engine order per sample; Python workers=1; cold means fresh puzzle caches, not cold OS/corpus pages. Warm native reuses ranking only; Python reuses generation and ranking. Elapsed time includes startup, parsing and JSON transport. Sampled summed process-tree RSS may double-count shared pages. No parallel speedup claim.",
+  "methodology": "Native-only serial fresh processes; cold means fresh puzzle caches, not cold OS/corpus pages. Warm native reuses completed generation and ranking after exact corpus identity checks. No Python measurements are included. Elapsed time includes startup, parsing and JSON transport. Sampled summed process-tree RSS may double-count shared pages. No parallel speedup claim.",
   "samples": 3,
   "cases": [
     "shakira_control"

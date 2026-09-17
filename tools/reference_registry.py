@@ -22,6 +22,7 @@ def main():
     args = parser.parse_args()
     verify_sources()
     temp_root = ROOT / ".codex/temp"
+    temp_root.mkdir(parents=True, exist_ok=True)
     tempfile.tempdir = str(temp_root)
     os.environ.update(TEMP=str(temp_root), TMP=str(temp_root), PYTHONIOENCODING="utf-8")
     from anagram_suite import cases_for, normal_user_case

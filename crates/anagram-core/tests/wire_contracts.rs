@@ -5,7 +5,7 @@ use serde_json::Value;
 fn shared_request_and_progress_fixtures_match_rust_deserialization() {
     let fixtures: Vec<Value> =
         serde_json::from_str(include_str!("../../../contracts/fixtures.json")).unwrap();
-    let mut checked = 0;
+    let mut checked = std::collections::BTreeMap::new();
     for fixture in fixtures {
         let value = fixture["value"].clone();
         let accepted = match fixture["schema"].as_str().unwrap() {
@@ -24,7 +24,20 @@ fn shared_request_and_progress_fixtures_match_rust_deserialization() {
             _ => continue,
         };
         assert_eq!(accepted, fixture["valid"].as_bool().unwrap(), "{fixture}");
-        checked += 1;
+        *checked
+            .entry(fixture["schema"].as_str().unwrap().to_owned())
+            .or_insert(0usize) += 1;
     }
-    assert!(checked >= 4);
+    for (schema, count) in [
+        ("DeploymentLimits", 4),
+        ("GenerateRequest", 5),
+        ("SolveRequest", 1),
+        ("JobStatus", 1),
+    ] {
+        assert_eq!(
+            checked.get(schema),
+            Some(&count),
+            "Missing fixture coverage for {schema}"
+        );
+    }
 }

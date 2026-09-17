@@ -102,15 +102,17 @@ impl Control {
             check()?;
             scratch[source] = destination;
         }
+        // Commit the permutation without fallible checkpoints: returning Err
+        // must leave the original ordering intact, not a partial permutation.
+        check()?;
         for i in 0..n {
             while scratch[i] != i {
-                check()?;
                 let j = scratch[i];
                 values.swap(i, j);
                 scratch.swap(i, j);
             }
         }
-        check()
+        Ok(())
     }
     pub fn reader<R>(&self, inner: R) -> Reader<'_, R> {
         Reader {

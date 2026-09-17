@@ -32,7 +32,8 @@ def main():
     verify_sources()
     cases = json.loads((ROOT / "tests/reference/registry.json").read_text())["normal_user_cli"]
     if args.case:
-        assert set(args.case) <= {case["id"] for case in cases}, "Unknown registry case"
+        if not set(args.case) <= {case["id"] for case in cases}:
+            parser.error("Unknown registry case")
         cases = [case for case in cases if case["id"] in args.case]
     subprocess.run(["cargo", "build", "--release", "--locked", "-p", "anagram-cli"], cwd=ROOT, check=True)
     executable = ROOT / "target/release" / ("anagram-cli.exe" if sys.platform == "win32" else "anagram-cli")

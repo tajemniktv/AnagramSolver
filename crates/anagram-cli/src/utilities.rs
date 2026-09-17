@@ -7,7 +7,7 @@ use std::{
     collections::{BTreeSet, HashSet},
     ffi::OsString,
     fs::File,
-    io::{self, BufRead, BufReader, Read, Write},
+    io::{self, BufReader, Read, Write},
     path::Path,
 };
 fn err(e: impl std::fmt::Display) -> Error {
@@ -47,7 +47,45 @@ fn stage(path: &Path) -> Result<tempfile::NamedTempFile, Error> {
     tempfile::NamedTempFile::new_in(parent).map_err(err)
 }
 pub fn run(args: &[OsString], control: &Control) -> Result<Value, Error> {
-    run_with_input(args, control, &mut io::stdin())
+    if args
+        .first()
+        .is_some_and(|arg| arg.to_string_lossy().starts_with("ranker-"))
+    {
+        let bytes = read_stdin(control, 16 * 1024 * 1024)?;
+        run_with_input(args, control, &mut io::Cursor::new(bytes))
+    } else {
+        run_with_input(args, control, &mut io::empty())
+    }
+}
+
+/// CLI-only input owner: a deadline must also work while a pipe writer stays open.
+/// On timeout the CLI exits; it never joins a thread blocked in an OS stdin read.
+pub fn read_stdin(control: &Control, limit: usize) -> Result<Vec<u8>, Error> {
+    let (send, receive) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let mut bytes = Vec::new();
+        let result = io::stdin()
+            .take(limit as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map(|_| bytes);
+        let _ = send.send(result);
+    });
+    loop {
+        control
+            .check()
+            .map_err(|reason| Error::new(reason, reason))?;
+        match receive.recv_timeout(std::time::Duration::from_millis(10)) {
+            Ok(result) => {
+                let bytes = result.map_err(err)?;
+                if bytes.len() > limit {
+                    return Err(Error::new("request_too_large", "Input exceeds byte limit"));
+                }
+                return Ok(bytes);
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+            Err(error) => return Err(err(error)),
+        }
+    }
 }
 pub fn run_with_input(
     args: &[OsString],
@@ -89,10 +127,9 @@ pub fn run_with_input(
             )
             .map_err(err)?;
             let mut words = BTreeSet::new();
-            for line in control
-                .reader(BufReader::new(File::open(&args[1]).map_err(err)?))
-                .lines()
-            {
+            for line in anagram_core::lexicon::decoded_lines(
+                control.reader(BufReader::new(File::open(&args[1]).map_err(err)?)),
+            ) {
                 let word = anagram_core::normalize_letters(&line.map_err(err)?);
                 if !word.is_empty() {
                     words.insert(word);

@@ -185,14 +185,25 @@ pub fn solve_cached_observed(
 /// Request semantics only; adapters can reject invalid requests before any I/O.
 pub fn validate(request: &Request) -> std::result::Result<(), Error> {
     request::validate(&request.generation)?;
+    validate_budgets(request)?;
+    if request.generation.max_words > 10 {
+        return Err(Error::new(
+            "invalid_ranking_limits",
+            "Ordering supports at most 10 words",
+        ));
+    }
+    Ok(())
+}
+
+/// Validate the shared solve-envelope budgets, including generation-only jobs.
+pub fn validate_budgets(request: &Request) -> std::result::Result<(), Error> {
     if request.workers > 32 {
         return Err(Error::new(
             "invalid_workers",
             "Workers must be 0 (automatic) or between 1 and 32",
         ));
     }
-    if request.generation.max_words > 10
-        || request.deep_per_group == 0
+    if request.deep_per_group == 0
         || request.beam_width == 0
         || request.exact_max_words == 0
         || request.retained_orders == 0

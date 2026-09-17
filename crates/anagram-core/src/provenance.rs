@@ -11,10 +11,16 @@ use std::{
 };
 
 pub struct Snapshot {
-    pub bytes: Vec<u8>,
-    pub identity: DataIdentity,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) identity: DataIdentity,
 }
 impl Snapshot {
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+    pub fn identity(&self) -> &DataIdentity {
+        &self.identity
+    }
     pub fn load(path: &Path, role: &str, control: &Control) -> io::Result<Self> {
         control.check_io()?;
         let mut file = File::open(path)?;

@@ -130,8 +130,7 @@ pub fn comparative_like(word: &str, lex: &WordNet) -> bool {
     if ["better", "worse", "more", "less", "rather", "sooner"].contains(&word) {
         return true;
     }
-    let f = lex.features(word);
-    word.len() > 3 && word.ends_with("er") && (f.adj || f.adv)
+    crate::comparative::evidence(word, lex).confidence >= 0.9
 }
 
 pub fn comparative(words: &[String], start: usize, lex: &WordNet) -> Option<(usize, f64)> {
@@ -144,10 +143,7 @@ pub fn comparative(words: &[String], start: usize, lex: &WordNet) -> Option<(usi
         }
         let left = &words[start..than];
         let right = &words[than + 1..];
-        if !left.iter().any(|w| {
-            let f = lex.features(w);
-            comparative_like(w, lex) || f.adj || f.adv
-        }) {
+        if !left.iter().any(|w| comparative_like(w, lex)) {
             continue;
         }
         let consumed = if let Some((end, _)) = phrase::starting_at(right, 0, lex, true) {

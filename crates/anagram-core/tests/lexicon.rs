@@ -2,6 +2,40 @@ use anagram_core::{Inventory, lexicon::*};
 use std::collections::BTreeSet;
 
 #[test]
+fn negative_counts_and_nonletter_forced_entries_are_safe() {
+    assert!(Unigrams::load(b"cat 5\ndog -1\n".as_slice()).is_err());
+    assert!(
+        anagram_core::corpus_ranking::Collocation::load(
+            b"cat 5\n".as_slice(),
+            b"cat dog -1\n".as_slice(),
+            &BTreeSet::new()
+        )
+        .is_err()
+    );
+    let policy = Admission {
+        min_length: 1,
+        max_length: 5,
+        min_zipf: 0.0,
+        short_policy: ShortPolicy::All,
+        short_whitelist: BTreeSet::new(),
+        forced: BTreeSet::from(["123".into()]),
+        excluded: BTreeSet::new(),
+        forbidden: BTreeSet::new(),
+    };
+    assert!(
+        admit(
+            b"".as_slice(),
+            Inventory::from_text("cat"),
+            &policy,
+            None,
+            |_| false
+        )
+        .unwrap()
+        .is_empty()
+    );
+}
+
+#[test]
 fn short_policy_keeps_explicit_whitelist_but_all_admits_other_short_words() {
     for (short_policy, expected) in [
         (ShortPolicy::None, vec!["at"]),

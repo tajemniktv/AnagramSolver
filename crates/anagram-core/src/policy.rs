@@ -59,15 +59,13 @@ impl DeploymentLimits {
 
     pub fn admit_generation(&self, request: &crate::request::GenerateRequest) -> Result<(), Error> {
         self.validate()?;
-        for (actual, maximum, name) in [
-            (request.text.len(), self.max_input_bytes, "input bytes"),
-            (
+        check(request.text.len(), self.max_input_bytes, "input bytes")?;
+        if self.max_normalized_letters.is_some() {
+            check(
                 normalize_letters(&request.text).len(),
                 self.max_normalized_letters,
                 "normalized letters",
-            ),
-        ] {
-            check(actual, maximum, name)?;
+            )?;
         }
         if self.max_candidates.is_some() && request.candidate_budget == 0 {
             return Err(Error::new(
