@@ -10,6 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import anagram_rerank_core as reference
+import anagram_auxiliary_grammar as auxiliary
+import anagram_comparative_grammar as comparative
+import anagram_clause_validity as validity
 from scoring import close
 
 
@@ -26,6 +29,13 @@ def main():
                  "mother of invention", "these old sheep", "a dogs", "school bus", "less is more",
                  "better late than never", "louder than words", "before you leap", "the bird sings",
                  "the pot boils", "turn red", "give him a book", "paint the wall red"])
+    cases.extend(phrase.split() for phrase in ["closer than one", "number than ice", "happier than before",
+                 "they are being tested", "he has been running", "they will have been being tested",
+                 "we will not be tested", "she does not run", "he has not been running",
+                 "they being tested", "he is runs", "the larger dog"])
+    cases.extend(phrase.split() for phrase in ["a am sitting managers", "an game starting aims",
+                 "one am here", "one is here", "a hour", "an university", "do run", "dont run",
+                 "the cat is was running", "the bird singing", "a honest person"])
     subprocess.run(["cargo", "build", "--locked", "--example", "grammar_probe"], cwd=ROOT, check=True)
     executable = ROOT / "target/debug/examples" / ("grammar_probe.exe" if sys.platform == "win32" else "grammar_probe")
     result = subprocess.run([str(executable), str(directory)], input="\n".join(map(json.dumps, cases)),
@@ -48,7 +58,19 @@ def main():
                         agreement=[[reference._subject_agreement(w,v,lex,auxiliary=False) for v in
                                     ["is","are","dont","doesnt","runs","run","stopped","have"]] for w in words],
                         tails=[reference._valency_for_tail(v,words,lex) for v in ["run","give","speak","look","turn"]],
-                        structure=asdict(reference.phrase_structure(words,lex)))
+                        structure=asdict(reference.phrase_structure(words,lex)),
+                        valid_subject=[validity.valid_subject_head(w,lex) for w in words],
+                        finite_lexical=[validity.lexical_finite_form(w,lex) for w in words],
+                        valid_pairs=[[validity.pair_validity_adjustment(a,b,lex) for b in words] for a in words],
+                        valid_coverage=validity.best_valid_lexical_clause_coverage(words,lex),
+                        adjusted=asdict(validity.adjust_base_clause_structure(words,lex,reference.phrase_structure(words,lex))),
+                        surface=asdict(validity.apply_surface_structure_penalties(words,lex,reference.phrase_structure(words,lex))),
+                        chains=[asdict(chain) if (chain := auxiliary.parse_auxiliary_chain(words,i,lex)) else None for i in range(len(words))],
+                        comparative_evidence=[asdict(comparative.comparative_evidence(w,lex)) for w in words],
+                        comparative_bases=[comparative.comparative_base_candidates(w) for w in words],
+                        graded_comparative=[comparative.comparative_span_starting_at(words,i,lex) for i in range(len(words))],
+                        aux_agreement=[[auxiliary.auxiliary_agreement(w,reference._subject_number(w,lex),v,lex) for v in
+                                        ["am","is","are","was","were","has","have","had","hasnt","dont","can"]] for w in words])
         try:
             close(got, expected)
         except AssertionError as error:

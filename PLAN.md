@@ -54,6 +54,13 @@ Phases 4–6 remain future roadmap context and are not part of this active goal.
   cases covering every exposed helper plus final base structure fields.
   Extended auxiliary-chain/clause-validity/comparative rules, retained-order
   search and final score assembly still need implementation and parity proof.
+- Native auxiliary-chain parsing/agreement now covers modal, perfect,
+  progressive, passive and nested/negated forms. Graded comparative morphology
+  and spans, finite-clause validity demotion, and article/auxiliary surface
+  penalties are ported. The expanded grammar parity gate passes 293 cases with
+  exact classification/consumption checks and component-score comparisons;
+  strict Clippy passes. Combining these into the extended structure scorer and
+  retained-order search is still unfinished.
 
 ## Outcome
 

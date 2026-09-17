@@ -3,13 +3,16 @@
 
 use unicode_normalization::UnicodeNormalization;
 
+pub mod auxiliary;
 pub mod clause;
+pub mod comparative;
 pub mod generation;
 pub mod grammar;
 pub mod lexicon;
 pub mod phrase;
 pub mod request;
 pub mod scoring;
+pub mod validity;
 pub mod wordnet;
 
 /// Match Python's NFKD -> ASCII(ignore) -> lowercase -> [a-z] pipeline.

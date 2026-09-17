@@ -1,4 +1,4 @@
-use anagram_core::{clause, grammar, phrase, wordnet::WordNet};
+use anagram_core::{auxiliary, clause, comparative, grammar, phrase, validity, wordnet::WordNet};
 use serde_json::json;
 use std::{
     io::{self, BufRead},
@@ -29,7 +29,18 @@ fn main() {
             "numbers": words.iter().map(|w| clause::subject_number(w,&lex)).collect::<Vec<_>>(),
             "agreement": words.iter().map(|w| ["is","are","dont","doesnt","runs","run","stopped","have"].map(|v| clause::agreement(w,v,&lex,false,None))).collect::<Vec<_>>(),
             "tails": (["run","give","speak","look","turn"].map(|v| clause::tail(v,&words,&lex))),
-            "structure": clause::base_structure(&words,&lex)})
+            "structure": clause::base_structure(&words,&lex),
+            "valid_subject": words.iter().map(|w| validity::valid_subject(w,&lex)).collect::<Vec<_>>(),
+            "finite_lexical": words.iter().map(|w| validity::finite_lexical(w,&lex)).collect::<Vec<_>>(),
+            "valid_pairs": words.iter().map(|a| words.iter().map(|b| validity::pair(a,b)).collect::<Vec<_>>()).collect::<Vec<_>>(),
+            "valid_coverage": validity::lexical_coverage(&words,&lex),
+            "adjusted": validity::adjust(&words,&lex,clause::base_structure(&words,&lex)),
+            "surface": validity::surface(&words,clause::base_structure(&words,&lex)),
+            "chains": (0..words.len()).map(|i| auxiliary::parse(&words,i,&lex)).collect::<Vec<_>>(),
+            "comparative_evidence": words.iter().map(|w| comparative::evidence(w,&lex)).collect::<Vec<_>>(),
+            "comparative_bases": words.iter().map(|w| comparative::bases(w)).collect::<Vec<_>>(),
+            "graded_comparative": (0..words.len()).map(|i| comparative::span(&words,i,&lex)).collect::<Vec<_>>(),
+            "aux_agreement": words.iter().map(|w| ["am","is","are","was","were","has","have","had","hasnt","dont","can"].map(|v| auxiliary::agreement(w,clause::subject_number(w,&lex),v,&lex))).collect::<Vec<_>>()})
         );
     }
 }
