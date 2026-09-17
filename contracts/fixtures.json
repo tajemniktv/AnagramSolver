@@ -66,7 +66,15 @@
     "value": {
       "schema_version": 1, "kind": "ranked", "engine_version": "0.1.0",
       "normalized_input": "ate", "generated": 0, "deep_analyzed": 0, "shown": 0,
-      "orders_evaluated": 0, "corpus_rescored": 0, "generation_stop": "exhausted", "buckets": {}
+      "orders_evaluated": 0, "corpus_rescored": 0, "generation_stop": "exhausted", "buckets": {},
+      "status": {
+        "schema_version": 1, "job_id": "fixture", "state": "succeeded", "stage": "complete",
+        "counts": { "generated": 0, "deep_selected": 0, "deep_analyzed": 0, "orders_evaluated": 0, "corpus_rescored": 0, "shown": 0 },
+        "budgets": { "candidate_limit": 20, "deep_per_group": 100, "deep_limit": null, "result_limit_per_group": 20, "deadline_ms": null },
+        "versions": { "engine": "0.1.0", "ranking": "native-ranking-v1", "data": [] },
+        "cache": { "hit": false, "rebuilt": false, "corrupt_entry_ignored": false },
+        "exhaustion": "exhausted", "error": null
+      }
     }
   },
   {
@@ -77,7 +85,7 @@
       "budgets": { "candidate_limit": 20, "deep_per_group": 100, "deep_limit": null, "result_limit_per_group": 20, "deadline_ms": 1000 },
       "versions": { "engine": "0.1.0", "ranking": "python-reference-v1", "data": [] },
       "cache": { "hit": false, "rebuilt": false, "corrupt_entry_ignored": false },
-      "exhaustion": "unknown", "error": null
+      "exhaustion": "unknown", "error": { "code": "timed_out", "message": "timed_out" }
     }
   }
 ]

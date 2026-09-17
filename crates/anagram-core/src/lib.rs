@@ -20,6 +20,7 @@ pub mod phrase;
 pub mod phrase_evidence;
 pub mod phrase_index;
 pub mod policy;
+mod progress;
 pub mod ranking;
 pub mod refinement;
 pub mod request;

@@ -46,8 +46,17 @@ def main():
                     colloc=ranking.load_positive_bigram_model(one,two,vocabulary)
                     rescored=ranking.apply_phrase_rescore(rows,collocation=colloc,phrase_index=None,top_per_group=2,bonus_max=5.0)
                 buckets={str(wc):[asdict(row) for row in bucket[:5]] for wc,bucket in ranking.rank_buckets(rows).items()}
-                result=subprocess.run([str(executable),"solve",str(dictionary),str(one),str(two),str(wordnet)],input=json.dumps(request),text=True,capture_output=True,check=True,timeout=120)
+                result=subprocess.run([str(executable),"solve",str(dictionary),str(one),str(two),str(wordnet),"--progress"],input=json.dumps(request),text=True,capture_output=True,check=True,timeout=120)
                 actual=json.loads(result.stdout)
+                status=actual.pop("status")
+                events=[json.loads(line) for line in result.stderr.splitlines()]
+                assert events[0]["state"]=="queued" and events[-1]==status
+                assert status["state"]=="succeeded" and status["stage"]=="complete"
+                for key in ("generated","deep_analyzed","shown","orders_evaluated","corpus_rescored"):
+                    assert status["counts"][key]==actual[key],key
+                assert status["counts"]["deep_selected"]==len(selected)
+                assert status["budgets"]["candidate_limit"]==20
+                assert status["exhaustion"]==("truncated" if stats.truncated else "exhausted")
                 expected=dict(schema_version=1,kind="ranked",engine_version="0.1.0",normalized_input=text,generated=len(records),deep_analyzed=sum(r.deep for r in rows),shown=sum(map(len,buckets.values())),orders_evaluated=int(deep["orders"]),corpus_rescored=rescored,generation_stop="candidate_cap" if stats.truncated else "exhausted",buckets=buckets)
                 try:close(actual,expected)
                 except AssertionError:

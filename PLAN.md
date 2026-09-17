@@ -26,8 +26,10 @@ in place, but is not a substitute for the missing earlier gates.
   No native performance claim is made.
 - Phase 1: structural schemas and TypeScript exist, as do generation/ranked CLI
   operations and job-state definitions. Adapter-owned deployment admission,
-  hard deep limits and non-extending deadlines are enforced. Runtime
-  provenance/progress is still required. The unchecked items below remain gates.
+  hard deep limits and non-extending deadlines are enforced. Ranked execution
+  emits actual stages, confirmed counts and terminal outcomes through the
+  `JobStatus` contract. Corpus provenance remains unfinished; the unchecked items
+  below remain gates.
 
 ### Historical implementation evidence (chronological)
 
@@ -277,6 +279,14 @@ small sample. Distinguish empty puzzle caches from cold corpus/OS caches.
         rules, including unknown exhaustion and semantic versus hard deep budgets.
   - [ ] Populate progress/provenance from the running engine and finish semantic
         validation; definitions alone do not prove runtime behavior.
+    - [x] Populate ranked queued/running/terminal events, effective limits,
+          generation exhaustion, completed deep-work counts and uncached flags.
+          Successful results carry the terminal status; `--progress` emits JSONL
+          on stderr without contaminating result stdout. Runtime cancellation,
+          policy rejection, finalization and real-corpus parity checks pass.
+    - [ ] Populate exact corpus identities and finish status/error semantic
+          validation. Interrupted in-flight order/corpus work is not yet included
+          in the confirmed-completion counters; see the phase-2 accounting gate.
 - [ ] Preserve the distinction between generated bags, deep-analyzed bags and shown
       rows. Distinguish exhausted search, generation cap and deadline termination;
       report unknown exhaustion when a deadline prevents the extra-candidate probe.

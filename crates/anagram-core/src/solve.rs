@@ -1,6 +1,10 @@
 //! Serial ranked vertical slice. Corpus paths are adapter-owned, not wire data.
 use crate::control::Control;
 use crate::{
+    contracts::{Exhaustion, JobStatus, Stage},
+    progress::Progress,
+};
+use crate::{
     corpus_ranking::{self, Collocation},
     lexicon::Unigrams,
     normalize_letters,
@@ -48,6 +52,7 @@ pub struct Result {
     pub corpus_rescored: usize,
     pub generation_stop: crate::generation::Stop,
     pub buckets: BTreeMap<usize, Vec<ranking::Row>>,
+    pub status: JobStatus,
 }
 pub struct Paths<'a> {
     pub dictionary: &'a Path,
@@ -85,19 +90,43 @@ pub fn solve_with_limits(
     control: &Control,
     limits: &crate::policy::DeploymentLimits,
 ) -> std::result::Result<Result, Error> {
+    solve_observed(request, paths, control, limits, "local", &mut |_| {})
+}
+
+/// Only admitted requests become executions; validation failures have no job.
+pub fn solve_observed(
+    request: &Request,
+    paths: Paths<'_>,
+    control: &Control,
+    limits: &crate::policy::DeploymentLimits,
+    job_id: &str,
+    observer: &mut dyn FnMut(&JobStatus),
+) -> std::result::Result<Result, Error> {
     control
         .check()
         .map_err(|reason| Error::new(reason, reason))?;
     validate(request)?;
     limits.admit(request)?;
     let control = limits.control(control)?;
-    control
-        .check()
-        .map_err(|reason| Error::new(reason, reason))?;
-    let result = run(request, paths, &control, limits);
-    control
-        .check()
-        .map_err(|reason| Error::new(reason, reason))?;
+    let mut progress = Progress::new(request, limits, &control, job_id, observer);
+    let mut result = match control.check() {
+        Ok(()) => {
+            progress.start();
+            run(request, paths, &control, limits, &mut progress)
+        }
+        Err(reason) => Err(Error::new(reason, reason)),
+    };
+    if let Err(reason) = control.check() {
+        result = Err(Error::new(reason, reason));
+    }
+    if result.is_err() {
+        // No result rows are published for a failed or interrupted execution.
+        progress.status.counts.shown = 0;
+    }
+    progress.finish(result.as_ref().err());
+    if let Ok(value) = &mut result {
+        value.status = progress.status;
+    }
     result
 }
 /// Request semantics only; adapters can reject invalid requests before any I/O.
@@ -154,9 +183,11 @@ fn run(
     paths: Paths<'_>,
     control: &Control,
     limits: &crate::policy::DeploymentLimits,
+    progress: &mut Progress<'_>,
 ) -> std::result::Result<Result, Error> {
     validate(request)?;
     let unigrams = Unigrams::load(control.reader(open(paths.unigrams)?)).map_err(corpus)?;
+    progress.stage(Stage::Generating);
     let generated = request::generate(
         &request.generation,
         control.reader(open(paths.dictionary)?),
@@ -164,6 +195,17 @@ fn run(
         control.flag(),
         control.deadline(),
     )?;
+    progress.status.counts.generated = generated.generated;
+    progress.status.exhaustion = match generated.stop {
+        crate::generation::Stop::Exhausted => Exhaustion::Exhausted,
+        crate::generation::Stop::CandidateCap => Exhaustion::Truncated,
+        _ => Exhaustion::Unknown,
+    };
+    progress.emit();
+    control
+        .check()
+        .map_err(|reason| Error::new(reason, reason))?;
+    progress.stage(Stage::Preparing);
     let bigrams = Bigrams::load(
         control.reader(open(paths.bigrams)?),
         &unigrams,
@@ -190,6 +232,8 @@ fn run(
     let mut rows = ranking::prepare_controlled(ranking::from_records(&records), &lex, control)
         .map_err(|e| Error::new(e, e))?;
     let selected = ranking::choose_deep(&rows, request.deep_per_group, request.deep_all);
+    progress.status.counts.deep_selected = selected.len();
+    progress.emit();
     limits.admit_deep(selected.len())?;
     let options = ranking::Options {
         mode: request.order_mode,
@@ -197,9 +241,21 @@ fn run(
         exact_max_words: request.exact_max_words,
         retained_orders: request.retained_orders,
     };
-    let orders_evaluated =
-        ranking::deep_analyze_controlled(&mut rows, &selected, &lex, &options, control)
-            .map_err(|e| Error::new("ranking_error", e))?;
+    progress.stage(Stage::DeepRanking);
+    let orders_evaluated = ranking::deep_analyze_observed(
+        &mut rows,
+        &selected,
+        &lex,
+        &options,
+        control,
+        &mut |completed, orders| {
+            progress.status.counts.deep_analyzed = completed;
+            progress.status.counts.orders_evaluated = orders;
+            progress.emit();
+        },
+    )
+    .map_err(|e| Error::new("ranking_error", e))?;
+    progress.stage(Stage::CorpusRanking);
     let positive = if request.positive_bigrams {
         Some(
             Collocation::load(
@@ -229,6 +285,11 @@ fn run(
     )
     .map_err(corpus)?;
     let deep_analyzed = rows.iter().filter(|r| r.deep).count();
+    progress.status.counts.corpus_rescored = corpus_rescored;
+    progress.stage(Stage::Finalizing);
+    control
+        .check()
+        .map_err(|reason| Error::new(reason, reason))?;
     let buckets: BTreeMap<_, Vec<_>> = ranking::rank_buckets(&rows)
         .into_iter()
         .map(|(wc, indices)| {
@@ -243,6 +304,7 @@ fn run(
         })
         .collect();
     let shown = buckets.values().map(Vec::len).sum();
+    progress.status.counts.shown = shown;
     Ok(Result {
         schema_version: 1,
         kind: "ranked",
@@ -255,5 +317,6 @@ fn run(
         corpus_rescored,
         generation_stop: generated.stop,
         buckets,
+        status: progress.status.clone(),
     })
 }

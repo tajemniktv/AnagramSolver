@@ -91,7 +91,7 @@ components. The generator's historical decimal export quantization is preserved
 before preparation because it affects ranking and ties.
 
 This is still a development interface: no persistent cache, corpus identities,
-emitted job/progress events or complete interruption coverage yet. Python remains the
+or complete interruption coverage yet. Python remains the
 default application. Still required before frontend adoption: semantic contract
 validation, deployment limits, corpus provenance and complete parity/performance
 acceptance gates.
@@ -119,8 +119,8 @@ stage, counts, effective budgets, version identities, cache flags and exhaustion
 Terminal states cannot restart or change outcome. `unknown` exhaustion is required
 when interruption prevents proving exhaustion, even if the number collected equals
 the candidate cap. Family-expanded shortlist size and a deployment hard deep limit
-are separate fields. These are transport-neutral definitions; the current CLI does
-not yet emit progress events, enforce those deployment limits or create jobs.
+are separate fields. Ranked execution now populates these definitions; it is
+still synchronous, not a background job scheduler or HTTP service.
 
 Scalars in generation/ranking requests remain explicit (no hidden defaults);
 constraint arrays default to empty. The fixtures check Rust deserialization and
@@ -162,3 +162,33 @@ with the caller and can shorten, never extend, an existing `--timeout-ms` deadli
 Malformed policy configuration returns `invalid_deployment_limits` before request
 execution. Library callers use `solve_with_limits`; the ordinary local wrapper
 supplies the explicit unbounded policy.
+
+## Ranked execution progress
+
+`solve --progress ...` emits one `JobStatus` JSON object per stderr line while
+stdout remains the single result/error JSON object. Successful ranked results
+also contain the terminal `status`. Library adapters use `solve_observed` with
+their own job ID and callback; the one-shot CLI uses `local`. The generation-only
+primitive does not advertise job events.
+
+Only admitted requests create an execution. Invalid requests, invalid policies
+and an already-expired caller control can fail before a queued event. Accepted
+executions emit queued, running stages, and exactly one terminal outcome. Failed
+and interrupted executions preserve the stage where they stopped and the last
+confirmed counts. The observer sees terminal failures even though no result is
+returned. No rows are marked shown on failure/cancellation.
+
+Counters acknowledge completed work: generation reports after enumeration;
+deep analysis reports after each completed bag; corpus rescoring reports after
+that stage completes. Evaluations inside an interrupted bag and an interrupted
+corpus pass are not included in these confirmed counts. These are not live inner
+loop counters or a claim of complete interruption accounting. Generation
+exhaustion is independent of job success: a cancelled ranking job can still have
+exhausted generation. Interruption before the generation probe finishes leaves
+exhaustion unknown.
+
+Effective candidate/deep/result limits and the remaining deadline at execution
+admission are populated. Engine/ranking versions and false cache flags reflect
+the current uncached engine. **Corpus identities are not populated yet**;
+`versions.data` is empty, not evidence that no corpora were used. That remaining
+provenance work keeps the phase-1 gate open.

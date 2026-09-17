@@ -250,12 +250,24 @@ pub fn deep_analyze_controlled(
     options: &Options,
     control: &crate::control::Control,
 ) -> Result<usize, &'static str> {
+    deep_analyze_observed(rows, selected, lex, options, control, &mut |_, _| {})
+}
+
+pub fn deep_analyze_observed(
+    rows: &mut [Row],
+    selected: &BTreeSet<usize>,
+    lex: &WordNet,
+    options: &Options,
+    control: &crate::control::Control,
+    observer: &mut dyn FnMut(usize, usize),
+) -> Result<usize, &'static str> {
     control.check()?;
     let raw_k = diversity::raw_pool_size(options.retained_orders)?;
     if options.beam_width == 0 || selected.iter().any(|i| *i >= rows.len()) {
         return Err("invalid deep-analysis options or row index");
     }
     let mut evaluated = 0;
+    let mut completed = 0;
     for &i in selected {
         control.check()?;
         let row = &mut rows[i];
@@ -290,6 +302,8 @@ pub fn deep_analyze_controlled(
             diversity::QUALITY_CORE,
             0.12,
         )?;
+        completed += 1;
+        observer(completed, evaluated);
     }
     Ok(evaluated)
 }

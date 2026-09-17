@@ -26,7 +26,7 @@ impl JobState {
         )
     }
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Stage {
     Queued,
@@ -38,7 +38,7 @@ pub enum Stage {
     Finalizing,
     Complete,
 }
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Exhaustion {
     Exhausted,
@@ -46,7 +46,7 @@ pub enum Exhaustion {
     Unknown,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Counts {
     pub generated: usize,

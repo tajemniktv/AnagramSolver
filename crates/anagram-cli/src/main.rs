@@ -11,6 +11,12 @@ use std::{
 
 fn run() -> Result<serde_json::Value, Error> {
     let mut args: Vec<_> = std::env::args_os().skip(1).collect();
+    let progress = if let Some(index) = args.iter().position(|a| a == "--progress") {
+        args.remove(index);
+        true
+    } else {
+        false
+    };
     let control = if let Some(index) = args.iter().position(|a| a == "--timeout-ms") {
         let millis = args
             .get(index + 1)
@@ -54,7 +60,7 @@ fn run() -> Result<serde_json::Value, Error> {
         anagram_core::policy::DeploymentLimits::default()
     };
     let control = limits.control(&control)?;
-    let result = run_inner(&args, &control, &limits);
+    let result = run_inner(&args, &control, &limits, progress);
     if result.is_err() {
         if let Err(reason) = control.check() {
             return Err(Error::new(reason, reason));
@@ -66,11 +72,15 @@ fn run_inner(
     args: &[std::ffi::OsString],
     control: &Control,
     limits: &anagram_core::policy::DeploymentLimits,
+    progress: bool,
 ) -> Result<serde_json::Value, Error> {
     control
         .check()
         .map_err(|reason| Error::new(reason, reason))?;
     let ranked = args.first().is_some_and(|a| a == "solve");
+    if progress && !ranked {
+        return Err(Error::new("usage", "--progress currently applies to solve"));
+    }
     if !(ranked && (args.len() == 5 || args.len() == 6)
         || !ranked && (args.len() == 2 || args.len() == 3) && args[0] == "generate")
     {
@@ -93,7 +103,7 @@ fn run_inner(
     if ranked {
         let request =
             serde_json::from_str(&input).map_err(|e| Error::new("invalid_json", e.to_string()))?;
-        let result = anagram_core::solve::solve_with_limits(
+        let result = anagram_core::solve::solve_observed(
             &request,
             anagram_core::solve::Paths {
                 dictionary: std::path::Path::new(&args[1]),
@@ -104,6 +114,12 @@ fn run_inner(
             },
             control,
             limits,
+            "local",
+            &mut |status| {
+                if progress {
+                    eprintln!("{}", serde_json::to_string(status).unwrap());
+                }
+            },
         )?;
         return serde_json::to_value(result)
             .map_err(|e| Error::new("serialization_error", e.to_string()));
