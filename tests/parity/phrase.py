@@ -27,7 +27,10 @@ def main():
         index=Index(counts,max_n)
         cohesion=score_corpus_cohesion(words,counts=index.counts,max_n=max_n)
         phrase=PhraseIndex.score(index,words)
-        expected.append(dict(cohesion=asdict(cohesion),phrase=phrase,blended=blend_phrase_cohesion(phrase[0],cohesion)))
+        details=dict(phrase[1],cohesion=cohesion.score,cohesion_coverage=cohesion.coverage,
+                     cohesion_longest_fraction=cohesion.longest_fraction,cohesion_segments=float(cohesion.segments),
+                     cohesion_splice_penalty=cohesion.splice_penalty,cohesion_frequency=cohesion.frequency_strength)
+        expected.append(dict(cohesion=asdict(cohesion),phrase=phrase,blended=(blend_phrase_cohesion(phrase[0],cohesion),details)))
         cases.append(dict(words=words,counts=counts,max_n=max_n))
     subprocess.run(["cargo","build","--locked","--example","phrase_probe"],cwd=ROOT,check=True)
     executable=ROOT/"target/debug/examples"/("phrase_probe.exe" if sys.platform=="win32" else "phrase_probe")

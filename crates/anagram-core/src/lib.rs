@@ -11,6 +11,7 @@ pub mod corpus_ranking;
 pub mod diversity;
 pub mod generation;
 pub mod grammar;
+pub mod learned;
 pub mod lexicon;
 pub mod ordering;
 pub mod phrase;

@@ -19,6 +19,22 @@ pub fn score(
     max_n: usize,
     with_cohesion: bool,
 ) -> (f64, HashMap<String, f64>) {
+    if with_cohesion {
+        let (base, mut details) = score(words, counts, max_n, false);
+        let evidence = cohesion::score(words, counts, max_n);
+        details.extend([
+            ("cohesion".into(), evidence.score),
+            ("cohesion_coverage".into(), evidence.coverage),
+            (
+                "cohesion_longest_fraction".into(),
+                evidence.longest_fraction,
+            ),
+            ("cohesion_segments".into(), evidence.segments as f64),
+            ("cohesion_splice_penalty".into(), evidence.splice_penalty),
+            ("cohesion_frequency".into(), evidence.frequency_strength),
+        ]);
+        return (cohesion::blend(base, &evidence), details);
+    }
     if words.is_empty() {
         return (0.0, HashMap::new());
     }
@@ -57,13 +73,8 @@ pub fn score(
         0.0
     };
     let base = exact.max(0.76 * longer).max(0.34 * bi_cov).min(1.0);
-    let score = if with_cohesion {
-        cohesion::blend(base, &cohesion::score(words, counts, max_n))
-    } else {
-        base
-    };
     (
-        score,
+        base,
         HashMap::from([
             ("whole_count".into(), whole_count as f64),
             ("longer".into(), longer),

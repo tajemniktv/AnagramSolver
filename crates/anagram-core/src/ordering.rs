@@ -1,9 +1,9 @@
 //! Deterministic retained-order search before diversity/refinement extensions.
 use crate::{grammar, structure, wordnet::WordNet};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Candidate {
     pub order: Vec<String>,
     pub grammar_raw: f64,

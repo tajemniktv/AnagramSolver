@@ -13,7 +13,7 @@ fn main() {
         let evidence = cohesion::score(&words, &counts, max_n);
         println!(
             "{}",
-            json!({"cohesion":evidence,"phrase":phrase_evidence::score(&words,&counts,max_n,false),"blended":phrase_evidence::score(&words,&counts,max_n,true).0})
+            json!({"cohesion":evidence,"phrase":phrase_evidence::score(&words,&counts,max_n,false),"blended":phrase_evidence::score(&words,&counts,max_n,true)})
         );
     }
 }

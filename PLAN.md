@@ -185,7 +185,9 @@ sub-items; its remaining scope is still required. No phase gate is passed yet.
       ordering, optional phrase evidence and optional learned ranking in parity scope.
   - [x] Add seeded prefix/diverse generation, lexical/WordNet/grammar/order,
         refinement and phrase/cohesion differential harnesses in `tests/parity/`.
-  - [ ] Add learned ranking and complete default-path/end-to-end oracle coverage.
+  - [x] Add learned-feature/model/ordering parity (`tests/parity/learned.py`,
+        253 cases, including invalid and missing model inputs).
+  - [ ] Complete default-path/end-to-end oracle coverage.
 - [ ] Benchmark generation and ranking separately, then actual end-to-end cold and
       warm CLI runs using `benchmark_user_runs.py` and the existing quality gates.
 
@@ -252,8 +254,12 @@ equal workloads. Explain any intentional ordering change before accepting it.
   - [x] Validate read-only SQLite integration, batched queries, missing/corrupt/
         invalid-schema errors and unchanged database contents
         (`tests/parity/corpus_storage.py`, `tests/parity/ranking.py`).
-  - [ ] Port learned ranking and complete optional-input provenance and its
-        missing/corrupt-data checks.
+  - [x] Port the 18-feature learned-model schema, bounded model loading, scoring
+        and deterministic optional-model ranking; validate invalid/missing models.
+        Like the reference, this remains an explicit offline scoring utility,
+        not an automatically enabled default-solver stage. Python training remains
+        available; no new runtime model policy has been invented.
+  - [ ] Complete versioned optional-input/model provenance in native run results.
 - [ ] Compare score components, final rankings and ties against Python. Define any
       floating-point tolerance explicitly; do not mask ranking regressions with it.
   - [x] Compare component scores at 1e-12 tolerance, with exact classifications,
