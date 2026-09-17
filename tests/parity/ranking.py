@@ -7,6 +7,9 @@ from pathlib import Path
 import random
 import subprocess
 import sys
+import sqlite3
+import tempfile
+import hashlib
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT))
@@ -16,6 +19,7 @@ from scoring import close
 
 
 def main():
+    temp=tempfile.TemporaryDirectory(prefix="ranking-parity-",dir=ROOT/".codex/temp")
     lex=reference.WordNetLexicon.load(ROOT/".anagram_data/wordnet31/dict")
     rng=random.Random(917)
     phrases=["", "dog", "dogs", "knowledge is power", "these hips dont lie", "these hips dont lies",
@@ -39,6 +43,39 @@ def main():
             ids={id(row):i for i,row in enumerate(rows)}
             alternatives=[[asdict(candidate) for candidate in reference.impl._ORDER_CANDIDATES_BY_ROW_ID.get(id(row),())] for row in rows]
             expected.append(dict(prepared=prepared,selected=sorted(selected),rows=[asdict(row) for row in rows],evaluated=int(stats["orders"]),buckets={str(k):[ids[id(row)] for row in bucket] for k,bucket in reference.rank_buckets(rows).items()},alternatives=alternatives))
+            counts={p:10**rng.randrange(1,6) for p in phrases if p and rng.random()<0.7}
+            for p in phrases:
+                words=p.split()
+                for n in (2,3):
+                    for start in range(len(words)-n+1):
+                        if rng.random()<0.6: counts[" ".join(words[start:start+n])]=rng.choice((0,1,100,100000))
+            unigrams={w:rng.randrange(1,100000) for p in phrases for w in p.split()}
+            bigrams={(a,b):rng.randrange(1,10000) for p in phrases for a,b in zip(p.split(),p.split()[1:])}
+            total=10**9
+            number=len(cases)-1
+            use_collocation=number%4 in (1,3)
+            use_phrase=number%4 in (2,3)
+            top=(0,1,2,10)[number%4]
+            bonus=(0.0,18.0,100.0)[number%3]
+            model=reference.PositiveBigramModel(unigrams,bigrams,total) if use_collocation else None
+            database=Path(temp.name)/f"phrase {number} # corpus.sqlite"
+            with sqlite3.connect(database) as connection:
+                connection.execute("CREATE TABLE ngrams (text TEXT PRIMARY KEY, n INTEGER, count INTEGER)")
+                connection.executemany("INSERT INTO ngrams VALUES (?, ?, ?)",[(text,len(text.split()),count) for text,count in counts.items()])
+                # Ensure corpus maximum order agrees with component fixtures.
+                connection.execute("INSERT INTO ngrams VALUES ('corpus maximum order sentinel never queried',6,1)")
+            connection.close()
+            before=hashlib.sha256(database.read_bytes()).hexdigest()
+            index=reference.PhraseIndex.open(database) if use_phrase else None
+            admission={}
+            for wc in sorted({r.word_count for r in rows if r.deep}):
+                chosen,added=reference.impl._select_phrase_rescore_rows([r for r in rows if r.deep and r.word_count==wc],collocation=model,phrase_index=index,top_per_group=top)
+                admission[str(wc)]=([ids[id(r)] for r in chosen],added)
+            rescored=reference.apply_phrase_rescore(rows,collocation=model,phrase_index=index,top_per_group=top,bonus_max=bonus)
+            expected[-1]["corpus"]=dict(rows=[asdict(r) for r in rows],rescored=rescored,admission=admission,buckets={str(k):[ids[id(r)] for r in bucket] for k,bucket in reference.rank_buckets(rows).items()})
+            cases[-1]["corpus"]=dict(counts=counts,unigrams=unigrams,bigrams=[(a,b,c) for (a,b),c in bigrams.items()],total=total,use_collocation=use_collocation,use_phrase=use_phrase,top=top,bonus=bonus)
+            if index is not None: index.connection.close()
+            cases[-1]["corpus"].update(path=str(database),sha256=before)
             reference._clear_order_side_tables()
     subprocess.run(["cargo","build","--locked","--example","ranking_probe"],cwd=ROOT,check=True)
     executable=ROOT/"target/debug/examples"/("ranking_probe.exe" if sys.platform=="win32" else "ranking_probe")
@@ -50,7 +87,10 @@ def main():
         except AssertionError as error:
             (ROOT/".codex/temp/ranking-mismatch.json").write_text(json.dumps(dict(case=cases[i],got=got,want=want),indent=2),encoding="utf-8")
             raise AssertionError((i,error)) from error
-    print(f"Final base-ranking parity passed: {len(cases)} complete preparation/shortlist/deep/bucket cases")
+    for case in cases:
+        assert hashlib.sha256(Path(case["corpus"]["path"]).read_bytes()).hexdigest()==case["corpus"]["sha256"]
+    temp.cleanup()
+    print(f"Ranking and corpus-rescoring parity passed: {len(cases)} complete pipeline cases")
 
 
 if __name__=="__main__":main()

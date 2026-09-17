@@ -164,10 +164,18 @@ do not transliterate monkeypatch layers into Rust global state.
 
 ## Phase 0 — Freeze behavior and establish measurements
 
+Checklist convention: checked items are implemented and have the evidence noted
+below or in Implementation evidence. An unchecked parent can contain completed
+sub-items; its remaining scope is still required. No phase gate is passed yet.
+
 - [x] Review and land the existing Python audit/improvement work separately from
       port commits; preserve unrelated changes. Record the exact reference commit.
 - [ ] Capture corpus versions/hashes, ranking configuration, cache state, machine
       details, candidate counts and reference outputs in reproducible fixtures.
+  - [x] Capture local dictionary/frequency/WordNet hashes with
+        `tools/capture_reference.py` (21 source and 73 corpus files).
+  - [ ] Complete durable pinned fixtures, optional input identities and machine/
+        cache/budget metadata; the temporary manifest alone is insufficient.
 - [ ] Inventory dictionary, frequency, WordNet, phrase SQLite and optional feature
       ranker inputs; document formats, licenses and redistribution requirements.
 - [ ] Extend the reference harness to cover letter normalization, punctuation and
@@ -175,6 +183,9 @@ do not transliterate monkeypatch layers into Rust global state.
       impossible inputs, empty results, exact cap exhaustion and deterministic ties.
 - [ ] Include prefix/diverse enumeration, exhaustive-generation semantics, grammar,
       ordering, optional phrase evidence and optional learned ranking in parity scope.
+  - [x] Add seeded prefix/diverse generation, lexical/WordNet/grammar/order,
+        refinement and phrase/cohesion differential harnesses in `tests/parity/`.
+  - [ ] Add learned ranking and complete default-path/end-to-end oracle coverage.
 - [ ] Benchmark generation and ranking separately, then actual end-to-end cold and
       warm CLI runs using `benchmark_user_runs.py` and the existing quality gates.
 
@@ -188,6 +199,8 @@ small sample. Distinguish empty puzzle caches from cold corpus/OS caches.
 
 - [ ] Define typed request/result/error contracts with a schema version and
       generated or mechanically checked TypeScript types.
+  - [x] Implement version-1 Rust generation request/result/errors and JSON CLI.
+  - [ ] Complete ranked/job contracts, JSON schema and TypeScript parity checks.
 - [ ] Separate semantic search options from deployment limits. Include input,
       hints/required/excluded words, word-count constraints, lexical options,
       generation strategy, candidate budget, deep-ranking budget and result limit.
@@ -198,7 +211,7 @@ small sample. Distinguish empty puzzle caches from cold corpus/OS caches.
 - [ ] Preserve the distinction between generated bags, deep-analyzed bags and shown
       rows. Distinguish exhausted search, generation cap and deadline termination;
       report unknown exhaustion when a deadline prevents the extra-candidate probe.
-- [ ] Implement corpus loading, normalization and a small deterministic generation
+- [x] Implement corpus loading, normalization and a small deterministic generation
       path through the Rust CLI. Keep ranking in Python until its own phase.
 
 Gate: schema fixtures pass in Python/Rust/TypeScript; a minimal Rust request works
@@ -209,11 +222,17 @@ replacement for the ranked solver.
 
 - [ ] Port letter inventories, vocabulary filtering, required/hint handling,
       pruning and word-count traversal. Preserve repeated-word multiplicity.
-- [ ] Implement bounded prefix and opt-in diverse traversal, including deduplication,
+  - [x] Port normalized inventories, basic lexical admission, required/hint
+        multiplicity and word-count traversal; validate small and real-corpus cases.
+  - [ ] Complete frontend lexical policies and reference pruning optimizations.
+- [x] Implement bounded prefix and opt-in diverse traversal, including deduplication,
       redistribution of budget and the extra unique-bag truncation probe.
 - [ ] Add cooperative cancellation/deadline checks in expensive loops and corpus
       operations. Limits must bound work, not merely the displayed result count.
-- [ ] Differential-test full candidate sets for small exhaustive cases and ordered
+  - [x] Check cancellation/deadlines inside generation DFS and expose stop reasons.
+  - [ ] Propagate cancellation through corpus loading and all ranking loops;
+        validate interrupted work and deadline probe semantics end-to-end.
+- [x] Differential-test full candidate sets for small exhaustive cases and ordered
       capped prefixes for bounded cases. Add seeded randomized small alphabets.
 - [ ] Benchmark serial first; introduce bounded parallelism only where it helps and
       does not change deterministic output or consume unbounded memory.
@@ -223,13 +242,23 @@ equal workloads. Explain any intentional ordering change before accepting it.
 
 ## Phase 3 — Port ranking and cache behavior
 
-- [ ] Port lexical scoring, grammar/valency, retained order candidates, top-K,
+- [x] Port lexical scoring, grammar/valency, retained order candidates, top-K,
       clause/auxiliary/comparative rules, order refinement/diversity and cohesion
       as independently reviewable changes.
 - [ ] Preserve optional phrase-index and learned-ranker semantics, including
       missing-data behavior and versioned model/input provenance.
+  - [x] Port phrase hierarchy/cohesion and positive-only retained-order rescoring;
+        compare shortlist admission and result rows against Python.
+  - [x] Validate read-only SQLite integration, batched queries, missing/corrupt/
+        invalid-schema errors and unchanged database contents
+        (`tests/parity/corpus_storage.py`, `tests/parity/ranking.py`).
+  - [ ] Port learned ranking and complete optional-input provenance and its
+        missing/corrupt-data checks.
 - [ ] Compare score components, final rankings and ties against Python. Define any
       floating-point tolerance explicitly; do not mask ranking regressions with it.
+  - [x] Compare component scores at 1e-12 tolerance, with exact classifications,
+        selected rows, retained orders and final bucket order in differential tests.
+  - [ ] Prove full CLI rankings, optional modes and quality-gate parity.
 - [ ] Re-run `ci_ordering_gate.py`, refinement/phrase checks and real user cases.
 - [ ] Implement versioned, bounded caches keyed by normalized semantic options,
       engine/ranking version and corpus identity. Keep budgets/strategy in keys
