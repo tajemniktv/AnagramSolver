@@ -71,6 +71,14 @@ Phases 4–6 remain future roadmap context and are not part of this active goal.
 
 ## Outcome
 
+Implementation update: native structural diversity passes 66 exact/beam order-pool
+comparisons, including widened 64/72-order pools. Standalone bounded k-opt refinement,
+refined endpoint pools and original-seed-preserving augmentation pass 160 differential
+cases with exact order, evaluation-count and round-count checks. Strict Clippy passes.
+Refinement remains opt-in, matching the Python facade's current behavior; it is not
+silently enabled in default ranking. Final score assembly, optional corpus/model
+rescoring, caches and the remaining phase 0–3 gates are still incomplete.
+
 Build one behavior-tested Rust solver that powers a cross-platform local app
 and a page on tajemniktv.com. Share the solver controls and results UI, not the
 entire website shell. Keep expensive testing and larger searches on the PC;

@@ -11,6 +11,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 import anagram_rerank_core as core
 import anagram_rerank_topk_impl as reference
 import anagram_auxiliary_grammar as auxiliary
+from anagram_order_diversity import raw_pool_size, select_diverse_orders
 from scoring import close
 
 
@@ -23,9 +24,14 @@ def main():
              "the engine is repaired", "they have been running", "actions speak louder than words",
              "a a dog", "united we stand divided we fall", "the cat is being tested", "xxyy zzxx aabb"]
     cases=[dict(words=p.split(),exact=exact) for p in phrases for exact in (True,False)]
+    cases += [dict(words=p.split(),exact=exact,top_k=k,diverse=True)
+              for p in phrases if len(p.split()) >= 4
+              for exact in (True,False) for k in (48,64,72)]
     expected=[]
     for case in cases:
-        orders,evaluated=reference.rank_orders(case["words"],lex,order_mode="exact" if case["exact"] else "beam",beam_width=32,top_k=8)
+        k=case.get("top_k",8)
+        orders,evaluated=reference.rank_orders(case["words"],lex,order_mode="exact" if case["exact"] else "beam",beam_width=32,top_k=raw_pool_size(k) if case.get("diverse") else k)
+        if case.get("diverse"): orders=select_diverse_orders(orders,k)
         expected.append(dict(orders=[asdict(order) for order in orders],evaluated=evaluated))
     subprocess.run(["cargo","build","--locked","--example","ordering_probe"],cwd=ROOT,check=True)
     executable=ROOT/"target/debug/examples"/("ordering_probe.exe" if sys.platform=="win32" else "ordering_probe")
