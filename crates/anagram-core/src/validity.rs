@@ -152,7 +152,7 @@ fn demote(mut result: Structure, coverage: f64, hard: bool) -> Structure {
         result.coverage = result.coverage.min(0.25);
         result.valency = result.valency.min(0.50);
         result.agreement = result.agreement.min(0.50);
-        result.kind = "fragment";
+        result.kind = "fragment".into();
     } else {
         let ratio = (coverage / result.coverage).clamp(0.0, 1.0);
         result.norm = result
@@ -162,7 +162,7 @@ fn demote(mut result: Structure, coverage: f64, hard: bool) -> Structure {
         result.valency = result.valency.min(0.65);
         result.agreement = result.agreement.min(0.65);
         if coverage < 0.60 {
-            result.kind = "fragment";
+            result.kind = "fragment".into();
         }
     }
     result.norm = result.norm.max(0.0);
@@ -171,7 +171,7 @@ fn demote(mut result: Structure, coverage: f64, hard: bool) -> Structure {
 }
 
 pub fn adjust(words: &[String], lex: &WordNet, result: Structure) -> Structure {
-    if !["clause", "copula"].contains(&result.kind) || result.coverage <= 0.0 {
+    if !["clause", "copula"].contains(&result.kind.as_str()) || result.coverage <= 0.0 {
         return result;
     }
     let (has_aux, valid) = explicit_aux(words, lex);

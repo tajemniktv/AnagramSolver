@@ -9,9 +9,11 @@ pub mod comparative;
 pub mod generation;
 pub mod grammar;
 pub mod lexicon;
+pub mod ordering;
 pub mod phrase;
 pub mod request;
 pub mod scoring;
+pub mod structure;
 pub mod validity;
 pub mod wordnet;
 

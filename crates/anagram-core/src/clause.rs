@@ -307,7 +307,7 @@ pub struct Structure {
     pub valency: f64,
     pub coverage: f64,
     pub agreement: f64,
-    pub kind: &'static str,
+    pub kind: String,
     pub raw: f64,
 }
 
@@ -323,7 +323,7 @@ fn structure(
         valency,
         coverage,
         agreement,
-        kind,
+        kind: kind.into(),
         raw: 4.0 * norm,
     }
 }

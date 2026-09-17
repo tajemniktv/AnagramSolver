@@ -36,6 +36,9 @@ def main():
     cases.extend(phrase.split() for phrase in ["a am sitting managers", "an game starting aims",
                  "one am here", "one is here", "a hour", "an university", "do run", "dont run",
                  "the cat is was running", "the bird singing", "a honest person"])
+    cases.extend(phrase.split() for phrase in ["united we stand divided we fall", "actions speak louder than words",
+                 "the engine is repaired by the mechanic quickly", "the engine is repaired by the mechanic dog",
+                 "they have been being tested", "the birds are flying", "the bird are flying"])
     subprocess.run(["cargo", "build", "--locked", "--example", "grammar_probe"], cwd=ROOT, check=True)
     executable = ROOT / "target/debug/examples" / ("grammar_probe.exe" if sys.platform == "win32" else "grammar_probe")
     result = subprocess.run([str(executable), str(directory)], input="\n".join(map(json.dumps, cases)),
@@ -59,6 +62,12 @@ def main():
                                     ["is","are","dont","doesnt","runs","run","stopped","have"]] for w in words],
                         tails=[reference._valency_for_tail(v,words,lex) for v in ["run","give","speak","look","turn"]],
                         structure=asdict(reference.phrase_structure(words,lex)),
+                        extended_structure=asdict(auxiliary.phrase_structure_with_auxiliaries(words,lex,reference.phrase_structure)),
+                        extended_local=auxiliary.local_grammar_raw_with_auxiliaries(words,lex,reference._order_local_tables),
+                        aux_structure=asdict(s) if (s:=auxiliary.auxiliary_structure(words,lex)) else None,
+                        comparative_structure=asdict(s) if (s:=auxiliary.comparative_clause_structure(words,lex)) else None,
+                        parallel_structure=asdict(s) if (s:=auxiliary.parallel_clause_structure(words,lex)) else None,
+                        passive_tail=auxiliary._passive_tail(words,lex),
                         valid_subject=[validity.valid_subject_head(w,lex) for w in words],
                         finite_lexical=[validity.lexical_finite_form(w,lex) for w in words],
                         valid_pairs=[[validity.pair_validity_adjustment(a,b,lex) for b in words] for a in words],

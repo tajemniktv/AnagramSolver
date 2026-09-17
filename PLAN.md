@@ -61,6 +61,13 @@ Phases 4–6 remain future roadmap context and are not part of this active goal.
   exact classification/consumption checks and component-score comparisons;
   strict Clippy passes. Combining these into the extended structure scorer and
   retained-order search is still unfinished.
+- Extended auxiliary/comparative/parallel structure selection and combined local
+  grammar are implemented; the grammar differential gate now passes 300 cases.
+  The initial exact/k-best retained-order pool passes 24 exact/beam parity cases,
+  including repeated words, unknown-word ties and six-word constructions. It
+  preserves per-state insertion order and lexical final tie breaks. Diversity,
+  k-opt refinement, final row scoring and corpus-based reranking remain separate
+  unfinished steps; this does not complete phase 3.
 
 ## Outcome
 

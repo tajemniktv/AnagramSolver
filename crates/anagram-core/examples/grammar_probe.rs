@@ -1,4 +1,6 @@
-use anagram_core::{auxiliary, clause, comparative, grammar, phrase, validity, wordnet::WordNet};
+use anagram_core::{
+    auxiliary, clause, comparative, grammar, phrase, structure, validity, wordnet::WordNet,
+};
 use serde_json::json;
 use std::{
     io::{self, BufRead},
@@ -30,6 +32,12 @@ fn main() {
             "agreement": words.iter().map(|w| ["is","are","dont","doesnt","runs","run","stopped","have"].map(|v| clause::agreement(w,v,&lex,false,None))).collect::<Vec<_>>(),
             "tails": (["run","give","speak","look","turn"].map(|v| clause::tail(v,&words,&lex))),
             "structure": clause::base_structure(&words,&lex),
+            "extended_structure": structure::evaluate(&words,&lex),
+            "extended_local": structure::local_raw(&words,&lex),
+            "aux_structure": structure::auxiliary_structure(&words,&lex),
+            "comparative_structure": structure::comparative_structure(&words,&lex),
+            "parallel_structure": structure::parallel_structure(&words,&lex),
+            "passive_tail": structure::passive_tail(&words,&lex),
             "valid_subject": words.iter().map(|w| validity::valid_subject(w,&lex)).collect::<Vec<_>>(),
             "finite_lexical": words.iter().map(|w| validity::finite_lexical(w,&lex)).collect::<Vec<_>>(),
             "valid_pairs": words.iter().map(|a| words.iter().map(|b| validity::pair(a,b)).collect::<Vec<_>>()).collect::<Vec<_>>(),
