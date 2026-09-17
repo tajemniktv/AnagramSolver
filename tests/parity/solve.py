@@ -22,6 +22,7 @@ def main():
     subprocess.run(["cargo","build","--locked","-p","anagram-cli"],cwd=ROOT,check=True)
     executable=ROOT/"target/debug"/("anagram-cli.exe" if sys.platform=="win32" else "anagram-cli")
     with tempfile.TemporaryDirectory(prefix="solve-parity-",dir=ROOT/".codex/temp") as temp:
+        checked_hard_deep_limit=False
         for text,required,hints in (("knowledgeispower",[],[]),("thesehipsdontlie",[],["hips"]),("ateate",["eat"],[]),("testing",[],[])):
             for strategy in ("prefix","diverse"):
                 g=dict(schema_version=1,text=text,required=required,hints=hints,excluded=[],min_words=1,max_words=4,min_word_length=3,max_word_length=30,min_zipf=2.7,candidate_budget=20,allow_repeat=True,strategy=strategy,hint_mode="any")
@@ -53,5 +54,13 @@ def main():
                     (ROOT/".codex/temp/solve-mismatch.json").write_text(json.dumps(dict(request=request,actual=actual,expected=expected),indent=2),encoding="utf-8")
                     raise
                 print(f"Ranked CLI parity passed: {text} / {strategy}")
+                if not checked_hard_deep_limit and len(selected)>1:
+                    policy=Path(temp)/"policy.json"
+                    policy.write_text(json.dumps(dict(max_deep_analyzed=1)),encoding="utf-8")
+                    denied=subprocess.run([str(executable),"solve",str(dictionary),str(one),str(two),str(wordnet),"--limits",str(policy)],input=json.dumps(request),text=True,capture_output=True,timeout=120)
+                    assert denied.returncode==2,denied.stdout
+                    assert json.loads(denied.stdout)["error"]["code"]=="deployment_limit_exceeded",denied.stdout
+                    checked_hard_deep_limit=True
+        assert checked_hard_deep_limit
     print("Real-corpus ranked CLI parity passed: 8 cases")
 if __name__=="__main__":main()

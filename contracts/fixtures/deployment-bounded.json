@@ -1,0 +1,9 @@
+{
+  "max_input_bytes": 128,
+  "max_normalized_letters": 10,
+  "max_candidates": 1,
+  "max_deep_analyzed": 1,
+  "max_beam_width": 128,
+  "max_retained_orders": 56,
+  "timeout_ms": 5000
+}

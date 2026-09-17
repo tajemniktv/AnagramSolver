@@ -19,6 +19,7 @@ pub mod ordering;
 pub mod phrase;
 pub mod phrase_evidence;
 pub mod phrase_index;
+pub mod policy;
 pub mod ranking;
 pub mod refinement;
 pub mod request;

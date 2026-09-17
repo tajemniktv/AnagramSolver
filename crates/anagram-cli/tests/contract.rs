@@ -38,6 +38,11 @@ fn expired_deadline_is_not_reported_as_corpus_failure() {
     let (ok, output) = invoke_with_args(request(), &["--timeout-ms", "bad"]);
     assert!(!ok);
     assert_eq!(output["error"]["code"], "invalid_timeout");
+    let mut zero_residual = request();
+    zero_residual["required"] = json!(["ate"]);
+    let (ok, output) = invoke_with_args(zero_residual, &["--timeout-ms", "0"]);
+    assert!(!ok);
+    assert_eq!(output["error"]["code"], "timed_out");
 }
 
 fn request() -> Value {
@@ -106,5 +111,22 @@ fn validation_precedes_corpus_io_and_rejects_unsafe_wire_integers() {
         assert!(!output.status.success());
         let result: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(result["error"]["code"], code);
+    }
+}
+
+#[test]
+fn adapter_policy_rejects_over_budget_work_without_clamping_semantics() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../contracts/fixtures/deployment-bounded.json");
+    let args = ["--limits", path.to_str().unwrap()];
+    let (ok, output) = invoke_with_args(request(), &args);
+    assert!(ok);
+    assert_eq!(output["candidate_budget"], 1);
+    for budget in [0, 2] {
+        let mut input = request();
+        input["candidate_budget"] = json!(budget);
+        let (ok, output) = invoke_with_args(input, &args);
+        assert!(!ok);
+        assert_eq!(output["error"]["code"], "deployment_limit_exceeded");
     }
 }

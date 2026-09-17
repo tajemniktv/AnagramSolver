@@ -23,6 +23,12 @@ in this baseline; they do not mean optional behavior has passed all gates.
   and these outputs; omit `--check` only for intentional recapture.
 - `user-performance.json` and `stress-attempt.json`: partial default 2,000-cap
   performance run and its 180-second timeout. Not a passing full suite.
+- `registry.json`: all 52 ordering cases and all five `normal_user_cli` cases,
+  at their actual default/registry semantic settings, with exact cold/warm
+  outputs. `python tools/reference_registry.py --check` replays and compares
+  them. Only verbose diagnostics are replaced with JSON transport. Associated
+  `registry-measurements.json` timings are informational, not an isolated
+  performance comparison; use the dedicated performance reports for that.
 - `user-performance-bounded.json`: representative actual CLI cold/warm runs.
   Reproduce using `benchmark_user_runs.py --case dog_ball --case phone_charge
   --samples 3 --output tests/reference/user-performance-bounded.json`.

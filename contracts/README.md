@@ -38,8 +38,9 @@ must match (`any`), or exactly one distinct hint (`exactly_one`). Impossible hin
 are removed only while another usable hint remains; otherwise validation fails.
 Required words never override exclusions.
 
-`candidate_budget: 0` means unlimited generation and will not be accepted by the
-future public service. This CLI has no deployment policy; it is local-only.
+`candidate_budget: 0` means unlimited generation. A deployment with a finite
+candidate limit rejects it. Without an explicit policy this development CLI is
+local-only and unbounded; that default is not a public-service configuration.
 `kind: generation_only` explicitly distinguishes unranked word bags. `stop` is
 `exhausted`, `candidate_cap`, `cancelled`, or `timed_out`; only the first proves
 complete enumeration. The extra-bag probe distinguishes exact cap exhaustion
@@ -135,5 +136,29 @@ apply that same validator before ranking limits and zero-residual restrictions.
 Corpus I/O follows semantic validation; a missing corpus must not hide an invalid
 request. An already-expired execution control takes precedence over work errors.
 Frequency-data availability is checked when the generation input is loaded.
-Full deployment policy and populated progress/provenance still need completion
-before the phase-1 gate is passed.
+Populated progress/provenance still needs completion before the phase-1 gate
+is passed.
+
+## Adapter-owned deployment limits
+
+Both CLI operations accept `--limits policy.json` (at most 64 KiB). The generated
+`DeploymentLimits` contract is separate from the semantic request. Every field
+defaults to `null` (no deployment limit); unknown fields and invalid numeric
+limits are rejected. The future service must supply its own fixed policy, not
+accept a caller-selected policy file.
+
+Supported fields: `max_input_bytes` (UTF-8 bytes of the target text),
+`max_normalized_letters`, `max_candidates`, `max_deep_analyzed`, `max_beam_width`,
+`max_retained_orders`, and `timeout_ms`. Count/size limits are positive exact
+integers; zero timeout is an immediate deadline. The CLI's separate 1 MiB JSON
+body limit remains in force.
+
+Requests exceeding admission limits return `deployment_limit_exceeded`; the
+engine does **not** silently change the candidate budget, beam, or retained
+orders. The hard deep limit is checked against the actual family-expanded
+shortlist, before ordering, rather than only `deep_per_group`. It can therefore
+reject a request after generation/preparation. Policy deadlines share cancellation
+with the caller and can shorten, never extend, an existing `--timeout-ms` deadline.
+Malformed policy configuration returns `invalid_deployment_limits` before request
+execution. Library callers use `solve_with_limits`; the ordinary local wrapper
+supplies the explicit unbounded policy.

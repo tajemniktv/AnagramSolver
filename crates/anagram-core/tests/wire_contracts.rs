@@ -9,6 +9,10 @@ fn shared_request_and_progress_fixtures_match_rust_deserialization() {
     for fixture in fixtures {
         let value = fixture["value"].clone();
         let accepted = match fixture["schema"].as_str().unwrap() {
+            "DeploymentLimits" => {
+                serde_json::from_value::<anagram_core::policy::DeploymentLimits>(value)
+                    .is_ok_and(|limits| limits.validate().is_ok())
+            }
             "GenerateRequest" => serde_json::from_value::<GenerateRequest>(value)
                 .is_ok_and(|request| anagram_core::request::validate(&request).is_ok()),
             "SolveRequest" => serde_json::from_value::<Request>(value)

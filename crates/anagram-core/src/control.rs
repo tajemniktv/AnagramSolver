@@ -23,6 +23,13 @@ impl Control {
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Relaxed);
     }
+    /// Preserve the shared cancellation flag and never extend an existing limit.
+    pub fn with_earlier_deadline(&self, deadline: Instant) -> Self {
+        Self {
+            cancelled: self.cancelled.clone(),
+            deadline: Some(self.deadline.map_or(deadline, |old| old.min(deadline))),
+        }
+    }
     pub fn flag(&self) -> &AtomicBool {
         &self.cancelled
     }

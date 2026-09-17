@@ -11,7 +11,8 @@ in place, but is not a substitute for the missing earlier gates.
 
 ### Current evidence and remaining gates
 
-- Phase 0: the pinned manifest is durable in `tests/reference/manifest.json`.
+- Phase 0 reference-freeze gate passed: the pinned manifest is durable in
+  `tests/reference/manifest.json`.
   `tools/reference_fixtures.py --check` verifies source/data identity and frozen
   normalization, generation, validation, synthetic phrase and model outputs.
   Corpus formats and distribution decisions are in `tests/reference/CORPORA.md`.
@@ -20,11 +21,13 @@ in place, but is not a substitute for the missing earlier gates.
   failure explicitly; `user-performance.json` contains only completed runs.
   It is not a passing full-suite report. The 24-run bounded CLI baseline,
   12 separate stage measurements, 258 Python tests and 52-case ordering gate
-  are captured in `tests/reference/`; see `ACCEPTANCE.md` for remaining coverage.
+  are captured in `tests/reference/`. All 52 ordering and five default CLI
+  registry cases now have replay-verified golden outputs; see `ACCEPTANCE.md`.
   No native performance claim is made.
 - Phase 1: structural schemas and TypeScript exist, as do generation/ranked CLI
-  operations and job-state definitions. Runtime provenance/progress and enforced
-  deployment policy are still required. The unchecked items below remain gates.
+  operations and job-state definitions. Adapter-owned deployment admission,
+  hard deep limits and non-extending deadlines are enforced. Runtime
+  provenance/progress is still required. The unchecked items below remain gates.
 
 ### Historical implementation evidence (chronological)
 
@@ -189,15 +192,16 @@ do not transliterate monkeypatch layers into Rust global state.
 
 Checklist convention: checked items are implemented and have the evidence noted
 below or in Implementation evidence. An unchecked parent can contain completed
-sub-items; its remaining scope is still required. No phase gate is passed yet.
+sub-items; its remaining scope is still required. Phase 0's reference-freeze gate
+is passed; native migration/performance gates remain open.
 
 - [x] Review and land the existing Python audit/improvement work separately from
       port commits; preserve unrelated changes. Record the exact reference commit.
-- [ ] Capture corpus versions/hashes, ranking configuration, cache state, machine
+- [x] Capture corpus versions/hashes, ranking configuration, cache state, machine
       details, candidate counts and reference outputs in reproducible fixtures.
   - [x] Capture local dictionary/frequency/WordNet hashes with
         `tools/capture_reference.py` (29 source and 73 corpus files).
-  - [ ] Complete durable pinned fixtures, optional input identities and machine/
+  - [x] Complete durable pinned fixtures, optional input identities and machine/
         cache/budget metadata; the temporary manifest alone is insufficient.
     - [x] Store `tests/reference/manifest.json` pinned to the Python reference,
           covering 29 oracle/harness files and 73 corpus files. Capture now rejects
@@ -209,22 +213,27 @@ sub-items; its remaining scope is still required. No phase gate is passed yet.
       ranker inputs; document formats, licenses and redistribution requirements.
       See `tests/reference/CORPORA.md`; unresolved data permissions prohibit
       bundling, not local comparison against the pinned, provisioned inputs.
-- [ ] Extend the reference harness to cover letter normalization, punctuation and
+- [x] Extend the reference harness to cover letter normalization, punctuation and
       Unicode behavior, repeated required words, alternative hints, exclusions,
       impossible inputs, empty results, exact cap exhaustion and deterministic ties.
-- [ ] Include prefix/diverse enumeration, exhaustive-generation semantics, grammar,
+- [x] Include prefix/diverse enumeration, exhaustive-generation semantics, grammar,
       ordering, optional phrase evidence and optional learned ranking in parity scope.
   - [x] Add seeded prefix/diverse generation, lexical/WordNet/grammar/order,
         refinement and phrase/cohesion differential harnesses in `tests/parity/`.
   - [x] Add learned-feature/model/ordering parity (`tests/parity/learned.py`,
         253 cases, including invalid and missing model inputs).
-  - [ ] Complete default-path/end-to-end oracle coverage.
+  - [x] Complete default-path/end-to-end oracle coverage.
     - [x] Verify native `solve` CLI against the real-corpus Python generator-export
           and reranker pipeline on eight prefix/diverse cases, including required
           words and hints (`tests/parity/solve.py`). All row components and counts
           match, including historical export quantization.
-    - [ ] Expand to the full quality suites, optional phrase/model fixtures and
+    - [x] Expand to the full quality suites, optional phrase/model fixtures and
           performance/cancellation/cache acceptance cases.
+          `registry.json` freezes all 52 ordering and five normal-user CLI cases;
+          both capture and independent replay pass. `behavior.json`, `gates.json`
+          and measured reports cover the remaining reference inputs/outcomes.
+          This freezes Python behavior; full native quality/cache parity is still
+          required by phases 2/3, not implied by these reference fixtures.
 - [x] Benchmark generation and ranking separately, then actual end-to-end cold and
       warm CLI runs using `benchmark_user_runs.py` and the existing quality gates.
       See `tests/reference/ACCEPTANCE.md`: bounded runs and quality gates pass;
@@ -251,6 +260,12 @@ small sample. Distinguish empty puzzle caches from cold corpus/OS caches.
 - [ ] Separate semantic search options from deployment limits. Include input,
       hints/required/excluded words, word-count constraints, lexical options,
       generation strategy, candidate budget, deep-ranking budget and result limit.
+  - [x] Add generated `DeploymentLimits`, independent of semantic requests, and
+        CLI `--limits` for both operations. Reject over-budget requests without
+        clamping; enforce actual family-expanded deep count before ordering;
+        keep shared cancellation and the earlier of policy/caller deadlines.
+        Fifteen cross-language fixtures, 21 Rust tests, strict Clippy and eight
+        ranked CLI parity cases pass (including hard-deep rejection).
 - [ ] Specify validation precedence, defaults, normalization and stable error codes.
       Reject non-finite values and contradictory constraints; never relax silently.
   - [x] Validate generation semantics before corpus I/O for both native operations;

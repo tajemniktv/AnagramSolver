@@ -34,13 +34,23 @@ RSS 10,223,185,920 bytes; its warm run took 0.48 s. The second cold sample hit t
 180 s timeout. Later cases/strategies were not attempted by that aborted run.
 `stress-attempt.json` identifies the failure; missing samples are not successes.
 
-## Still open
+## Reference-freeze gate passed
 
-Phase 0's broad end-to-end fixture coverage remains incomplete: the durable
-ranked outputs currently cover two stage-measurement inputs, two user benchmark
-cases and the separate eight-case native CLI parity harness, not a frozen
-default-path result fixture for every registry case and optional mode. Keep the
-phase gate open until that coverage is reconciled explicitly.
+`registry.json` now captures all 52 ordering cases and all five cases assigned to
+the `normal_user_cli` suite. Capture and a fresh `--check` replay both pass,
+including actual default/registry budgets, expected displayed phrases and exact
+cold/warm rankings. Registry phrase-ordering/refinement/feature-ranker/full case
+IDs are all included in the 52-case ordering set; their optional algorithms are
+also exercised by the dedicated gates and synthetic fixtures. Performance cases
+remain measured workloads, not an assertion that bounded search must recover
+their answers.
+
+Together with `behavior.json`, the source/data manifest, full Python test/gate
+reports and explicit performance failure record, this satisfies phase 0's pinned,
+repeatable reference requirement. It does **not** claim full native CLI quality
+or native cache parity, which still belong to phases 2/3. Real Wikimedia-derived
+optional data and trained models are not enabled in this baseline; their fixture
+provenance and distribution requirements are explicit rather than fabricated.
 
 The stress timeout is now a known, reproducible measurement boundary, not a
 reason to retry expensive runs indefinitely or claim a native speedup. Native

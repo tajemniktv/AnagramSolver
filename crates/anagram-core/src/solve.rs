@@ -71,10 +71,30 @@ pub fn solve_controlled(
     paths: Paths<'_>,
     control: &Control,
 ) -> std::result::Result<Result, Error> {
+    solve_with_limits(
+        request,
+        paths,
+        control,
+        &crate::policy::DeploymentLimits::default(),
+    )
+}
+
+pub fn solve_with_limits(
+    request: &Request,
+    paths: Paths<'_>,
+    control: &Control,
+    limits: &crate::policy::DeploymentLimits,
+) -> std::result::Result<Result, Error> {
     control
         .check()
         .map_err(|reason| Error::new(reason, reason))?;
-    let result = run(request, paths, control);
+    validate(request)?;
+    limits.admit(request)?;
+    let control = limits.control(control)?;
+    control
+        .check()
+        .map_err(|reason| Error::new(reason, reason))?;
+    let result = run(request, paths, &control, limits);
     control
         .check()
         .map_err(|reason| Error::new(reason, reason))?;
@@ -133,6 +153,7 @@ fn run(
     request: &Request,
     paths: Paths<'_>,
     control: &Control,
+    limits: &crate::policy::DeploymentLimits,
 ) -> std::result::Result<Result, Error> {
     validate(request)?;
     let unigrams = Unigrams::load(control.reader(open(paths.unigrams)?)).map_err(corpus)?;
@@ -169,6 +190,7 @@ fn run(
     let mut rows = ranking::prepare_controlled(ranking::from_records(&records), &lex, control)
         .map_err(|e| Error::new(e, e))?;
     let selected = ranking::choose_deep(&rows, request.deep_per_group, request.deep_all);
+    limits.admit_deep(selected.len())?;
     let options = ranking::Options {
         mode: request.order_mode,
         beam_width: request.beam_width,
