@@ -12,6 +12,32 @@ fn scratch() -> tempfile::TempDir {
         .tempdir_in(root)
         .unwrap()
 }
+
+#[test]
+fn dictionary_preparation_uses_lossy_corpus_decoding() {
+    let temp = scratch();
+    let base = temp.path().join("base.txt");
+    let one = temp.path().join("one.txt");
+    let output = temp.path().join("dictionary.txt");
+    fs::write(&base, b"ca\xfft\ndog\n").unwrap();
+    fs::write(&one, b"cat 5\ndog 5\n").unwrap();
+    let result = Command::new(env!("CARGO_BIN_EXE_anagram-cli"))
+        .arg("prepare-dictionary")
+        .args([&base, &one, &output])
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stdout)
+    );
+    assert!(
+        fs::read_to_string(output)
+            .unwrap()
+            .lines()
+            .any(|line| line == "cat")
+    );
+}
 fn run(args: &[&str], input: &serde_json::Value) -> std::process::Output {
     let mut child = Command::new(env!("CARGO_BIN_EXE_anagram-cli"))
         .args(args)

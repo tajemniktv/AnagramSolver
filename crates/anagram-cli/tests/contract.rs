@@ -4,6 +4,33 @@ use std::{
     process::{Command, Stdio},
 };
 
+#[test]
+fn timeout_exits_even_when_stdin_writer_remains_open() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_anagram-cli"))
+        .args(["generate", "unused", "--timeout-ms", "50"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let stdin = child.stdin.take().unwrap();
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while child.try_wait().unwrap().is_none() {
+        if std::time::Instant::now() > deadline {
+            child.kill().unwrap();
+            panic!("stdin bypassed deadline");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+    drop(stdin);
+    let output = child.wait_with_output().unwrap();
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8(output.stdout)
+            .unwrap()
+            .contains("timed_out")
+    );
+}
+
 fn invoke(request: Value) -> (bool, Value) {
     invoke_with_args(request, &[])
 }
@@ -22,7 +49,7 @@ fn invoke_with_args(request: Value, args: &[&str]) -> (bool, Value) {
         .take()
         .unwrap()
         .write_all(request.to_string().as_bytes())
-        .unwrap();
+        .unwrap_or_else(|error| assert_eq!(error.kind(), std::io::ErrorKind::BrokenPipe));
     let output = child.wait_with_output().unwrap();
     (
         output.status.success(),

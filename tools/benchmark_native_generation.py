@@ -28,7 +28,7 @@ def reference_worker():
 
 
 def measure(command, payload, *, process_tree=False, timeout=120, json_lines=True):
-    sys.path.insert(0, str(TEMP / "native-bench-deps"))
+    sys.path.insert(0, str(TEMP / "reference-runtime"))
     import psutil
     with tempfile.TemporaryFile(dir=TEMP) as source, tempfile.TemporaryFile(dir=TEMP) as output, tempfile.TemporaryFile(dir=TEMP) as errors:
         source.write(payload)
@@ -95,6 +95,7 @@ def main():
                     min_words=1, max_words=4, cap=200, repeat=True, clues=[],
                     initial=[], mode="any", strategy=strategy))
     payload = ("\n".join(map(json.dumps, cases)) + "\n").encode()
+    subprocess.run(["cargo", "build", "--release", "--locked", "--example", "generation_probe"], cwd=ROOT, check=True)
     executable = ROOT / "target/release/examples" / ("generation_probe.exe" if sys.platform == "win32" else "generation_probe")
     commands = {"python": [sys.executable, str(Path(__file__).resolve()), "--worker"], "rust": [str(executable)]}
     runs = []

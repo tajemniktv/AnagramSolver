@@ -113,6 +113,20 @@ pub fn train(groups: &[Group], options: &Options, control: &Control) -> Result<R
             "Need word bags in at least two hash folds for honest held-out evaluation",
         ));
     }
+    // Each pair participates in K-1 held-out fits and the final all-data fit.
+    let updates = groups
+        .iter()
+        .try_fold(0usize, |total, group| {
+            let positives = group.items.iter().filter(|item| item.positive).count();
+            positives
+                .checked_mul(group.items.len() - positives)
+                .and_then(|pairs| total.checked_add(pairs))
+        })
+        .and_then(|pairs| pairs.checked_mul(options.epochs))
+        .and_then(|updates| updates.checked_mul(folds.len()));
+    if updates.is_none_or(|updates| updates > 50_000_000) {
+        return Err(error("Training exceeds the 50-million pair-update budget"));
+    }
     let mut baseline = Metrics::default();
     let mut held_out = Metrics::default();
     for f in folds {

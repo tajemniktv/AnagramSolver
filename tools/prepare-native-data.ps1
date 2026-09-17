@@ -10,10 +10,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 $project = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
-$output = [IO.Path]::GetFullPath($OutputDirectory)
+$destination = [IO.Path]::GetFullPath($OutputDirectory)
 $cli = (Resolve-Path -LiteralPath $NativeCli).Path
-if (Test-Path -LiteralPath $output) { throw 'Choose a new output directory; existing corpora are never overwritten.' }
+if (Test-Path -LiteralPath $destination) { throw 'Choose a new output directory; existing corpora are never overwritten.' }
 $scratch = Join-Path $project ('.codex/temp/native-data-' + [guid]::NewGuid().ToString('N'))
+$output = Join-Path $scratch 'prepared'
 New-Item -ItemType Directory -Path $scratch, $output | Out-Null
 function Fetch([string]$Url, [string]$Path) {
     if ($SourceDirectory) {
@@ -60,6 +61,13 @@ if ($titles.Count) {
     & $cli build-phrases (Join-Path $output 'phrases.db') @titles
     if ($LASTEXITCODE -ne 0) { throw 'Phrase build failed; source downloads retained for retry' }
 }
-Get-ChildItem -LiteralPath $output -File -Recurse | Get-FileHash | Select-Object Path,Hash |
+Get-ChildItem -LiteralPath $output -File -Recurse | Get-FileHash | ForEach-Object {
+    [pscustomobject]@{ Path = [IO.Path]::GetRelativePath($output, $_.Path); Hash = $_.Hash }
+} |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'manifest.json') -Encoding utf8
+New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force | Out-Null
+# Directory.Move refuses existing destinations. Cross-volume publication fails
+# safely with complete staging retained rather than publishing a partial tree.
+[IO.Directory]::Move($output, $destination)
+$output = $destination
 Write-Output "Prepared: $output. Select these paths in Settings. Downloads retained at $scratch. See dictionary/policy.json for corpus-derived extra short words."

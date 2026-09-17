@@ -4,8 +4,10 @@ The native generation/ranking engine, contracts, cache/provenance, data tools
 and experimental model tooling are implemented in this branch. See
 `NATIVE_TOOLS.md` and `tests/reference/NATIVE_PHASE3_ACCEPTANCE.md`.
 The desktop application and Python archival are separate follow-up PRs.
-The detailed plan below preserves the earlier planning baseline; its checkboxes
-will be reconciled with the desktop implementation in the next PR.
+Everything below this review-boundary summary is a **superseded historical
+planning snapshot**, not a current readiness checklist. Current native acceptance
+is recorded in `tests/reference/NATIVE_PHASE3_ACCEPTANCE.md`. Desktop and archival
+readiness belong to the next two PRs in the stack.
 
 # AnagramSolver: Rust engine and shared UI plan
 

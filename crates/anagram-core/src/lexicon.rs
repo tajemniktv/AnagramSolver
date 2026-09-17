@@ -5,7 +5,7 @@ use std::io::{self, BufRead};
 
 // Python's corpus readers use UTF-8 errors="ignore". Preserve valid text while
 // dropping only malformed byte sequences, including errors inside count fields.
-pub(crate) fn decoded_lines(reader: impl BufRead) -> impl Iterator<Item = io::Result<String>> {
+pub fn decoded_lines(reader: impl BufRead) -> impl Iterator<Item = io::Result<String>> {
     reader.split(b'\n').map(|bytes| {
         let bytes = bytes?;
         let mut remaining = bytes.as_slice();
@@ -51,6 +51,12 @@ impl Unigrams {
             let Ok(count) = count.trim().parse::<i64>() else {
                 continue;
             };
+            if count < 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "negative unigram count",
+                ));
+            }
             let word = normalize_letters(token);
             if word.is_empty() {
                 continue;
@@ -182,7 +188,9 @@ pub(crate) fn admit_checked(
         if policy.min_zipf > 0.0 && zipf < policy.min_zipf && !forced {
             return;
         }
-        admitted.push((Candidate::new(&word).unwrap(), zipf));
+        if let Some(candidate) = Candidate::new(&word) {
+            admitted.push((candidate, zipf));
+        }
     };
     for line in decoded_lines(reader) {
         check().map_err(io::Error::other)?;

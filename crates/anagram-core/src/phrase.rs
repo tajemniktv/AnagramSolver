@@ -131,6 +131,7 @@ pub fn starting_at(
         if (f.adj && (!f.noun || following_nominal))
             || (i == start + 1
                 && det.is_some()
+                && function_class(&words[i]).is_none()
                 && f.verb_past
                 && (words[i].ends_with("ed") || words[i].ends_with("en"))
                 && following_nominal)

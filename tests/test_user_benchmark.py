@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
 import benchmark_user_runs as benchmark
 
@@ -36,5 +37,13 @@ class UserBenchmarkTests(unittest.TestCase):
             )
 
     def test_rejects_nonfinite_timeout_without_starting_work(self):
-        with self.assertRaises(SystemExit):
-            benchmark.main(["--timeout", "nan"])
+        with (
+            patch.object(benchmark, "measure") as measure,
+            patch("anagram_user_lexicon.ensure_user_lexicon") as lexicon,
+            patch("anagram_rerank.ensure_wordnet") as wordnet,
+            patch("anagram_generate.ensure_ngram_data") as ngrams,
+        ):
+            with self.assertRaises(SystemExit):
+                benchmark.main(["--timeout", "nan"])
+            for operation in (measure, lexicon, wordnet, ngrams):
+                operation.assert_not_called()

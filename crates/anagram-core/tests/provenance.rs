@@ -70,13 +70,30 @@ fn file_identity_hashes_the_bytes_retained_for_parsing() {
     fs::write(&path, b"abc").unwrap();
     let snapshot = Snapshot::load(&path, "dictionary", &Control::default()).unwrap();
     fs::write(&path, b"changed").unwrap();
-    assert_eq!(snapshot.bytes, b"abc");
+    assert_eq!(snapshot.bytes(), b"abc");
     assert_eq!(
-        snapshot.identity.sha256,
+        snapshot.identity().sha256,
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
-    assert_eq!(snapshot.identity.bytes, 3);
-    assert!(snapshot.identity.present);
+    assert_eq!(snapshot.identity().bytes, 3);
+    assert!(snapshot.identity().present);
+}
+
+#[test]
+fn phrase_lookup_rejects_duplicates_and_accepts_identifier_case() {
+    let scratch = Scratch::new("case-duplicates");
+    let path = scratch.0.join("phrases.sqlite");
+    let writer = rusqlite::Connection::open(&path).unwrap();
+    writer.execute_batch("CREATE TABLE NGrams(text TEXT,n INTEGER,count INTEGER); INSERT INTO NGrams VALUES('a b',2,1);").unwrap();
+    {
+        let index = PhraseIndex::open(&path).unwrap();
+        assert!(index.identity().is_ok());
+    }
+    writer
+        .execute_batch("INSERT INTO NGrams VALUES('a b',2,99)")
+        .unwrap();
+    let index = PhraseIndex::open(&path).unwrap();
+    assert!(index.counts(&["a b".into()]).is_err());
 }
 
 #[test]

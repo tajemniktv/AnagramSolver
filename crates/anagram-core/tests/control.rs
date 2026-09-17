@@ -198,7 +198,7 @@ fn exact_ordering_stops_inside_permutation_search() {
         fs::write(scratch.0.join(name), "dog n\ncat n\n").unwrap();
     }
     let lex = WordNet::load(&scratch.0).unwrap();
-    let words = "the small dog and a black cat will run today"
+    let words = "the small dog and a black cat runs"
         .split_whitespace()
         .map(str::to_owned)
         .collect::<Vec<_>>();
@@ -207,6 +207,28 @@ fn exact_ordering_stops_inside_permutation_search() {
     let error = ordering::rank_controlled(&words, &lex, true, 128, 56, &control).unwrap_err();
     assert_eq!(error, "timed_out");
     assert!(start.elapsed() < Duration::from_secs(5));
+    assert!(
+        ordering::rank_controlled(
+            &vec!["dog".into(); 10],
+            &lex,
+            true,
+            128,
+            56,
+            &Control::default()
+        )
+        .is_err()
+    );
+    assert!(
+        ordering::rank_controlled(
+            &["dog".into(), "cat".into()],
+            &lex,
+            false,
+            usize::MAX,
+            56,
+            &Control::default()
+        )
+        .is_err()
+    );
 }
 
 #[test]

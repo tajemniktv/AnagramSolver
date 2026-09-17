@@ -55,7 +55,7 @@ impl PhraseIndex {
         let (kind, schema): (String, String) = self
             .connection
             .query_row(
-                "SELECT type, sql FROM sqlite_schema WHERE name='ngrams'",
+                "SELECT type, sql FROM sqlite_schema WHERE name='ngrams' COLLATE NOCASE",
                 [],
                 |row| Ok((row.get(0)?, row.get(1)?)),
             )
@@ -136,7 +136,12 @@ impl PhraseCorpus for PhraseIndex {
                 .map_err(error)?;
             for item in matches {
                 let (phrase, count) = item.map_err(error)?;
-                counts.insert(phrase, count);
+                if counts.insert(phrase, count).is_some() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Duplicate phrase keys",
+                    ));
+                }
             }
         }
         Ok(counts)

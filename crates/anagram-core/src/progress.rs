@@ -37,7 +37,7 @@ impl<'a> Progress<'a> {
             },
             versions: Versions {
                 engine: env!("CARGO_PKG_VERSION").to_owned(),
-                ranking: "native-ranking-v1".to_owned(),
+                ranking: "native-ranking-v2".to_owned(),
                 data: vec![],
                 data_complete: false,
             },

@@ -15,14 +15,16 @@ from capture_reference import REFERENCE
 
 def verify_sources():
     manifest = json.loads((ROOT / "tests/reference/manifest.json").read_text())
-    assert manifest["reference_commit"] == REFERENCE
+    if manifest["reference_commit"] != REFERENCE:
+        raise RuntimeError("Reference commit drift")
     subprocess.run(["git", "diff", "--exit-code", REFERENCE, "--",
                     *[f["path"] for f in manifest["source_files"]]],
                    cwd=ROOT, check=True, capture_output=True)
     for item in manifest["corpus_files"]:
         path = ROOT / item["path"]
         with path.open("rb") as stream:
-            assert hashlib.file_digest(stream, "sha256").hexdigest() == item["sha256"], path
+            if hashlib.file_digest(stream, "sha256").hexdigest() != item["sha256"]:
+                raise RuntimeError(f"Corpus drift: {path}")
 
 
 def capture():
@@ -72,6 +74,7 @@ def capture():
             value = dict(error=str(error))
         validation.append(dict(argv=argv, output=value))
     phrase_rows = [("the dog", 2, 100), ("dog runs", 2, 50), ("the dog runs", 3, 20)]
+    (ROOT / ".codex/temp").mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=ROOT / ".codex/temp", prefix="reference-phrase-") as temp:
         path = Path(temp) / "phrases.sqlite"
         connection = sqlite3.connect(path)
@@ -106,7 +109,8 @@ def main():
     value = json.dumps(capture(), indent=2, ensure_ascii=True) + "\n"
     path = ROOT / "tests/reference/behavior.json"
     if args.check:
-        assert path.read_text(encoding="utf-8") == value, "Frozen behavior drift"
+        if path.read_text(encoding="utf-8") != value:
+            raise RuntimeError("Frozen behavior drift")
     else:
         path.write_text(value, encoding="utf-8")
     print("Pinned oracle behavior fixtures " + ("verified" if args.check else "captured"))

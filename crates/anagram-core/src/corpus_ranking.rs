@@ -25,6 +25,12 @@ fn parse(line: &str) -> Option<(&str, i64)> {
     Some((token, count.trim().parse().ok()?))
 }
 fn add(value: &mut i64, count: i64) -> io::Result<()> {
+    if count < 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "negative corpus count",
+        ));
+    }
     *value = value
         .checked_add(count)
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "corpus count overflow"))?;
@@ -54,6 +60,12 @@ impl Collocation {
             let Some((text, count)) = parse(&line) else {
                 continue;
             };
+            if count < 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "negative bigram count",
+                ));
+            }
             let parts: Vec<_> = text.split_whitespace().collect();
             if parts.len() != 2 {
                 continue;
