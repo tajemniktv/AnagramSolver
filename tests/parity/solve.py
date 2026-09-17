@@ -10,7 +10,7 @@ import sys
 import tempfile
 import sqlite3
 ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT));sys.path.insert(0,str(Path(__file__).resolve().parent))
+sys.path.insert(0,str(ROOT / "archive"));sys.path.insert(0,str(Path(__file__).resolve().parent))
 import anagram_generate as generator
 import anagram_rerank as ranking
 from scoring import close

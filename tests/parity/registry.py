@@ -7,7 +7,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "archive"))
 sys.path.insert(0, str(ROOT / "tools"))
 from reference_fixtures import verify_sources
 import anagram_solver as oracle

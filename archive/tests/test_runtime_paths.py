@@ -33,8 +33,8 @@ class RuntimePathTests(unittest.TestCase):
             resolved = Path(path).resolve()
             self.assertTrue(resolved == data or data in resolved.parents, path)
 
-    def test_project_data_root_is_next_to_scripts(self) -> None:
-        self.assertEqual(anagram_paths.DATA_DIR.parent, anagram_paths.PROJECT_DIR)
+    def test_archive_reuses_repository_data_root(self) -> None:
+        self.assertEqual(anagram_paths.DATA_DIR.parent, anagram_paths.PROJECT_DIR.parent)
         self.assertEqual(anagram_paths.PROJECT_DIR, Path(anagram_paths.__file__).resolve().parent)
 
     def test_python_defaults_do_not_reference_legacy_home_cache(self) -> None:

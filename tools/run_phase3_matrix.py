@@ -4,7 +4,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMP = ROOT / ".codex/temp/phase3-corpora"
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "archive"))
 
 
 def main():

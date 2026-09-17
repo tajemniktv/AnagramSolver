@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_CASES = HERE / "anagram_benchmarks.json"
+DEFAULT_CASES = HERE.parent / "anagram_benchmarks.json"
 REGISTRY_SCHEMA = 3
 
 CASE_SUITES = (

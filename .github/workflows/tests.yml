@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    working-directory: archive
+
 jobs:
   static-analysis:
     name: static analysis
@@ -83,7 +87,7 @@ jobs:
             .anagram_data/wordnet31
             .anagram_data/dictionary
             .anagram_data/ngrams
-          key: normal-user-corpora-${{ runner.os }}-v2-${{ hashFiles('anagram_user_lexicon.py', 'anagram_generate.py') }}
+          key: normal-user-corpora-${{ runner.os }}-v2-${{ hashFiles('archive/anagram_user_lexicon.py', 'archive/anagram_generate.py') }}
       - name: Provision runtime corpora outside smoke timeouts
         run: |
           python - <<'PY'
@@ -100,7 +104,7 @@ jobs:
           print(u.ensure_user_lexicon())
           PY
       - name: Clear puzzle-specific caches
-        run: rm -rf .anagram_data/prepared_cache .anagram_data/solver_runs
+        run: rm -rf ../.anagram_data/prepared_cache ../.anagram_data/solver_runs
       - name: Run registry-selected user invocations
         run: python ci_user_runs.py
       - name: Exercise concurrent cold runs and cache recovery

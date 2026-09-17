@@ -4,6 +4,9 @@ Status: phases 0–4 implemented, 2026-09-17. Production deployment still
 requires explicit approval.
 
 Current implementation: native engine plus an installed Windows desktop app.
+Legacy Python modules, runners and unit tests are archived under `archive/`.
+Active native/reference validation tools remain in `tools/` and `tests/parity/`;
+reference identity checks allow only the three documented data/registry path changes.
 Website integration and hosting remain deferred until explicitly resumed.
 The Python-feature follow-up below extends the original desktop acceptance.
 The remaining desktop/CLI feature-control gaps are implemented: generation-only,

@@ -54,7 +54,7 @@ def main():
                 for engine in (("python", "native") if sample % 2 == 0 else ("native", "python")):
                     if args.engine and engine not in args.engine: continue
                     with tempfile.TemporaryDirectory(prefix="cli-benchmark-", dir=TEMP) as temp:
-                        command = ([sys.executable, str(ROOT / "anagram_solver.py"), case["target"], *case["options"],
+                        command = ([sys.executable, str(ROOT / "archive/anagram_solver.py"), case["target"], *case["options"],
                             "--workers", "1", "--work-root", temp, "--json"] if engine == "python" else
                             [*native, "--cache", str(Path(temp) / "cache.sqlite")])
                         for mode in ("cold", "warm"):

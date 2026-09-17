@@ -8,7 +8,7 @@ import sys
 import tempfile
 
 ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT))
+sys.path.insert(0,str(ROOT / "archive"))
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from anagram_rerank_core import PhraseIndex,load_positive_bigram_model
 from scoring import close

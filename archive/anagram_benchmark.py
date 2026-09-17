@@ -46,7 +46,7 @@ from pathlib import Path
 from anagram_paths import BENCHMARK_DIR
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_CASES = HERE / "anagram_benchmarks.json"
+DEFAULT_CASES = HERE.parent / "anagram_benchmarks.json"
 DEFAULT_RERANKER = HERE / "anagram_rerank.py"
 DEFAULT_GENERATOR = HERE / "anagram_generate.py"
 DEFAULT_CACHE = BENCHMARK_DIR

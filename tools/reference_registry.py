@@ -10,7 +10,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "archive"))
 sys.path.insert(0, str(ROOT / ".codex/temp/reference-runtime"))
 from capture_reference import REFERENCE
 from reference_fixtures import verify_sources
@@ -39,7 +39,7 @@ def main():
         # JSON replaces verbose diagnostics only; all semantic/default budgets stay.
         options = [option for option in case.solver_args if option != "--verbose"]
         with tempfile.TemporaryDirectory(dir=temp_root, prefix="registry-reference-") as temp:
-            command = [sys.executable, str(ROOT / "anagram_solver.py"), case.target,
+            command = [sys.executable, str(ROOT / "archive/anagram_solver.py"), case.target,
                        *options, "--work-root", temp, "--json"]
             cold, elapsed, peak = measure(command, case.timeout_seconds)
             warm, warm_elapsed, warm_peak = measure(command, case.timeout_seconds)

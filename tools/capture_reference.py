@@ -15,6 +15,26 @@ ROOT = Path(__file__).resolve().parents[1]
 REFERENCE = "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a"
 
 
+def reference_source_path(name):
+    path = ROOT / name
+    return path if path.is_file() else ROOT / "archive" / name
+
+
+def verify_reference_source(reference, name):
+    """Check pinned source, allowing only the documented archive path migration."""
+    name = name.removeprefix("archive/")
+    expected = subprocess.check_output(
+        ["git", "show", f"{reference}:{name}"], cwd=ROOT, text=True, encoding="utf-8")
+    if name == "anagram_paths.py":
+        expected = expected.replace('DATA_DIR = PROJECT_DIR / ".anagram_data"',
+                                    'DATA_DIR = PROJECT_DIR.parent / ".anagram_data"')
+    elif name in ("anagram_suite.py", "anagram_benchmark.py"):
+        expected = expected.replace('DEFAULT_CASES = HERE / "anagram_benchmarks.json"',
+                                    'DEFAULT_CASES = HERE.parent / "anagram_benchmarks.json"')
+    path = reference_source_path(name)
+    assert path.read_text(encoding="utf-8") == expected, f"Reference source differs: {path}"
+
+
 def identity(path):
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -34,8 +54,9 @@ def main():
     reference=subprocess.check_output(["git","rev-parse",f"{args.reference}^{{commit}}"],cwd=ROOT,text=True).strip()
     tracked=subprocess.check_output(["git","ls-tree","--name-only",reference],cwd=ROOT,text=True).splitlines()
     source_names=sorted(name for name in tracked if name.endswith(".py") or name=="anagram_benchmarks.json")
-    subprocess.run(["git","diff","--exit-code",reference,"--",*source_names],cwd=ROOT,check=True,capture_output=True)
-    sources=[ROOT/name for name in source_names]
+    for name in source_names:
+        verify_reference_source(reference, name)
+    sources=[reference_source_path(name) for name in source_names]
     source_files=[]
     for path in sources:
         item=identity(path)

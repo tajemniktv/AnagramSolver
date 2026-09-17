@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT));sys.path.insert(0,str(Path(__file__).resolve().parent))
+sys.path.insert(0,str(ROOT / "archive"));sys.path.insert(0,str(Path(__file__).resolve().parent))
 from anagram_feature_ranker import FEATURE_NAMES,LinearRankModel,RankItem,explicit_order_features,_rank
 from scoring import close
 

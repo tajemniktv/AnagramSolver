@@ -4,21 +4,19 @@ from dataclasses import asdict
 import hashlib
 import json
 from pathlib import Path
-import subprocess
 import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-from capture_reference import REFERENCE
+sys.path.insert(0, str(ROOT / "archive"))
+from capture_reference import REFERENCE, verify_reference_source
 
 
 def verify_sources():
     manifest = json.loads((ROOT / "tests/reference/manifest.json").read_text())
     assert manifest["reference_commit"] == REFERENCE
-    subprocess.run(["git", "diff", "--exit-code", REFERENCE, "--",
-                    *[f["path"] for f in manifest["source_files"]]],
-                   cwd=ROOT, check=True, capture_output=True)
+    for item in manifest["source_files"]:
+        verify_reference_source(REFERENCE, item["path"])
     for item in manifest["corpus_files"]:
         path = ROOT / item["path"]
         with path.open("rb") as stream:

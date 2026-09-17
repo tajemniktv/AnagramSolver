@@ -11,7 +11,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMP = ROOT / ".codex/temp"
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "archive"))
 
 
 def reference_worker():
@@ -118,7 +118,7 @@ def main():
         platform=platform.platform(), python=sys.version, input_sha256=hashlib.sha256(payload).hexdigest(),
         rust_binary_sha256=hashlib.sha256(executable.read_bytes()).hexdigest(), cases=report_cases,
         corpus_identities=corpus_identities,
-        reference_source_sha256=hashlib.sha256((ROOT / "anagram_generate.py").read_bytes()).hexdigest(),
+        reference_source_sha256=hashlib.sha256((ROOT / "archive/anagram_generate.py").read_bytes()).hexdigest(),
         output_counts=[len(r["bags"]) for r in expected], runs=runs)
     path = ROOT / "tests/reference" / ("native-generation-real.json" if real else "native-generation-synthetic.json")
     path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

@@ -6,7 +6,7 @@ import subprocess
 import sys
 
 ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT))
+sys.path.insert(0,str(ROOT / "archive"))
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 import anagram_rerank_core as core
 import anagram_rerank_topk_impl as reference

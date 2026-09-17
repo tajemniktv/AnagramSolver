@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "archive"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import anagram_rerank_core as reference
 import anagram_auxiliary_grammar as auxiliary

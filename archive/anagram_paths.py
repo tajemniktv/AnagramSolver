@@ -6,7 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 
 PROJECT_DIR = Path(__file__).resolve().parent
-DATA_DIR = PROJECT_DIR / ".anagram_data"
+DATA_DIR = PROJECT_DIR.parent / ".anagram_data"
 
 DICTIONARY_DIR = DATA_DIR / "dictionary"
 NGRAM_DIR = DATA_DIR / "ngrams"

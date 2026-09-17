@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "archive"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from anagram_order_refinement import refine_order, refine_seed_pool, augment_seed_pool
 from scoring import close

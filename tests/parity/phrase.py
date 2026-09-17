@@ -7,7 +7,7 @@ import subprocess
 import sys
 
 ROOT=Path(__file__).resolve().parents[2]
-sys.path.insert(0,str(ROOT))
+sys.path.insert(0,str(ROOT / "archive"))
 sys.path.insert(0,str(Path(__file__).resolve().parent))
 from anagram_corpus_cohesion import score_corpus_cohesion, blend_phrase_cohesion
 from anagram_rerank_core import PhraseIndex
