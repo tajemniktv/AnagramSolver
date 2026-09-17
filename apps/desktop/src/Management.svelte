@@ -6,13 +6,15 @@
   let base = $state(''); let unigrams = $state(''); let titles = $state('');
   async function pick(kind: 'dictionary' | 'unigrams' | 'titles') { try { const path = await bridge.choose(kind); if(!path) return; if(kind === 'dictionary') base = path; else if(kind === 'unigrams') unigrams = path; else titles += (titles ? '\n' : '') + path; } catch(e) { error = message(e); } }
   let report = $state<Record<string, unknown> | null>(null); let error = $state(''); let cancelling = $state(false);
-  let timer: ReturnType<typeof setTimeout>; let disposed = false;
-  async function refresh() {
-    try { const status = await bridge.maintenanceStatus(); if(disposed) return; busy = status.active; error = status.error ?? ''; report = status.report;
-      if(busy) timer = setTimeout(refresh,500); else cancelling = false;
-    } catch(e) { error = message(e); if(busy && !disposed) timer = setTimeout(refresh,1000); }
+  let timer: ReturnType<typeof setTimeout>; let disposed = false; let revision = 0;
+  async function refresh(restore = false) {
+    if(disposed) return;
+    const current = ++revision;
+    try { const status = await bridge.maintenanceStatus(); if(disposed || current !== revision) return; busy = status.active; error = restore ? '' : status.error ?? ''; report = status.report;
+      if(busy) timer = setTimeout(() => refresh(),500); else cancelling = false;
+    } catch(e) { if(disposed || current !== revision) return; error = message(e); if(busy) timer = setTimeout(() => refresh(),1000); }
   }
-  async function run(action: unknown) { if(busy) return; busy = true; error = ''; report = null; try { await bridge.manage(action); await refresh(); } catch(e) { error = message(e); busy = false; } }
+  async function run(action: unknown) { if(busy) return; ++revision; clearTimeout(timer); busy = true; error = ''; report = null; try { await bridge.manage(action); await refresh(); } catch(e) { if(disposed) return; error = message(e); busy = false; } }
   async function inspect() { try { report = await bridge.diagnostics(); } catch(e) { error = message(e); } }
   async function browse() { try { source = await bridge.choose('source') ?? source; } catch(e) { error = message(e); } }
   async function reopen() { try { const path = await bridge.choose('training'); if(!path) return; const saved = await bridge.readReport(path) as Record<string, unknown>;
@@ -22,7 +24,7 @@
   } catch(e) { error = message(e); } }
   async function cancel() { try { await bridge.cancelTraining(); cancelling = true; } catch(e) { error = message(e); } }
   function select() { if(report?.corpora) settings.corpora = structuredClone(report.corpora as Settings['corpora']); }
-  onMount(() => { if(diagnostics) inspect(); else refresh(); return () => {disposed = true; clearTimeout(timer);}; });
+  onMount(() => { if(diagnostics) inspect(); else refresh(true); return () => {disposed = true; clearTimeout(timer);}; });
 </script>
 {#if diagnostics}
   <h3>Diagnostics</h3><p class="hint">Configured paths, last solve identities (SHA-256), timings in milliseconds, effective budgets and cache flags. Last-solve evidence may predate settings changes. Nothing is uploaded.</p>

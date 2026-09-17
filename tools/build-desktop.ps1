@@ -52,7 +52,14 @@ try {
     Copy-Item -LiteralPath $candidate -Destination $staged -Force
     $hash = (Get-FileHash -LiteralPath $candidate).Hash
     if ((Get-FileHash -LiteralPath $staged).Hash -ne $hash) { throw 'Staged executable hash mismatch' }
+    $rollback = $null
     if (Test-Path -LiteralPath $exe) {
+        # Preserve this attempt's predecessor independently of the rotating backup.
+        # An identical rebuild must not roll back to an older distinct release.
+        $rollback = Join-Path $project ('.codex/temp/install-rollback-' + [guid]::NewGuid().ToString('N') + '.exe')
+        $rollbackHash = (Get-FileHash -LiteralPath $exe).Hash
+        Copy-Item -LiteralPath $exe -Destination $rollback
+        if ((Get-FileHash -LiteralPath $rollback).Hash -ne $rollbackHash) { throw 'Pre-install snapshot verification failed' }
         if ((Get-FileHash -LiteralPath $exe).Hash -ne $hash -or -not (Test-Path -LiteralPath $backup)) {
             Copy-Item -LiteralPath $exe -Destination $backup -Force
             if ((Get-FileHash -LiteralPath $exe).Hash -ne (Get-FileHash -LiteralPath $backup).Hash) { throw 'Backup verification failed' }
@@ -76,18 +83,19 @@ try {
     $process = Start-Process -FilePath $exe -WorkingDirectory $install -WindowStyle Normal -PassThru
     Start-Sleep -Seconds 3
     if ($process.HasExited) {
-        if (Test-Path -LiteralPath $backup -PathType Leaf) {
-            $rollbackHash = (Get-FileHash -LiteralPath $backup).Hash
-            Copy-Item -LiteralPath $backup -Destination $staged
+        if ($rollback) {
+            Copy-Item -LiteralPath $rollback -Destination $staged
             if ((Get-FileHash -LiteralPath $staged).Hash -ne $rollbackHash) { throw 'Startup failed and rollback staging verification failed; backup retained.' }
             Move-Item -LiteralPath $staged -Destination $exe -Force
             if ((Get-FileHash -LiteralPath $exe).Hash -ne $rollbackHash) { throw 'Startup failed and rollback verification failed; backup retained.' }
             Start-Process -FilePath $exe -WorkingDirectory $install -WindowStyle Normal
+            Remove-Item -LiteralPath $rollback
             throw 'New app exited during startup; restored the verified previous release and requested its restart.'
         }
         throw 'Installed app exited during startup; this first install has no previous release to restore.'
     }
     Write-Output "Installed and started: $exe (PID $($process.Id), SHA256 $hash)"
+    if ($rollback) { Remove-Item -LiteralPath $rollback }
     if ($KeepBuildCache) {
         Write-Output 'Build cache retained explicitly; installed release rotation is unchanged.'
         return
