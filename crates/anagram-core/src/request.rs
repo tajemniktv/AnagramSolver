@@ -11,6 +11,7 @@ use std::{collections::BTreeSet, io::BufRead, sync::atomic::AtomicBool, time::In
 #[derive(Deserialize, Serialize, schemars::JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct GenerateRequest {
+    #[schemars(range(min = 1, max = 1))]
     pub schema_version: u32,
     pub text: String,
     #[serde(default)]
@@ -19,11 +20,17 @@ pub struct GenerateRequest {
     pub hints: Vec<String>,
     #[serde(default)]
     pub excluded: Vec<String>,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub min_words: usize,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub max_words: usize,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub min_word_length: usize,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub max_word_length: usize,
+    #[schemars(range(min = 0))]
     pub min_zipf: f64,
+    #[schemars(range(max = 9007199254740991_u64))]
     pub candidate_budget: usize,
     pub allow_repeat: bool,
     pub strategy: Strategy,
@@ -86,13 +93,17 @@ fn words(values: &[String]) -> Result<Vec<String>, Error> {
         .collect()
 }
 
-pub fn generate(
-    request: &GenerateRequest,
-    dictionary: impl BufRead,
-    unigrams: Option<&Unigrams>,
-    cancel: &AtomicBool,
-    deadline: Option<Instant>,
-) -> Result<Generated, Error> {
+/// Validated semantics, independent of corpus availability or deployment policy.
+pub struct Validated {
+    normalized_input: String,
+    remaining: Inventory,
+    required: Vec<String>,
+    hints: BTreeSet<String>,
+    excluded: BTreeSet<String>,
+}
+
+/// Validate before opening corpora so identical requests have stable errors.
+pub fn validate(request: &GenerateRequest) -> Result<Validated, Error> {
     if request.schema_version != 1 {
         return Err(Error::new(
             "unsupported_version",
@@ -105,6 +116,15 @@ pub fn generate(
         || request.max_word_length < request.min_word_length
         || !request.min_zipf.is_finite()
         || request.min_zipf < 0.0
+        || [
+            request.min_words,
+            request.max_words,
+            request.min_word_length,
+            request.max_word_length,
+            request.candidate_budget,
+        ]
+        .iter()
+        .any(|&n| n as u128 > 9_007_199_254_740_991)
     {
         return Err(Error::new(
             "invalid_limits",
@@ -147,6 +167,30 @@ pub fn generate(
             "No supplied hint can satisfy the constraints",
         ));
     }
+    Ok(Validated {
+        normalized_input,
+        remaining,
+        required,
+        hints,
+        excluded,
+    })
+}
+
+pub fn generate(
+    request: &GenerateRequest,
+    dictionary: impl BufRead,
+    unigrams: Option<&Unigrams>,
+    cancel: &AtomicBool,
+    deadline: Option<Instant>,
+) -> Result<Generated, Error> {
+    let Validated {
+        normalized_input,
+        remaining,
+        required,
+        hints,
+        excluded,
+    } = validate(request)?;
+    let required_set: BTreeSet<_> = required.iter().cloned().collect();
     if request.min_zipf > 0.0 && unigrams.is_none() {
         return Err(Error::new(
             "missing_frequency_data",

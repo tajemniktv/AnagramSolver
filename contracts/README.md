@@ -124,5 +124,16 @@ not yet emit progress events, enforce those deployment limits or create jobs.
 Scalars in generation/ranking requests remain explicit (no hidden defaults);
 constraint arrays default to empty. The fixtures check Rust deserialization and
 independent Python/JavaScript schema consumers; TypeScript includes negative type
-checks. Runtime validation, numeric wire bounds and provenance population still
-need completion before the phase-1 gate is passed.
+checks. Request integers must be at most 9,007,199,254,740,991 so JavaScript does
+not silently round them; schemas and native semantic validation enforce that
+bound. TypeScript `number` alone is not a runtime validator.
+
+Validation precedence is JSON shape first, generation schema version, generation
+numeric ranges, normalized nonempty input, constraint tokens, required/excluded
+conflicts and required letter availability, then usable hints. Ranked requests
+apply that same validator before ranking limits and zero-residual restrictions.
+Corpus I/O follows semantic validation; a missing corpus must not hide an invalid
+request. An already-expired execution control takes precedence over work errors.
+Frequency-data availability is checked when the generation input is loaded.
+Full deployment policy and populated progress/provenance still need completion
+before the phase-1 gate is passed.

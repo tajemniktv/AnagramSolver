@@ -23,6 +23,7 @@
     },
     "candidate_budget": {
       "format": "uint",
+      "maximum": 9007199254740991,
       "minimum": 0,
       "type": "integer"
     },
@@ -45,26 +46,31 @@
     },
     "max_word_length": {
       "format": "uint",
-      "minimum": 0,
+      "maximum": 9007199254740991,
+      "minimum": 1,
       "type": "integer"
     },
     "max_words": {
       "format": "uint",
-      "minimum": 0,
+      "maximum": 9007199254740991,
+      "minimum": 1,
       "type": "integer"
     },
     "min_word_length": {
       "format": "uint",
-      "minimum": 0,
+      "maximum": 9007199254740991,
+      "minimum": 1,
       "type": "integer"
     },
     "min_words": {
       "format": "uint",
-      "minimum": 0,
+      "maximum": 9007199254740991,
+      "minimum": 1,
       "type": "integer"
     },
     "min_zipf": {
       "format": "double",
+      "minimum": 0,
       "type": "number"
     },
     "required": {
@@ -76,7 +82,8 @@
     },
     "schema_version": {
       "format": "uint32",
-      "minimum": 0,
+      "maximum": 1,
+      "minimum": 1,
       "type": "integer"
     },
     "strategy": {

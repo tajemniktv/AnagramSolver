@@ -17,15 +17,22 @@ use std::{collections::BTreeMap, fs::File, io::BufReader, path::Path};
 #[serde(deny_unknown_fields)]
 pub struct Request {
     pub generation: GenerateRequest,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub deep_per_group: usize,
     pub deep_all: bool,
     pub order_mode: OrderMode,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub beam_width: usize,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub exact_max_words: usize,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub retained_orders: usize,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub phrase_rescore_top: usize,
+    #[schemars(range(min = 0))]
     pub phrase_bonus_max: f64,
     pub positive_bigrams: bool,
+    #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub result_limit_per_group: usize,
 }
 #[derive(Serialize, schemars::JsonSchema)]
@@ -73,11 +80,9 @@ pub fn solve_controlled(
         .map_err(|reason| Error::new(reason, reason))?;
     result
 }
-fn run(
-    request: &Request,
-    paths: Paths<'_>,
-    control: &Control,
-) -> std::result::Result<Result, Error> {
+/// Request semantics only; adapters can reject invalid requests before any I/O.
+pub fn validate(request: &Request) -> std::result::Result<(), Error> {
+    request::validate(&request.generation)?;
     if request.generation.max_words > 10
         || request.deep_per_group == 0
         || request.beam_width == 0
@@ -87,6 +92,16 @@ fn run(
         || request.result_limit_per_group == 0
         || !request.phrase_bonus_max.is_finite()
         || request.phrase_bonus_max < 0.0
+        || [
+            request.deep_per_group,
+            request.beam_width,
+            request.exact_max_words,
+            request.retained_orders,
+            request.phrase_rescore_top,
+            request.result_limit_per_group,
+        ]
+        .iter()
+        .any(|&n| n as u128 > 9_007_199_254_740_991)
     {
         return Err(Error::new(
             "invalid_ranking_limits",
@@ -111,6 +126,15 @@ fn run(
             "Required words consume the entire target; the reference ranked solver does not support zero-residual answers",
         ));
     }
+    Ok(())
+}
+
+fn run(
+    request: &Request,
+    paths: Paths<'_>,
+    control: &Control,
+) -> std::result::Result<Result, Error> {
+    validate(request)?;
     let unigrams = Unigrams::load(control.reader(open(paths.unigrams)?)).map_err(corpus)?;
     let generated = request::generate(
         &request.generation,

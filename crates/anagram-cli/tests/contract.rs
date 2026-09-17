@@ -76,3 +76,35 @@ fn explicit_errors_and_required_multiplicity() {
     assert_eq!(output["bags"], json!([["ate", "ate"]]));
     assert_eq!(output["stop"], "exhausted");
 }
+
+#[test]
+fn validation_precedes_corpus_io_and_rejects_unsafe_wire_integers() {
+    for (field, value, code) in [
+        ("schema_version", json!(2), "unsupported_version"),
+        (
+            "candidate_budget",
+            json!(9_007_199_254_740_992_u64),
+            "invalid_limits",
+        ),
+        ("text", json!("!!!"), "empty_input"),
+    ] {
+        let mut input = request();
+        input[field] = value;
+        let mut child = Command::new(env!("CARGO_BIN_EXE_anagram-cli"))
+            .args(["generate", "nonexistent-corpus-for-validation-test.txt"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.to_string().as_bytes())
+            .unwrap();
+        let output = child.wait_with_output().unwrap();
+        assert!(!output.status.success());
+        let result: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(result["error"]["code"], code);
+    }
+}

@@ -9,7 +9,27 @@ Execution priority updated by the user: **finish phases 0 and 1 fully before
 further phase-2/3 feature expansion**. Existing later-phase implementation stays
 in place, but is not a substitute for the missing earlier gates.
 
-### Implementation evidence
+### Current evidence and remaining gates
+
+- Phase 0: the pinned manifest is durable in `tests/reference/manifest.json`.
+  `tools/reference_fixtures.py --check` verifies source/data identity and frozen
+  normalization, generation, validation, synthetic phrase and model outputs.
+  Corpus formats and distribution decisions are in `tests/reference/CORPORA.md`.
+- The full default Python performance attempt exceeded its 180-second timeout
+  on the second cold sample. `tests/reference/stress-attempt.json` preserves this
+  failure explicitly; `user-performance.json` contains only completed runs.
+  It is not a passing full-suite report. The 24-run bounded CLI baseline,
+  12 separate stage measurements, 258 Python tests and 52-case ordering gate
+  are captured in `tests/reference/`; see `ACCEPTANCE.md` for remaining coverage.
+  No native performance claim is made.
+- Phase 1: structural schemas and TypeScript exist, as do generation/ranked CLI
+  operations and job-state definitions. Runtime provenance/progress and enforced
+  deployment policy are still required. The unchecked items below remain gates.
+
+### Historical implementation evidence (chronological)
+
+The notes below describe individual milestones, not the current remaining-work
+list; later entries supersede statements that a component is not yet ported.
 
 - Python reference commit: `c12e3d5519d653fd65c7ffbbb2a1597941fedd2a`.
   All 258 tests (including CLI integration) and the 52-case ordering gate passed
@@ -176,15 +196,19 @@ sub-items; its remaining scope is still required. No phase gate is passed yet.
 - [ ] Capture corpus versions/hashes, ranking configuration, cache state, machine
       details, candidate counts and reference outputs in reproducible fixtures.
   - [x] Capture local dictionary/frequency/WordNet hashes with
-        `tools/capture_reference.py` (21 source and 73 corpus files).
+        `tools/capture_reference.py` (29 source and 73 corpus files).
   - [ ] Complete durable pinned fixtures, optional input identities and machine/
         cache/budget metadata; the temporary manifest alone is insufficient.
     - [x] Store `tests/reference/manifest.json` pinned to the Python reference,
           covering 29 oracle/harness files and 73 corpus files. Capture now rejects
           oracle source drift instead of labeling the current HEAD as the oracle.
-    - [ ] Finish behavior fixtures, licensing and measured cold/warm reports.
-- [ ] Inventory dictionary, frequency, WordNet, phrase SQLite and optional feature
+    - [x] Capture deterministic behavior fixtures and corpus licensing inventory.
+    - [x] Capture measured cold/warm reports, separate stage timings and a truthful
+          acceptance record, including the failed stress attempt.
+- [x] Inventory dictionary, frequency, WordNet, phrase SQLite and optional feature
       ranker inputs; document formats, licenses and redistribution requirements.
+      See `tests/reference/CORPORA.md`; unresolved data permissions prohibit
+      bundling, not local comparison against the pinned, provisioned inputs.
 - [ ] Extend the reference harness to cover letter normalization, punctuation and
       Unicode behavior, repeated required words, alternative hints, exclusions,
       impossible inputs, empty results, exact cap exhaustion and deterministic ties.
@@ -201,8 +225,10 @@ sub-items; its remaining scope is still required. No phase gate is passed yet.
           match, including historical export quantization.
     - [ ] Expand to the full quality suites, optional phrase/model fixtures and
           performance/cancellation/cache acceptance cases.
-- [ ] Benchmark generation and ranking separately, then actual end-to-end cold and
+- [x] Benchmark generation and ranking separately, then actual end-to-end cold and
       warm CLI runs using `benchmark_user_runs.py` and the existing quality gates.
+      See `tests/reference/ACCEPTANCE.md`: bounded runs and quality gates pass;
+      the default stress attempt times out and is not a full performance-suite pass.
 
 Gate: a pinned, repeatable oracle and data manifest, not snapshots from a moving
 worktree. Preserve the current default prefix strategy: earlier local 20k-cap
@@ -227,6 +253,9 @@ small sample. Distinguish empty puzzle caches from cold corpus/OS caches.
       generation strategy, candidate budget, deep-ranking budget and result limit.
 - [ ] Specify validation precedence, defaults, normalization and stable error codes.
       Reject non-finite values and contradictory constraints; never relax silently.
+  - [x] Validate generation semantics before corpus I/O for both native operations;
+        reject request budgets above JavaScript's exact-integer range. Ranked
+        validation uses the same generation validator before ranking constraints.
 - [ ] Define job states: queued, running, succeeded, cancelled, timed_out, failed.
       Include stage, counts, effective budgets, engine/data versions and cache flags.
   - [x] Define transport-neutral job/progress data and terminal-state transition

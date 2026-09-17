@@ -10,6 +10,30 @@
   },
   { "schema": "GenerateRequest", "valid": false, "value": {} },
   {
+    "schema": "GenerateRequest", "valid": false,
+    "value": {
+      "schema_version": 2, "text": "ate", "min_words": 1, "max_words": 3,
+      "min_word_length": 1, "max_word_length": 20, "min_zipf": 0,
+      "candidate_budget": 20, "allow_repeat": true, "strategy": "prefix", "hint_mode": "any"
+    }
+  },
+  {
+    "schema": "GenerateRequest", "valid": false,
+    "value": {
+      "schema_version": 1, "text": "ate", "min_words": 1, "max_words": 3,
+      "min_word_length": 1, "max_word_length": 20, "min_zipf": 0,
+      "candidate_budget": 9007199254740992, "allow_repeat": true, "strategy": "prefix", "hint_mode": "any"
+    }
+  },
+  {
+    "schema": "GenerateRequest", "valid": false,
+    "value": {
+      "schema_version": 1, "text": "ate", "min_words": 0, "max_words": 3,
+      "min_word_length": 1, "max_word_length": 20, "min_zipf": 0,
+      "candidate_budget": 20, "allow_repeat": true, "strategy": "prefix", "hint_mode": "any"
+    }
+  },
+  {
     "schema": "Generated", "valid": true,
     "value": {
       "schema_version": 1, "kind": "generation_only", "engine_version": "0.1.0",

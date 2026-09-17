@@ -80,6 +80,7 @@ fn run_inner(args: &[std::ffi::OsString], control: &Control) -> Result<serde_jso
     }
     let request: GenerateRequest =
         serde_json::from_str(&input).map_err(|e| Error::new("invalid_json", e.to_string()))?;
+    anagram_core::request::validate(&request)?;
     let dictionary = File::open(&args[1]).map_err(|e| Error::new("corpus_error", e.to_string()))?;
     let unigrams = args
         .get(2)

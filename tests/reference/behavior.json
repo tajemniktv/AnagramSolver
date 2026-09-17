@@ -1,0 +1,3005 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "normalization": [
+    {
+      "input": "",
+      "letters": ""
+    },
+    {
+      "input": "!!!",
+      "letters": ""
+    },
+    {
+      "input": "A t\u00e9\u2014A",
+      "letters": "atea"
+    },
+    {
+      "input": "Stra\u00dfe",
+      "letters": "strae"
+    },
+    {
+      "input": "\u00c6 \u0152 \u00f8 \u0141",
+      "letters": ""
+    },
+    {
+      "input": "\ufb03 \uff21\uff22\uff23",
+      "letters": "ffiabc"
+    },
+    {
+      "input": "e\u0301",
+      "letters": "e"
+    },
+    {
+      "input": "\u732b\ud83d\ude42",
+      "letters": ""
+    }
+  ],
+  "generation": [
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "eat"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateateate",
+      "required": [
+        "eat",
+        "eat"
+      ],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "eat",
+          "eat",
+          "ate"
+        ],
+        [
+          "eat",
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "eat"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "eat"
+        ],
+        [
+          "ate",
+          "tea"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "eat"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "eat"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "eat"
+        ],
+        [
+          "ate",
+          "tea"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "eat"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ateate",
+      "required": [],
+      "hints": [
+        "ate",
+        "eat"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate",
+          "ate"
+        ],
+        [
+          "ate",
+          "tea"
+        ],
+        [
+          "eat",
+          "eat"
+        ],
+        [
+          "eat",
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ]
+      ],
+      "truncated": true
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [],
+      "excluded": [
+        "eat"
+      ],
+      "vocabulary": [
+        "ate",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [
+        [
+          "ate"
+        ],
+        [
+          "tea"
+        ]
+      ],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "zzz",
+      "required": [],
+      "hints": [],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "prefix",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 0,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 1,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 3,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "any",
+      "bags": [],
+      "truncated": false
+    },
+    {
+      "input": "ate",
+      "required": [],
+      "hints": [
+        "zzz"
+      ],
+      "excluded": [],
+      "vocabulary": [
+        "ate",
+        "eat",
+        "tea"
+      ],
+      "min_residual_words": 1,
+      "max_residual_words": 3,
+      "repeat": true,
+      "strategy": "diverse",
+      "cap": 10,
+      "hint_mode": "exactly-one",
+      "bags": [],
+      "truncated": false
+    }
+  ],
+  "frontend_validation": [
+    {
+      "argv": [
+        "!!!"
+      ],
+      "output": {
+        "error": "Target contains no A-Z letters."
+      }
+    },
+    {
+      "argv": [
+        "ate",
+        "--exhaustive",
+        "--max-results",
+        "1"
+      ],
+      "output": {
+        "error": "--max-results must be positive and cannot be combined with --exhaustive"
+      }
+    },
+    {
+      "argv": [
+        "ate",
+        "--require",
+        "eat"
+      ],
+      "output": {
+        "error": "Required words consume the entire target; zero-residual answers are not supported by the ranked solver."
+      }
+    },
+    {
+      "argv": [
+        "ateate",
+        "--require",
+        "eat,eat"
+      ],
+      "output": {
+        "error": "Required words consume the entire target; zero-residual answers are not supported by the ranked solver."
+      }
+    },
+    {
+      "argv": [
+        "ateate",
+        "--require",
+        "eat",
+        "--words",
+        "1"
+      ],
+      "output": {
+        "error": "Required words leave target letters unused, but the requested total word count leaves no residual word slots."
+      }
+    },
+    {
+      "argv": [
+        "ate",
+        "--min-words",
+        "3",
+        "--max-words",
+        "2"
+      ],
+      "output": {
+        "error": "Invalid --min-words/--max-words range"
+      }
+    },
+    {
+      "argv": [
+        "ate",
+        "--min-zipf",
+        "nan"
+      ],
+      "output": {
+        "error": "--min-zipf must be finite and >= 0"
+      }
+    },
+    {
+      "argv": [
+        "ate",
+        "--exhaustive"
+      ],
+      "output": {
+        "mode": "exhaustive",
+        "cap": null,
+        "residual_bounds": [
+          2,
+          6
+        ]
+      }
+    },
+    {
+      "argv": [
+        "ate",
+        "--quick"
+      ],
+      "output": {
+        "mode": "quick",
+        "cap": 20000,
+        "residual_bounds": [
+          2,
+          6
+        ]
+      }
+    },
+    {
+      "argv": [
+        "ate",
+        "--max-results",
+        "3"
+      ],
+      "output": {
+        "mode": "balanced",
+        "cap": 3,
+        "residual_bounds": [
+          2,
+          6
+        ]
+      }
+    }
+  ],
+  "optional_phrase": {
+    "origin": "project-authored synthetic fixture",
+    "rows": [
+      [
+        "the dog",
+        2,
+        100
+      ],
+      [
+        "dog runs",
+        2,
+        50
+      ],
+      [
+        "the dog runs",
+        3,
+        20
+      ]
+    ],
+    "outputs": [
+      {
+        "words": [
+          "the",
+          "dog",
+          "runs"
+        ],
+        "score": [
+          0.7940442805050995,
+          {
+            "whole_count": 20.0,
+            "longer": 0.6689997365260528,
+            "bigram_coverage": 1.0
+          }
+        ]
+      },
+      {
+        "words": [
+          "runs",
+          "dog",
+          "the"
+        ],
+        "score": [
+          0.0,
+          {
+            "whole_count": 0.0,
+            "longer": 0.0,
+            "bigram_coverage": 0.0
+          }
+        ]
+      },
+      {
+        "words": [
+          "missing",
+          "evidence"
+        ],
+        "score": [
+          0.0,
+          {
+            "whole_count": 0.0,
+            "longer": 0.0,
+            "bigram_coverage": 0.0
+          }
+        ]
+      }
+    ]
+  },
+  "optional_model": {
+    "origin": "project-authored synthetic fixture",
+    "model": {
+      "schema": "anagram-explicit-ranker-1",
+      "features": [
+        "grammar_norm",
+        "structure_norm",
+        "valency_norm",
+        "syntax_coverage",
+        "objective",
+        "phrase_score",
+        "phrase_exact",
+        "phrase_longer",
+        "phrase_bigram_coverage",
+        "cohesion",
+        "cohesion_coverage",
+        "cohesion_longest",
+        "cohesion_compactness",
+        "cohesion_frequency",
+        "cohesion_splice_clean",
+        "grammar_x_phrase",
+        "structure_x_cohesion",
+        "word_count_scaled"
+      ],
+      "weights": [
+        0.25,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "items": [
+      {
+        "key": "b",
+        "features": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "positive": false,
+        "baseline_score": 0.2
+      },
+      {
+        "key": "a",
+        "features": [
+          1.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "positive": false,
+        "baseline_score": 0.2
+      },
+      {
+        "key": "c",
+        "features": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "positive": false,
+        "baseline_score": 0.9
+      }
+    ],
+    "scores": [
+      0.25,
+      0.25,
+      0.0
+    ],
+    "ranked": [
+      "a",
+      "b",
+      "c"
+    ],
+    "disabled": [
+      "c",
+      "a",
+      "b"
+    ]
+  }
+}
