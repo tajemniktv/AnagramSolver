@@ -13,6 +13,8 @@ Python standard library only.
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import math
 import re
 import sys
@@ -20,10 +22,11 @@ import time
 import unicodedata
 import urllib.request
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Generator, Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from anagram_cache_io import download_atomic
 from anagram_paths import DICTIONARY_DIR, NGRAM_DIR
 
 DEFAULT_DICT_URL = "https://phillipmfeldman.org/English/large.txt"
@@ -137,12 +140,7 @@ def download_file(url: str, path: Path, refresh: bool = False) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     print(f"Downloading {url} -> {path}", file=sys.stderr)
     req = urllib.request.Request(url, headers={"User-Agent": "multi-anagram-generator/1.0"})
-    with urllib.request.urlopen(req, timeout=60) as response, path.open("wb") as f:
-        while True:
-            chunk = response.read(1024 * 1024)
-            if not chunk:
-                break
-            f.write(chunk)
+    download_atomic(req, path, timeout=60)
     return path
 
 
@@ -295,6 +293,7 @@ class SearchStats:
 
     exact_examined: int = 0
     accepted: int = 0
+    truncated: bool = False
 
 
 def load_words(
@@ -388,7 +387,7 @@ def solve(
     hint_mode: str = "any",
     initial_clue_words: set[str] | None = None,
     stats: SearchStats | None = None,
-) -> Iterator[tuple[str, ...]]:
+) -> Generator[tuple[str, ...], None, None]:
     """Yield exact word bags, optionally admitting only clue-valid bags.
 
     The historical uncued search order is preserved. When clues are supplied,
@@ -569,6 +568,70 @@ def solve(
         )
         if max_results > 0 and results_found >= max_results:
             break
+
+
+def search_solutions(
+    remaining: tuple[int, ...], candidates: list[Candidate], min_words: int,
+    max_words: int, max_results: int, allow_repeat: bool, *,
+    clue_words: set[str] | None = None, hint_mode: str = "any",
+    initial_clue_words: set[str] | None = None, stats: SearchStats | None = None,
+    strategy: str = "prefix",
+) -> Iterator[tuple[str, ...]]:
+    """Budget unique bags across strata; probe one extra bag to prove truncation.
+
+    Exhaustive mode retains historical enumeration. Each diverse stream has its
+    own DFS memoization; duplicates across clue streams never consume the cap.
+    """
+    if strategy not in {"prefix", "diverse"}:
+        raise ValueError("Unknown search strategy")
+    stats = stats if stats is not None else SearchStats()
+    if not candidates:
+        return
+    letter_count = sum(remaining)
+    min_words = max(min_words, (letter_count + max(c.length for c in candidates) - 1) // max(c.length for c in candidates))
+    max_words = min(max_words, letter_count // min(c.length for c in candidates))
+    stream_stats: list[SearchStats] = []
+
+    def make_stream(low: int, high: int, clues: set[str] | None) -> Generator[tuple[str, ...], None, None]:
+        child_stats = SearchStats()
+        stream_stats.append(child_stats)
+        return solve(remaining, candidates, low, high, 0, allow_repeat,
+                     clue_words=clues, hint_mode=hint_mode,
+                     initial_clue_words=initial_clue_words, stats=child_stats)
+
+    deduplicate = False
+    if strategy == "prefix" or max_results == 0:
+        streams = [make_stream(min_words, max_words, clue_words)]
+    else:
+        groups = [clue_words]
+        if clue_words and not initial_clue_words and hint_mode == "any":
+            groups = [{clue} for clue in sorted(clue_words)]
+        deduplicate = len(groups) > 1
+        streams = [make_stream(count, count, group)
+                   for count in range(min_words, max_words + 1) for group in groups]
+    seen: set[tuple[str, ...]] = set()
+    try:
+        while streams:
+            active = []
+            for stream in streams:
+                for bag in stream:
+                    if not deduplicate or bag not in seen:
+                        break
+                else:
+                    continue
+                if max_results and stats.accepted >= max_results:
+                    stats.truncated = True
+                    return
+                if deduplicate:
+                    seen.add(bag)
+                stats.accepted += 1
+                yield bag
+                active.append(stream)
+            streams = active
+    finally:
+        stats.exact_examined = sum(child.exact_examined for child in stream_stats)
+        for stream in streams:
+            stream.close()
 
 
 def morph_root(word: str, vocabulary: set[str], unigrams: UnigramModel | None) -> str:
@@ -970,13 +1033,15 @@ def format_deep_record(rank: int, r: Record, show_components: bool) -> str:
     return f"{rank:6d}. FINAL={r.final_score:6.2f}  {phrase}"
 
 
-def write_full_export(path: Path, records: Sequence[Record], show_components: bool) -> None:
+def write_full_export(path: Path, records: Sequence[Record], show_components: bool, *, search: dict | None = None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     by_wc: dict[int, list[Record]] = defaultdict(list)
     for r in records:
         by_wc[r.word_count].append(r)
 
     with path.open("w", encoding="utf-8", newline="\n") as f:
+        if search is not None:
+            f.write("# SEARCH " + json.dumps(search, sort_keys=True) + "\n")
         for wc in sorted(by_wc):
             bucket = sorted(
                 by_wc[wc],
@@ -987,6 +1052,12 @@ def write_full_export(path: Path, records: Sequence[Record], show_components: bo
             for rank, r in enumerate(bucket, 1):
                 f.write(format_pre_record(rank, r, show_components) + "\n")
             f.write("\n")
+
+    if search is not None:
+        with path.open("rb") as handle:
+            checksum = hashlib.file_digest(handle, "sha256").hexdigest()
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write("# SHA256 " + checksum + "\n")
 
 
 def write_deep_export(path: Path, records: Sequence[Record], show_components: bool) -> None:
@@ -1142,6 +1213,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Additional 1-2 letter words allowed by the safe short-word policy",
     )
     p.add_argument("--no-repeat", action="store_true")
+    p.add_argument("--search-strategy", choices=("prefix", "diverse"), default="prefix",
+                   help="Bounded search: historical prefix or round-robin word-count/clue coverage")
 
     p.add_argument(
         "--analyze", action="store_true",
@@ -1340,6 +1413,13 @@ def main() -> int:
 
     if not candidates:
         print("No candidate dictionary words fit the remaining letters.", file=sys.stderr)
+        if args.export:
+            write_full_export(Path(args.export).expanduser(), [], args.show_components,
+                search={"generated": 0, "cap": args.max_results or None,
+                        "truncated": False, "strategy": args.search_strategy,
+                        "seconds": 0.0, "vocabulary_size": 0,
+                        "status": "no_matches_under_constraints"})
+            return 0
         return 1
 
     vocabulary = {c.word for c in candidates}
@@ -1410,7 +1490,7 @@ def main() -> int:
     search_stats = SearchStats()
     search_started = time.perf_counter()
     try:
-        for solution in solve(
+        for solution in search_solutions(
             remaining,
             candidates,
             args.min_words,
@@ -1421,6 +1501,7 @@ def main() -> int:
             hint_mode=args.hint_mode,
             initial_clue_words=contains_any.intersection(required_words),
             stats=search_stats,
+            strategy=args.search_strategy,
         ):
             all_words = (*required_words, *solution)
             solutions.append(solution)
@@ -1440,7 +1521,17 @@ def main() -> int:
         file=sys.stderr,
     )
 
+    search_summary = {
+        "generated": len(solutions), "cap": args.max_results or None,
+        "truncated": search_stats.truncated, "strategy": args.search_strategy,
+        "seconds": search_seconds,
+        "vocabulary_size": len(candidates),
+        "status": "ok" if solutions else "no_matches_under_constraints",
+    }
     if not solutions:
+        if args.export:
+            write_full_export(Path(args.export).expanduser(), [], args.show_components, search=search_summary)
+            return 0
         return 1
 
     records = build_records(
@@ -1511,9 +1602,9 @@ def main() -> int:
 
     if args.export:
         export_path = Path(args.export).expanduser()
-        write_full_export(export_path, records, args.show_components)
+        write_full_export(export_path, records, args.show_components, search=search_summary)
         print(
-            f"Full exhaustive PRE-ranked export: {export_path} "
+            f"Candidate PRE-ranked export: {export_path} "
             f"({len(records):,} records)",
             file=sys.stderr,
         )
@@ -1535,7 +1626,7 @@ def main() -> int:
             f"Exhaustive search completed: {len(records):,} accepted result set(s).",
             file=sys.stderr,
         )
-    elif accepted >= args.max_results:
+    elif search_stats.truncated:
         print(
             f"Search stopped at --max-results {args.max_results:,} accepted result set(s).",
             file=sys.stderr,

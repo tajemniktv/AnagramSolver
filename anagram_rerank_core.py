@@ -181,8 +181,9 @@ def safe_extract_tar(archive: Path, destination: Path) -> None:
 def download(url: str, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     req = urllib.request.Request(url, headers={"User-Agent": "anagram-solver/1.0"})
-    with urllib.request.urlopen(req, timeout=90) as response, path.open("wb") as f:
-        shutil.copyfileobj(response, f)
+    from anagram_cache_io import download_atomic
+
+    download_atomic(req, path, timeout=90)
 
 
 def find_wordnet_dict(root: Path) -> Path | None:
@@ -1347,6 +1348,18 @@ def _np_span_ending_at(
             i -= 1
             continue
 
+        # WordNet often records regular participles only as verbs, not as
+        # adjectives. An immediately preceding determiner disambiguates their
+        # attributive use ("the repaired engine") from a finite predicate
+        # ("the mechanic repaired engines").
+        if (c is None and f.verb_past and words[i].endswith(("ed", "en"))
+                and i > 0 and _det_class(words[i - 1]) is not None):
+            start = i
+            coherence += 0.06
+            modifiers += 1
+            i -= 1
+            continue
+
         # Relatively unambiguous noun modifier, e.g. "school bus".
         if c is None and f.noun and not f.verb and not f.adj:
             start = i
@@ -1422,7 +1435,17 @@ def _np_span_starting_at(
     adjective_count = 0
     while i < len(words):
         f = lex.features(words[i])
-        if f.adj:
+        following_is_nominal = i + 1 < len(words) and (
+            lex.features(words[i + 1]).noun or lex.features(words[i + 1]).adj
+        )
+        # Do not consume a noun/adjective-ambiguous final head as a modifier:
+        # "the young", "a professional", and "the light faded" need a head.
+        if f.adj and (not f.noun or following_is_nominal):
+            adjective_count += 1
+            i += 1
+            continue
+        if (i == start + 1 and det_word is not None and f.verb_past
+                and words[i].endswith(("ed", "en")) and following_is_nominal):
             adjective_count += 1
             i += 1
             continue

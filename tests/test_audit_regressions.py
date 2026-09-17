@@ -46,7 +46,8 @@ class AuditRegressionTests(unittest.TestCase):
                 root = Path(tmp)
                 run = root / "run"
                 run.mkdir()
-                (run / "candidates.txt").write_text("candidates", encoding="utf-8")
+                generator.write_full_export(run / "candidates.txt", [], True,
+                    search={"generated": 1, "truncated": False})
                 shared = run / "reranked.txt"
                 shared.write_text("previous", encoding="utf-8")
                 exports = []

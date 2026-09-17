@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: "3.14"
       - name: Install Ruff and Pyright
-        run: python -m pip install --disable-pip-version-check ruff==0.16.3 pyright==1.1.411
+        run: python -m pip install --disable-pip-version-check ruff==0.16.3 pyright==1.1.411 psutil==7.2.2
       - name: Enforce reported Ruff diagnostics
         run: >-
           ruff check
@@ -33,6 +33,7 @@ jobs:
           anagram_rerank.py anagram_rerank_core.py anagram_rerank_topk_impl.py anagram_solver.py anagram_performance.py anagram_corpus_cohesion.py
           anagram_feature_ranker.py anagram_order_diversity.py anagram_order_refinement.py train_feature_ranker.py build_wikimedia_phrase_index.py
           ci_phrase_matrix.py ci_ordering_gate.py ci_performance_probe.py ci_order_refinement.py ci_user_runs.py
+          anagram_cache_io.py anagram_run_cache.py benchmark_user_runs.py anagram_clause_validity.py
       - name: Enforce Pylance/Pyright diagnostics
         run: >-
           pyright anagram_paths.py anagram_suite.py anagram_generate.py anagram_user_generate.py anagram_user_lexicon.py
@@ -40,12 +41,14 @@ jobs:
           anagram_performance.py anagram_corpus_cohesion.py anagram_feature_ranker.py anagram_order_diversity.py
           anagram_order_refinement.py train_feature_ranker.py ci_phrase_matrix.py ci_ordering_gate.py ci_performance_probe.py
           ci_order_refinement.py ci_user_runs.py
+          anagram_cache_io.py anagram_run_cache.py benchmark_user_runs.py anagram_clause_validity.py
 
   unit-tests:
-    name: unit tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: unit tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: ["3.13", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -59,7 +62,13 @@ jobs:
 
   normal-user-cli:
     name: normal user CLI smoke
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -94,6 +103,10 @@ jobs:
         run: rm -rf .anagram_data/prepared_cache .anagram_data/solver_runs
       - name: Run registry-selected user invocations
         run: python ci_user_runs.py
+      - name: Exercise concurrent cold runs and cache recovery
+        env:
+          ANAGRAM_INTEGRATION: "1"
+        run: python -m unittest discover -s tests -p test_cli_integration.py -v
 
   ordering-regression:
     name: ordering regression

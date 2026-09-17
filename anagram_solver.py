@@ -18,10 +18,12 @@ import sys
 import unicodedata
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from anagram_cache_io import publish
 from anagram_paths import SOLVER_RUNS_DIR
+from anagram_run_cache import load_results, ranking_key, save_results
 from anagram_user_lexicon import ensure_user_lexicon
 
 HERE = Path(__file__).resolve().parent
@@ -33,7 +35,7 @@ DEFAULT_RUN_ROOT = SOLVER_RUNS_DIR
 BALANCED_MAX_RESULTS = 100_000
 QUICK_MAX_RESULTS = 20_000
 DEFAULT_ORDER_CANDIDATES = 56
-GENERATION_CACHE_SCHEMA = 5
+GENERATION_CACHE_SCHEMA = 6
 
 _RESULT_RE = re.compile(
     r"^\s*(?P<rank>\d+)\.\s+FINAL=\s*(?P<score>[\d.]+).*?"
@@ -101,6 +103,8 @@ def _generation_mode(args: argparse.Namespace) -> str:
 def _generation_cap(args: argparse.Namespace) -> int | None:
     if args.exhaustive:
         return None
+    if args.max_results is not None:
+        return args.max_results
     return QUICK_MAX_RESULTS if args.quick else BALANCED_MAX_RESULTS
 
 
@@ -125,6 +129,7 @@ def _run_key(
         "require": _normalized_required_words(args.require),
         "generation_mode": _generation_mode(args),
         "generation_cap": _generation_cap(args),
+        "search_strategy": args.search_strategy,
         "generator": _source_hash(GENERATOR),
         "generator_core": _source_hash(GENERATOR_CORE),
         "user_lexicon": _source_hash(USER_LEXICON),
@@ -180,6 +185,7 @@ def build_generator_command(args: argparse.Namespace, output: Path) -> list[str]
         "--min-words", str(max(1, residual_min_words)),
         "--max-words", str(max(1, residual_max_words)),
         "--min-zipf", str(args.min_zipf),
+        "--search-strategy", args.search_strategy,
         "--short-word-policy", "common",
         # The reranker consumes the generator's component-rich PRE export.
         # Without this flag the generator writes only PRE score + phrase, which
@@ -220,6 +226,7 @@ def build_reranker_command(
         str(candidates),
         "--backend", "auto",
         "--workers", str(args.workers),
+        "--prepared-cache-dir", str(candidates.parent / "prepared"),
         "--deep-per-group", "2000" if args.quick else "5000",
         "--beam-width", "128",
         "--phrase-rescore-top", "300",
@@ -229,6 +236,8 @@ def build_reranker_command(
     ]
     if args.phrase_db is not None:
         cmd += ["--phrase-db", str(args.phrase_db.expanduser().resolve())]
+    if args.rebuild:
+        cmd.append("--rebuild-prepared-cache")
     return cmd
 
 
@@ -342,7 +351,11 @@ def build_parser() -> argparse.ArgumentParser:
             "final deep reranking remains bounded and displayed results are not exhaustive"
         ),
     )
-    parser.add_argument("--rebuild", action="store_true", help="Regenerate the cached candidate export")
+    parser.add_argument("--rebuild", action="store_true", help="Regenerate candidates, prepared rows and final rankings")
+    parser.add_argument("--max-results", type=int, metavar="N",
+                        help="Override the balanced/quick generation budget with a positive bag count")
+    parser.add_argument("--search-strategy", choices=("prefix", "diverse"), default="prefix",
+                        help="Historical prefix, or broader word-count/clue coverage (can increase ranking time)")
     parser.add_argument("--verbose", action="store_true", help="Show generator/reranker diagnostic output live")
     parser.add_argument("--json", action="store_true", help="Emit final results as JSON")
     parser.add_argument(
@@ -367,6 +380,8 @@ def _validate_args(args: argparse.Namespace) -> None:
         raise SystemExit("Invalid --min-words/--max-words range")
     if args.min_word_len < 1:
         raise SystemExit("--min-word-len must be >= 1")
+    if args.max_results is not None and (args.max_results < 1 or args.exhaustive):
+        raise SystemExit("--max-results must be positive and cannot be combined with --exhaustive")
     if not math.isfinite(args.min_zipf) or args.min_zipf < 0:
         raise SystemExit("--min-zipf must be finite and >= 0")
     if args.top < 1:
@@ -385,12 +400,13 @@ def _validate_args(args: argparse.Namespace) -> None:
     _residual_word_limits(args)
 
 
-def _print_results(args: argparse.Namespace, results: Sequence[Result], run_dir: Path) -> None:
+def _print_results(args: argparse.Namespace, results: Sequence[Result], run_dir: Path, summary: dict | None = None) -> None:
     if args.json:
         print(
             json.dumps(
                 {
                     "target": args.text,
+                    "search": summary or {},
                     "results": [
                         {
                             "word_count": result.word_count,
@@ -407,8 +423,21 @@ def _print_results(args: argparse.Namespace, results: Sequence[Result], run_dir:
         return
 
     print(f"\nAnagramSolver results for: {args.text}")
+    if summary:
+        print(f"  Generated {summary.get('generated', 'unknown')} bags; deep-analyzed {summary.get('deep_analyzed', 0)}.")
+        if summary.get("truncated"):
+            print("  Generation cap reached; more matches exist. Add clues or use --exhaustive.")
+        if summary.get("deep_analyzed", 0) < summary.get("generated", 0):
+            print("  Only shortlisted bags received full grammar analysis.")
     if not results:
-        print("  No deep-ranked results were produced.")
+        if summary and summary.get("status") == "no_matches_under_constraints":
+            if summary.get("vocabulary_size") == 0:
+                print("  No usable words remain after dictionary, frequency and exclusion filters.")
+            else:
+                print("  No exact word bag matches the target under the current constraints.")
+            print("  Try fewer exclusions, a lower --min-zipf, or different word-count bounds.")
+        else:
+            print("  No deep-ranked results were produced.")
         return
 
     last_count: int | None = None
@@ -433,9 +462,33 @@ def _generate_candidates(args: argparse.Namespace, candidates: Path) -> None:
             raise SystemExit(
                 f"Generator completed without writing its candidate export: {temporary}"
             )
-        temporary.replace(candidates)
+        publish(temporary, candidates)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def _search_summary(candidates: Path) -> dict | None:
+    """Reject damaged candidate exports instead of ranking partial bags."""
+    try:
+        with candidates.open("rb") as handle:
+            header = handle.readline()
+            if not header.startswith(b"# SEARCH "):
+                return None
+            summary = json.loads(header[len(b"# SEARCH "):])
+            if not isinstance(summary, dict) or type(summary.get("generated")) is not int:
+                return None
+            if summary["generated"] < 0 or type(summary.get("truncated")) is not bool:
+                return None
+            digest = hashlib.sha256(header)
+            for line in handle:
+                if line.startswith(b"# SHA256 "):
+                    if line.strip().split()[-1].decode("ascii") == digest.hexdigest() and not handle.read(1):
+                        return summary
+                    return None
+                digest.update(line)
+    except (OSError, UnicodeError, ValueError, TypeError):
+        return None
+    return None
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -454,7 +507,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     candidates = run_dir / "candidates.txt"
     reranked = run_dir / "reranked.txt"
 
-    if args.rebuild or not candidates.is_file():
+    summary = None if args.rebuild else _search_summary(candidates)
+    generation_cached = summary is not None
+    if summary is None:
         if not args.json:
             mode = _generation_mode(args)
             cap = _generation_cap(args)
@@ -462,13 +517,36 @@ def main(argv: Sequence[str] | None = None) -> int:
                 detail = "unlimited exact enumeration"
             else:
                 detail = f"up to {cap:,} candidate bags"
-            print(f"Generating exact candidate word bags ({mode}; {detail}) ...")
+            print(f"Generating exact candidate word bags ({mode}; {detail}) ...", flush=True)
         _generate_candidates(args, candidates)
+        summary = _search_summary(candidates)
+        if summary is None:
+            raise SystemExit("Generator produced an incomplete candidate export; retry with --rebuild.")
     elif not args.json:
         print("Using cached candidate word bags ...")
 
+    summary["generation_cached"] = generation_cached
+    if summary.get("generated") == 0:
+        summary["deep_analyzed"] = 0
+        summary["ranking_cached"] = False
+        summary["ranking_skipped"] = True
+        _print_results(args, [], run_dir, summary)
+        return 0
+
+    # Placeholder paths exclude random export names from ranking identity.
+    options = [option for option in build_reranker_command(args, Path("candidates"), Path("output"))[2:]
+               if option != "--rebuild-prepared-cache"]
+    cache_path = run_dir / ("ranking-" + ranking_key(candidates, options, args.phrase_db) + ".json")
+    cached = None if args.rebuild else load_results(cache_path)
+    if cached is not None:
+        if not args.json:
+            print("Using cached ranked phrases ...")
+        results = [Result(**row) for row in cached["results"] if row["rank"] <= args.top]
+        _print_results(args, results, run_dir, {**cached["summary"], **summary, "ranking_cached": True})
+        return 0
+
     if not args.json:
-        print("Ranking candidate phrases ...")
+        print("Ranking candidate phrases ...", flush=True)
     # Ranking options are deliberately absent from the candidate cache key.
     # Read our private export before publishing so simultaneous runs cannot
     # return each other's results (or consume a partially written export).
@@ -477,11 +555,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         _run(build_reranker_command(args, candidates, temporary), verbose=args.verbose)
         if not temporary.is_file():
             raise SystemExit("Reranker completed without writing its result export.")
-        results = parse_results(temporary, args.top)
-        temporary.replace(reranked)
+        all_results = parse_results(temporary, 2**63 - 1)
+        summary["deep_analyzed"] = len(all_results)
+        summary["ranking_cached"] = False
+        results = [row for row in all_results if row.rank <= args.top]
+        # A cold run may have provisioned previously absent runtime corpora.
+        cache_path = run_dir / ("ranking-" + ranking_key(candidates, options, args.phrase_db) + ".json")
+        save_results(cache_path, {"results": [asdict(row) for row in all_results], "summary": summary})
+        publish(temporary, reranked)
     finally:
         temporary.unlink(missing_ok=True)
-    _print_results(args, results, run_dir)
+    _print_results(args, results, run_dir, summary)
     return 0
 
 

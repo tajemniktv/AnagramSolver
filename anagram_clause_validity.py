@@ -310,6 +310,14 @@ def pair_validity_adjustment(
     right_cls = core.function_class(right)
     score = 0.0
 
+    # Inflected BE forms cannot form an auxiliary chain with each other.
+    # WordNet's noun entry for "was" (plural of an abbreviation) otherwise
+    # lets a sequence such as "is was" masquerade as BE + nominal complement.
+    # Do not extend this to base/participle forms: "has been" and "is being"
+    # are valid, and adjacent "had had" is a valid perfect construction.
+    if left in _FINITE_BE and right in _FINITE_BE:
+        score -= 1.0
+
     # A determiner cannot itself be the subject head immediately before a
     # finite auxiliary. Core pair_grammar may otherwise recover some positive
     # noun evidence from WordNet's alternate sense of tokens such as ``a``.
@@ -360,6 +368,7 @@ def apply_surface_structure_penalties(
     penalty = (
         _ARTICLE_MISMATCH_SURFACE_PENALTY * article_mismatches
         + _DETERMINER_AUX_SURFACE_PENALTY * determiner_aux
+        + 0.30 * sum(left in _FINITE_BE and right in _FINITE_BE for left, right in pairwise(words))
     )
     if penalty <= 0.0:
         return result

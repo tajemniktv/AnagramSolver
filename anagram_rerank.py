@@ -11,6 +11,7 @@ import math
 import multiprocessing
 import sys
 import threading
+import uuid
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -21,8 +22,10 @@ from anagram_auxiliary_grammar import (
     order_local_tables_with_auxiliaries,
     phrase_structure_with_auxiliaries,
 )
+from anagram_cache_io import publish
 from anagram_order_diversity import raw_pool_size, select_diverse_orders
 from anagram_performance import FastPhraseIndex, FastWordNetLexicon, performance_hooks
+from anagram_run_cache import candidate_content_hash
 
 if TYPE_CHECKING:
     from anagram_rerank_topk_impl import OrderCandidate
@@ -176,7 +179,9 @@ def _prepared_cache_key(input_path: Path, wordnet_dir: Path) -> str:
     """Fingerprint prepared caches by content, independent of project location."""
     h = hashlib.sha256()
     h.update(PREPARED_CACHE_SCHEMA.encode("ascii"))
-    h.update(core._hash_file(input_path).encode("ascii"))
+    for name in ("anagram_rerank.py", "anagram_rerank_core.py", "anagram_performance.py"):
+        h.update((Path(__file__).resolve().parent / name).read_bytes())
+    h.update(candidate_content_hash(input_path).encode("ascii"))
     for name in (
         "index.noun", "index.verb", "index.adj", "index.adv",
         "noun.exc", "verb.exc", "data.verb",
@@ -330,21 +335,24 @@ def load_prepared_cache(cache_path: Path) -> list[Row] | None:
 
 def save_prepared_cache(cache_path: Path, rows: list[Row]) -> None:
     cache_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = cache_path.with_suffix(cache_path.suffix + ".tmp")
-    with gzip.open(
-        tmp, "wt", encoding="utf-8", compresslevel=PREPARED_CACHE_COMPRESSLEVEL
-    ) as handle:
-        json.dump(
-            {
-                "schema": PREPARED_CACHE_SCHEMA,
-                "rows": [_row_to_cache_dict(row) for row in rows],
-            },
-            handle,
-            ensure_ascii=True,
-            allow_nan=False,
-            separators=(",", ":"),
-        )
-    tmp.replace(cache_path)
+    tmp = cache_path.with_name(f".{cache_path.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        with gzip.open(
+            tmp, "wt", encoding="utf-8", compresslevel=PREPARED_CACHE_COMPRESSLEVEL
+        ) as handle:
+            json.dump(
+                {
+                    "schema": PREPARED_CACHE_SCHEMA,
+                    "rows": [_row_to_cache_dict(row) for row in rows],
+                },
+                handle,
+                ensure_ascii=True,
+                allow_nan=False,
+                separators=(",", ":"),
+            )
+        publish(tmp, cache_path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def prepare_rows(rows: list[Row], lex: WordNetLexicon) -> None:

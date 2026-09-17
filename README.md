@@ -16,6 +16,10 @@ On the first run the solver may download/cache its dictionary, WordNet data, and
 
 Normal use runs a **balanced** search capped at 100,000 generated word bags. It is much more responsive than unlimited 2–6-word enumeration, but the cap means it **can miss the answer** if the correct bag occurs later in generation order.
 
+Use `--search-strategy diverse` to distribute a bounded budget round-robin across feasible word counts and supplied alternative clues. Exhausted groups give their unused share to the remaining groups, and duplicate bags never consume the budget twice. This improves coverage of later word counts; it does not guarantee better answer recall for every puzzle. The default remains `--search-strategy prefix`: broader coverage can make deep ranking much slower because it admits more long word bags. Unlimited generation retains its historical enumeration order.
+
+The final output reports generated bags, deep-analyzed bags, and whether more matches actually exist beyond the generation cap. The solver probes one additional unique bag to distinguish reaching the cap from exhausting the search at exactly that count. This probe can add search time. A no-match result explains whether any usable vocabulary remained; contradictory required/excluded words and impossible clues produce explicit errors rather than silently relaxing constraints.
+
 For a faster exploratory pass:
 
 ```powershell
@@ -80,6 +84,14 @@ python anagram_solver.py "ODITIHNSLSHEEEPT" --words 4 --json
 
 Use `--verbose` to expose the underlying generator/reranker diagnostics.
 
+For a custom bounded search budget:
+
+```powershell
+python anagram_solver.py "ODITIHNSLSHEEEPT" --max-results 5000
+```
+
+`--max-results` must be positive and cannot be combined with `--exhaustive`. It overrides the balanced/quick generation cap, not the deep-ranking shortlist size. JSON output includes a `search` object with the cap, strategy, generated/deep-analyzed counts, truncation, vocabulary size, generation duration (`seconds`), and cache-hit flags. When candidates are reused, `seconds` describes their original generation, not the current invocation's latency.
+
 ## Optional Wikimedia phrase evidence
 
 The solver works without a phrase database and still uses positive-only observed bigrams. A Wikimedia phrase database can provide stronger late-stage evidence for known titles, names, sayings, and other attested phrases.
@@ -113,6 +125,32 @@ The user-facing frontend stores intermediate candidate/reranked exports under:
 ```
 
 All default generated/cache directories are children of `.anagram_data/`: solver runs, dictionaries, n-grams, WordNet, prepared rows, Wikimedia title downloads, phrase indexes, and benchmark artifacts. The cache key includes the generation constraints, generation mode/cap, and generator source hash, so repeating the same search can skip candidate generation while changed constraints/source code create a new cache entry. Use `--rebuild` to force regeneration or `--work-root` to choose a different location.
+
+Completed rankings are also reused. Their separate cache identity includes candidate content, ranking options, engine source, and runtime corpus identity/size/modification times (including an optional phrase database and its WAL). Changing `--top` only changes display, so it can reuse the same ranking. Normal frontend runs keep their prepared-row caches inside the run directory; low-level reranker defaults remain unchanged.
+
+Candidate and ranking caches are integrity-checked and regenerated if damaged. Concurrent runs write private temporary files before atomic publication. Interrupted downloads similarly preserve previous corpus files. `--rebuild` bypasses cached generation, prepared rows, and final rankings. Corpus files edited in place should retain normal modification-time updates; if a tool deliberately preserves both size and timestamp, use `--rebuild`.
+
+## Performance and integration checks
+
+The hot-path probe remains available with `python ci_performance_probe.py`. For actual CLI latency, memory, candidate coverage, and cold/warm comparison:
+
+```powershell
+python -m pip install psutil==7.2.2
+python benchmark_user_runs.py --case phone_charge --case user_testing_anagrams --cap 2000 --samples 3
+```
+
+The default case selection is the registry's `performance` suite. Both search strategies use the same bag cap and per-invocation timeout. The JSON report is written to `.anagram_data/benchmarks/user_performance.json` and includes source/platform identity, individual samples, median latency, memory, and expected-bag recall. These are observational measurements, not hard cross-machine speed thresholds.
+
+Here **cold** means empty candidate, prepared-row, and ranking caches for the puzzle. Runtime corpora are provisioned beforehand; download latency and OS page-cache clearing are deliberately excluded. Memory is the sampled sum of solver/descendant RSS, so short peaks can be missed and shared pages can be counted more than once.
+
+After provisioning runtime corpora, enable real-subprocess integration tests:
+
+```powershell
+$env:ANAGRAM_INTEGRATION = "1"
+python -m unittest discover -s tests -p test_cli_integration.py -v
+```
+
+CI runs unit tests on Windows and Linux with Python 3.13/3.14, and real CLI/cache-recovery tests on both operating systems. Integration tests use temporary puzzle caches and do not remove existing user caches.
 
 ## Research / low-level tools
 

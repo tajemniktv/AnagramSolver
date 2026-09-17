@@ -452,6 +452,7 @@ def normal_user_case(
         ("top", "--top"),
         ("workers", "--workers"),
         ("order_candidates", "--order-candidates"),
+        ("max_results", "--max-results"),
     ):
         value = options.get(key)
         if value is not None:
@@ -472,6 +473,11 @@ def normal_user_case(
         args += ["--min-zipf", str(min_zipf)]
 
     mode = options.get("mode", "balanced")
+    strategy = options.get("search_strategy")
+    if strategy is not None:
+        if strategy not in ("prefix", "diverse"):
+            raise ValueError("normal_user_cli search_strategy must be prefix or diverse")
+        args += ["--search-strategy", str(strategy)]
     if mode not in ("balanced", "quick", "exhaustive"):
         raise ValueError("normal_user_cli mode must be balanced, quick, or exhaustive")
     if mode == "quick":
