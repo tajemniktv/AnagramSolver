@@ -38,6 +38,15 @@ must match (`any`), or exactly one distinct hint (`exactly_one`). Impossible hin
 are removed only while another usable hint remains; otherwise validation fails.
 Required words never override exclusions.
 
+`exclude_regex` optionally supplies case-insensitive search patterns over
+normalized words (default `[]`), in both generate and solve requests. Patterns
+filter dictionary words and hints, and conflicting required words are rejected.
+The linear-time Rust regex syntax supports anchors, classes, groups, alternation
+and repetition, but not backreferences or look-around; unsupported or malformed
+patterns return `invalid_regex`, never silently fall back. Limits: 64 patterns,
+16 KiB combined UTF-8 source, 2 MiB compiled size and 2 MiB DFA cache. These
+explicit bounds keep user expressions from introducing unbounded backtracking.
+
 `candidate_budget: 0` means unlimited generation. A deployment with a finite
 candidate limit rejects it. Without an explicit policy this development CLI is
 local-only and unbounded; that default is not a public-service configuration.
@@ -50,12 +59,53 @@ The engine accepts an explicit shared cancellation control. A timeout in corpus
 loading is an error with code `timed_out`, not a false empty/exhausted result.
 
 Failures exit with status 2 and emit `{schema_version: 1, error: {code, message}}`.
-Stable codes currently include `unsupported_version`, `invalid_limits`,
+Stable codes include `unsupported_version`, `invalid_limits`,
 `invalid_word`, `empty_input`, `conflicting_constraints`, `unavailable_letters`,
 `impossible_hints`, `missing_frequency_data`, `corpus_error`, `invalid_search`,
-`usage`, `input_error`, `request_too_large`, and `invalid_json`.
+`usage`, `input_error`, `request_too_large`, `invalid_json`, `invalid_timeout`,
+`invalid_ranking_limits`, `invalid_regex`, `ranking_error`,
+`invalid_deployment_limits`, `deployment_limit_exceeded`, `invalid_job_id`,
+`serialization_error`, `cancelled`, and `timed_out`. The complete error envelope
+has the generated `ErrorResponse` schema; `SolverError` describes its nested
+code/message object. Messages provide details but are not stable dispatch keys.
 
 ## Ranked development operation
+
+### Optional native ranking cache
+
+`solve --cache FILE` enables a dedicated SQLite ranking cache. The default bounds
+are 128 entries and 64 MiB of retained payloads; override them with positive
+`--cache-max-entries N` and `--cache-max-bytes N` values. SQLite page/journal
+overhead is additional. The parent directory must already exist. Never use a
+corpus database as the cache file. These flags are deployment controls, not
+semantic JSON request fields, and are rejected for `generate`.
+
+`--rebuild-cache` requires `--cache FILE`: it bypasses lookup and replaces the
+matching entry after successful computation. Unavailable/busy cache storage
+falls back to ordinary computation; an unreadable database is not deleted or
+replaced. Corrupt individual payloads are ignored and rebuilt.
+
+Cache hits still capture exact corpus identities, but bypass generation,
+pre-scoring, preparation and deep/corpus ranking. Cache format 2 stores the
+completed generation count and exhaustion/truncation outcome; older entries
+are misses. The current candidate budget and completed-count invariants are
+validated, and the current hard-deep policy
+is checked against the cached shortlist count, never the displayed row count.
+The key binds that count to the exact semantic request and consumed corpora.
+`status.cache.hit` identifies reuse; on a hit, generation and ranking counters
+describe the reused result's completed work, not fresh evaluations. Job status,
+deployment budgets and cancellation belong to the current request. Original
+ranking computation milliseconds are exposed separately when caching is enabled:
+
+- `timings.execution_ms` measures this solve invocation, including corpus loading,
+  cache access and observers, but excluding CLI JSON input/output transport.
+- `timings.ranking_computation_ms` measures deep/corpus ranking and final bucket
+  assembly, excluding cache serialization/writes. On a hit it is the original
+  saved duration, not fresh work and not this request's elapsed time.
+
+These millisecond measurements can be zero for short operations. The optional
+`timings` object is omitted when no cache configuration was requested. Cache
+failure still reports fresh execution/ranking timing if solving succeeds.
 
 ```text
 anagram-cli solve DICTIONARY UNIGRAMS BIGRAMS WORDNET [PHRASE_DB] < request.json
@@ -90,11 +140,10 @@ Results use `kind: ranked`, separate `generated`, `deep_analyzed`, `shown`,
 components. The generator's historical decimal export quantization is preserved
 before preparation because it affects ranking and ties.
 
-This is still a development interface: no persistent cache, corpus identities,
-or complete interruption coverage yet. Python remains the
-default application. Still required before frontend adoption: semantic contract
-validation, deployment limits, corpus provenance and complete parity/performance
-acceptance gates.
+This is still a development interface: no persistent cache or complete
+interruption coverage yet. Python remains the default application. Full native
+parity/performance acceptance and the application adapters remain required before
+replacement/frontend adoption.
 
 ## Generated types and checks
 
@@ -132,14 +181,33 @@ bound. TypeScript `number` alone is not a runtime validator.
 Validation precedence is JSON shape first, generation schema version, generation
 numeric ranges, normalized nonempty input, constraint tokens, required/excluded
 conflicts and required letter availability, then usable hints. Ranked requests
-apply that same validator before ranking limits and zero-residual restrictions.
+apply that same validator before ranking limits. Fully required answers (including
+repeated required words) are ranked normally when they consume exactly the target;
+native solve no longer reproduces Python's zero-residual restriction.
 Corpus I/O follows semantic validation; a missing corpus must not hide an invalid
 request. An already-expired execution control takes precedence over work errors.
 Frequency-data availability is checked when the generation input is loaded.
-Populated progress/provenance still needs completion before the phase-1 gate
-is passed.
+The version-1 default policy is shared: semantic scalar options are required,
+constraint lists default to empty, and absent deployment limits mean unbounded
+local execution. No hidden candidate/deep budget is supplied by an adapter.
+JSON Schema checks shape/ranges; `request::validate`, `solve::validate` and
+`JobStatus::validate` own cross-field semantic checks. TypeScript types are not
+runtime validators. Status validation checks lifecycle/error consistency,
+completed-work bounds, unique well-formed data identities, and complete provenance
+before success. Debug/test builds check every emitted status against these rules.
 
 ## Adapter-owned deployment limits
+
+Generation requests also support `short_policy` (`none`, `common`, `all`, default
+`common`) and `extra_short_words` (default empty). Extra words are normalized into
+the short whitelist, not injected into the dictionary. Like Python, the common
+and explicit whitelist may bypass minimum length even under `none`; maximum
+length, exclusions and frequency filtering still apply unless separately forced.
+
+`forbid_chars` defaults to an empty string and uses the same letter normalization
+as the target. Required words cannot bypass forbidden letters; conflicts fail
+before corpus loading. Forbidden hints are removed from the usable hint set, and
+an entirely unusable requested set returns `impossible_hints`.
 
 Both CLI operations accept `--limits policy.json` (at most 64 KiB). The generated
 `DeploymentLimits` contract is separate from the semantic request. Every field
@@ -180,8 +248,10 @@ returned. No rows are marked shown on failure/cancellation.
 
 Counters acknowledge completed work: generation reports after enumeration;
 deep analysis reports after each completed bag; corpus rescoring reports after
-that stage completes. Evaluations inside an interrupted bag and an interrupted
-corpus pass are not included in these confirmed counts. These are not live inner
+each completed row, preserving that count if the pass is interrupted. Evaluations
+inside an interrupted bag are included once each order score completes; deep bag
+counts still require a completed bag. Order events are batched every 256 scores
+with an exact final count on interruption. Unfinished corpus rows are not included. These are not live inner
 loop counters or a claim of complete interruption accounting. Generation
 exhaustion is independent of job success: a cancelled ranking job can still have
 exhausted generation. Interruption before the generation probe finishes leaves
@@ -189,6 +259,35 @@ exhaustion unknown.
 
 Effective candidate/deep/result limits and the remaining deadline at execution
 admission are populated. Engine/ranking versions and false cache flags reflect
-the current uncached engine. **Corpus identities are not populated yet**;
-`versions.data` is empty, not evidence that no corpora were used. That remaining
-provenance work keeps the phase-1 gate open.
+the current uncached engine. `versions.data_complete` is false until all enabled
+inputs are identified; failed/early events can contain only a partial inventory.
+
+## Data identity representations
+
+Each identity contains a stable role, representation, presence flag, byte count
+and lowercase SHA-256. No local filesystem paths are exposed in wire provenance.
+
+- `file_bytes`: exact dictionary/unigram/bigram or WordNet bytes consumed by the
+  run. Optional absent WordNet files use `present: false`, zero bytes and the
+  empty SHA-256; an empty **present** file is distinct. Unigram/bigram parsers
+  reuse immutable captured buffers for both scoring passes instead of reopening
+  a possibly changed path. These buffers add their raw corpus sizes to peak
+  memory until the second pass finishes; native performance remains to be measured.
+- `phrase_rows_v1`: a logical SQLite read-snapshot identity, **not** a database
+  file hash. Hash UTF-8 compact JSON `["schema", create_table_sql]` followed by LF,
+  then compact JSON `[text,n,count]` plus LF for every row, ordered by
+  `text COLLATE BINARY,n,count`. SQL NULL encodes as JSON null. Byte count refers
+  to this canonical stream. The table definition is included because collations
+  can affect queries. Dynamic views and duplicate text keys cannot provide this
+  deterministic identity and are rejected when provenance is requested.
+
+SQLite's read transaction covers MAX(n), identity capture and subsequent score
+queries, including when another connection commits WAL changes. Hashing and
+reads honor the execution control. Optional learned models remain explicit
+offline utilities, not silently enabled solver inputs.
+
+The offline library's `learned::rank_result` returns versioned selected indices,
+model schema and optional exact loaded-model identity. Programmatic models have
+no source-byte identity; baseline-only results have neither model field populated.
+The supplied execution control covers scoring and stable sorting. This library
+envelope is separate from the default solver and its generated transport schemas.

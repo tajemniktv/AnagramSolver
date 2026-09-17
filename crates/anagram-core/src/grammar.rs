@@ -32,53 +32,40 @@ fn member(word: &str, list: &str) -> bool {
 
 pub fn function_class(word: &str) -> Option<Class> {
     use Class::*;
-    // Order matters for ambiguous words: e.g. "her", "for", "you".
-    for (class, words) in [
-        (DetPl, "these those both many few several"),
-        (DetSg, "this that each every either neither another"),
-        (Article, "a an the"),
-        (
-            NumDet,
-            "one two three four five six seven eight nine ten eleven twelve dozen hundred thousand",
-        ),
-        (
-            Det,
-            "some any no my your his her its our their whose what which",
-        ),
-        (Pron12, "i you we"),
-        (PronPl, "we they you"),
-        (PronSg3, "he she it"),
-        (
-            Pron,
-            "me him her us them myself yourself himself herself itself ourselves themselves who whom",
-        ),
-        (Dont, "dont"),
-        (Doesnt, "doesnt"),
-        (DoAux, "do did didnt"),
-        (
-            Modal,
-            "can cant could couldnt will wont would wouldnt should shouldnt may might must",
-        ),
-        (
-            BeAux,
-            "am is are was were be been being isnt arent wasnt werent",
-        ),
-        (HaveAux, "have has had havent hasnt hadnt"),
-        (
-            Prep,
-            "about above across after against along among around at before behind below beneath beside between beyond by despite down during except for from in inside into near of off on onto over past since through throughout to toward under until up upon with within without like than",
-        ),
-        (
-            Conj,
-            "and but or nor for yet so although because if unless while",
-        ),
-        (Neg, "not never"),
-    ] {
-        if member(word, words) {
-            return Some(class);
-        }
-    }
-    None
+    // Preserve the precedence of ambiguous words (her=Det, for=Prep,
+    // you/we=Pron12), without splitting/scanning every category per lookup.
+    Some(match word {
+        "these" | "those" | "both" | "many" | "few" | "several" => DetPl,
+        "this" | "that" | "each" | "every" | "either" | "neither" | "another" => DetSg,
+        "a" | "an" | "the" => Article,
+        "one" | "two" | "three" | "four" | "five" | "six" | "seven" | "eight" | "nine" | "ten"
+        | "eleven" | "twelve" | "dozen" | "hundred" | "thousand" => NumDet,
+        "some" | "any" | "no" | "my" | "your" | "his" | "her" | "its" | "our" | "their"
+        | "whose" | "what" | "which" => Det,
+        "i" | "you" | "we" => Pron12,
+        "they" => PronPl,
+        "he" | "she" | "it" => PronSg3,
+        "me" | "him" | "us" | "them" | "myself" | "yourself" | "himself" | "herself" | "itself"
+        | "ourselves" | "themselves" | "who" | "whom" => Pron,
+        "dont" => Dont,
+        "doesnt" => Doesnt,
+        "do" | "did" | "didnt" => DoAux,
+        "can" | "cant" | "could" | "couldnt" | "will" | "wont" | "would" | "wouldnt" | "should"
+        | "shouldnt" | "may" | "might" | "must" => Modal,
+        "am" | "is" | "are" | "was" | "were" | "be" | "been" | "being" | "isnt" | "arent"
+        | "wasnt" | "werent" => BeAux,
+        "have" | "has" | "had" | "havent" | "hasnt" | "hadnt" => HaveAux,
+        "about" | "above" | "across" | "after" | "against" | "along" | "among" | "around"
+        | "at" | "before" | "behind" | "below" | "beneath" | "beside" | "between" | "beyond"
+        | "by" | "despite" | "down" | "during" | "except" | "for" | "from" | "in" | "inside"
+        | "into" | "near" | "of" | "off" | "on" | "onto" | "over" | "past" | "since"
+        | "through" | "throughout" | "to" | "toward" | "under" | "until" | "up" | "upon"
+        | "with" | "within" | "without" | "like" | "than" => Prep,
+        "and" | "but" | "or" | "nor" | "yet" | "so" | "although" | "because" | "if" | "unless"
+        | "while" => Conj,
+        "not" | "never" => Neg,
+        _ => return None,
+    })
 }
 
 pub fn pair(left: &str, right: &str, lex: &WordNet) -> f64 {

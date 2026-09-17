@@ -83,9 +83,11 @@ impl Unigrams {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "snake_case")]
 pub enum ShortPolicy {
     None,
+    #[default]
     Common,
     All,
 }
@@ -110,6 +112,38 @@ pub fn admit(
     unigrams: Option<&Unigrams>,
     excludes: impl Fn(&str) -> bool,
 ) -> io::Result<Vec<Candidate>> {
+    admit_controlled(
+        reader,
+        target,
+        policy,
+        unigrams,
+        excludes,
+        &crate::control::Control::default(),
+    )
+}
+
+pub fn admit_controlled(
+    reader: impl BufRead,
+    target: Inventory,
+    policy: &Admission,
+    unigrams: Option<&Unigrams>,
+    excludes: impl Fn(&str) -> bool,
+    control: &crate::control::Control,
+) -> io::Result<Vec<Candidate>> {
+    admit_checked(reader, target, policy, unigrams, excludes, || {
+        control.check()
+    })
+}
+
+pub(crate) fn admit_checked(
+    reader: impl BufRead,
+    target: Inventory,
+    policy: &Admission,
+    unigrams: Option<&Unigrams>,
+    excludes: impl Fn(&str) -> bool,
+    check: impl Fn() -> Result<(), &'static str>,
+) -> io::Result<Vec<Candidate>> {
+    check().map_err(io::Error::other)?;
     if policy.min_length == 0
         || policy.max_length < policy.min_length
         || !policy.min_zipf.is_finite()
@@ -151,16 +185,23 @@ pub fn admit(
         admitted.push((Candidate::new(&word).unwrap(), zipf));
     };
     for line in decoded_lines(reader) {
+        check().map_err(io::Error::other)?;
         add(normalize_letters(&line?));
     }
     for word in &policy.forced {
+        check().map_err(io::Error::other)?;
         add(word.clone());
     }
-    admitted.sort_by(|(a, az), (b, bz)| {
-        bz.total_cmp(az)
-            .then_with(|| b.word.len().cmp(&a.word.len()))
-            .then_with(|| a.word.cmp(&b.word))
-    });
+    crate::control::Control::sort_checked(
+        &mut admitted,
+        |(a, az), (b, bz)| {
+            bz.total_cmp(az)
+                .then_with(|| b.word.len().cmp(&a.word.len()))
+                .then_with(|| a.word.cmp(&b.word))
+        },
+        &check,
+    )
+    .map_err(io::Error::other)?;
     Ok(admitted
         .into_iter()
         .map(|(candidate, _)| candidate)

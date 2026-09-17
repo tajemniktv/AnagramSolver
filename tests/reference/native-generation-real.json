@@ -1,0 +1,167 @@
+{
+  "scope": "8 real-corpus-admitted generation cases per fresh process; three serial samples per engine",
+  "limitations": "includes startup, Python imports, JSON I/O and candidate setup; 2ms sampled root RSS can miss peaks; OS caches not flushed; no corpus, ranking or application performance claim",
+  "platform": "Windows-11-10.0.26220-SP0",
+  "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
+  "input_sha256": "57878569a5fb28ef3a165b21d8e5905d309ff95d31bde1e581df7e461904b1c0",
+  "rust_binary_sha256": "19fbab84c353d0e2e4dcad6e7bc0e6206111ab2d177c8ad72d22ebb34edac6e7",
+  "cases": [
+    {
+      "text": "knowledgeispower",
+      "min_words": 1,
+      "max_words": 4,
+      "cap": 200,
+      "repeat": true,
+      "clues": [],
+      "initial": [],
+      "mode": "any",
+      "strategy": "prefix",
+      "candidate_count": 991,
+      "candidates_sha256": "6f52724d47b0bdf02061ebb136e53d08363fa3fd37295a3a8ce1c86392964141"
+    },
+    {
+      "text": "knowledgeispower",
+      "min_words": 1,
+      "max_words": 4,
+      "cap": 200,
+      "repeat": true,
+      "clues": [],
+      "initial": [],
+      "mode": "any",
+      "strategy": "diverse",
+      "candidate_count": 991,
+      "candidates_sha256": "6f52724d47b0bdf02061ebb136e53d08363fa3fd37295a3a8ce1c86392964141"
+    },
+    {
+      "text": "thesehipsdontlie",
+      "min_words": 1,
+      "max_words": 4,
+      "cap": 200,
+      "repeat": true,
+      "clues": [],
+      "initial": [],
+      "mode": "any",
+      "strategy": "prefix",
+      "candidate_count": 734,
+      "candidates_sha256": "a1638872b262838d4a9c915ed1ea5a2f3138d4a143131e01ef77094ed789d7bb"
+    },
+    {
+      "text": "thesehipsdontlie",
+      "min_words": 1,
+      "max_words": 4,
+      "cap": 200,
+      "repeat": true,
+      "clues": [],
+      "initial": [],
+      "mode": "any",
+      "strategy": "diverse",
+      "candidate_count": 734,
+      "candidates_sha256": "a1638872b262838d4a9c915ed1ea5a2f3138d4a143131e01ef77094ed789d7bb"
+    },
+    {
+      "text": "testing",
+      "min_words": 1,
+      "max_words": 4,
+      "cap": 200,
+      "repeat": true,
+      "clues": [],
+      "initial": [],
+      "mode": "any",
+      "strategy": "prefix",
+      "candidate_count": 61,
+      "candidates_sha256": "db1dc6cee72a2b90627b8b161e07fbcce88814648c7626303cae3ac5d96356ef"
+    },
+    {
+      "text": "testing",
+      "min_words": 1,
+      "max_words": 4,
+      "cap": 200,
+      "repeat": true,
+      "clues": [],
+      "initial": [],
+      "mode": "any",
+      "strategy": "diverse",
+      "candidate_count": 61,
+      "candidates_sha256": "db1dc6cee72a2b90627b8b161e07fbcce88814648c7626303cae3ac5d96356ef"
+    },
+    {
+      "text": "ateate",
+      "min_words": 1,
+      "max_words": 4,
+      "cap": 200,
+      "repeat": true,
+      "clues": [],
+      "initial": [],
+      "mode": "any",
+      "strategy": "prefix",
+      "candidate_count": 13,
+      "candidates_sha256": "d4a830c0c92a9574f2be4eeb4c262681a45a26a1a18dd6cec057f92b724ab36e"
+    },
+    {
+      "text": "ateate",
+      "min_words": 1,
+      "max_words": 4,
+      "cap": 200,
+      "repeat": true,
+      "clues": [],
+      "initial": [],
+      "mode": "any",
+      "strategy": "diverse",
+      "candidate_count": 13,
+      "candidates_sha256": "d4a830c0c92a9574f2be4eeb4c262681a45a26a1a18dd6cec057f92b724ab36e"
+    }
+  ],
+  "corpus_identities": {
+    "dictionary": "1a92993c6db1e33f9f4c62cb0e41513777eba96fe4f8def15d6515692e63a01c",
+    "unigrams": "51df159fd3de12b20e403c108f526e96dbd723d9cabdd5f17955cdc16059e690"
+  },
+  "reference_source_sha256": "9327337b3cedd4d8914691aa911bde9883198bb74f5e5cc1537862e01c457e18",
+  "output_counts": [
+    200,
+    200,
+    200,
+    200,
+    26,
+    26,
+    17,
+    17
+  ],
+  "runs": [
+    {
+      "engine": "python",
+      "sample": 0,
+      "seconds": 0.46209749999979977,
+      "sampled_peak_rss_bytes": 69210112
+    },
+    {
+      "engine": "rust",
+      "sample": 0,
+      "seconds": 0.13064400000075693,
+      "sampled_peak_rss_bytes": 18882560
+    },
+    {
+      "engine": "rust",
+      "sample": 1,
+      "seconds": 0.13049139999930048,
+      "sampled_peak_rss_bytes": 18726912
+    },
+    {
+      "engine": "python",
+      "sample": 1,
+      "seconds": 0.44478130000061356,
+      "sampled_peak_rss_bytes": 69095424
+    },
+    {
+      "engine": "python",
+      "sample": 2,
+      "seconds": 0.43420749999859254,
+      "sampled_peak_rss_bytes": 69091328
+    },
+    {
+      "engine": "rust",
+      "sample": 2,
+      "seconds": 0.13036210000063875,
+      "sampled_peak_rss_bytes": 19787776
+    }
+  ]
+}

@@ -102,21 +102,20 @@ fn kbest(
             }
         }
         for state in &mut next {
-            state.paths.sort_by(|a, b| b.score.total_cmp(&a.score));
+            control.sort_by(&mut state.paths, |a, b| b.score.total_cmp(&a.score))?;
             state.paths.truncate(per_state);
         }
         states = next;
     }
-    let mut complete: Vec<_> = states
-        .into_iter()
-        .flat_map(|state| {
-            state.paths.into_iter().map(move |mut path| {
-                path.score += ends[state.last];
-                path
-            })
-        })
-        .collect();
-    complete.sort_by(|a, b| b.score.total_cmp(&a.score));
+    let mut complete = Vec::new();
+    for state in states {
+        for mut path in state.paths {
+            control.check()?;
+            path.score += ends[state.last];
+            complete.push(path);
+        }
+    }
+    control.sort_by(&mut complete, |a, b| b.score.total_cmp(&a.score))?;
     complete.truncate(max_complete);
     control.check()?;
     Ok(complete.into_iter().map(|p| p.indices).collect())
@@ -168,6 +167,18 @@ pub fn rank_controlled(
     top_k: usize,
     control: &crate::control::Control,
 ) -> Result<(Vec<Candidate>, usize), &'static str> {
+    rank_observed(words, lex, exact, beam_width, top_k, control, &mut |_| {})
+}
+
+pub fn rank_observed(
+    words: &[String],
+    lex: &WordNet,
+    exact: bool,
+    beam_width: usize,
+    top_k: usize,
+    control: &crate::control::Control,
+    observer: &mut dyn FnMut(usize),
+) -> Result<(Vec<Candidate>, usize), &'static str> {
     control.check()?;
     if top_k == 0 || beam_width == 0 {
         return Err("ordering budgets must be positive");
@@ -183,7 +194,10 @@ pub fn rank_controlled(
     }
     if n == 1 {
         let raw = structure::local_raw(&words, lex);
-        return Ok((vec![score(words, raw, lex)], 1));
+        let candidate = score(words, raw, lex);
+        observer(1);
+        control.check()?;
+        return Ok((vec![candidate], 1));
     }
     let starts: Vec<_> = words.iter().map(|w| grammar::start(w, lex)).collect();
     let ends: Vec<_> = words.iter().map(|w| grammar::end(w, lex)).collect();
@@ -212,9 +226,13 @@ pub fn rank_controlled(
         if !seen.insert(order.clone()) {
             return Ok(());
         }
-        let edge_sum = indices.windows(2).map(|p| pair[p[0]][p[1]]).sum::<f64>();
-        let raw = (starts[indices[0]] + ends[*indices.last().unwrap()] + edge_sum) / (n - 1) as f64;
+        // Modern Python sum compensates edge accumulation. One-ULP differences
+        // here can change grammar tie-breaks even when objectives compare equal.
+        let edges = crate::compensated_sum(indices.windows(2).map(|edge| pair[edge[0]][edge[1]]));
+        let raw = (starts[indices[0]] + ends[*indices.last().unwrap()] + edges) / (n - 1) as f64;
         candidates.push(score(order, raw, lex));
+        observer(candidates.len());
+        control.check()?;
         Ok(())
     };
     if exact {
@@ -226,7 +244,7 @@ pub fn rank_controlled(
         }
     }
     let evaluated = candidates.len();
-    candidates.sort_by(compare);
+    control.sort_by(&mut candidates, compare)?;
     candidates.truncate(top_k);
     control.check()?;
     Ok((candidates, evaluated))

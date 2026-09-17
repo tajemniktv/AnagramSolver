@@ -17,9 +17,13 @@ export type Counts = {
 
 export type DataIdentity = {
   "bytes": number;
+  "present": boolean;
+  "representation": DataRepresentation;
   "role": string;
   "sha256": string;
 };
+
+export type DataRepresentation = "file_bytes" | "phrase_rows_v1";
 
 export type EffectiveBudgets = {
   "candidate_limit"?: number | null;
@@ -56,6 +60,7 @@ export type Row = {
   "best_order": Array<string>;
   "colloc_norm": number;
   "deep": boolean;
+  "display_phrase"?: string;
   "fam": number;
   "family_key": Array<string>;
   "final": number;
@@ -89,15 +94,22 @@ export type Stage = "queued" | "loading_corpora" | "generating" | "preparing" | 
 
 export type Stop = "exhausted" | "candidate_cap" | "cancelled" | "timed_out";
 
+export type Timings = {
+  "execution_ms": number;
+  "ranking_computation_ms": number;
+  [key: string]: unknown;
+};
+
 export type Versions = {
   "data": Array<DataIdentity>;
+  "data_complete": boolean;
   "engine": string;
   "ranking": string;
 };
 
 export type SolveResult = {
   "buckets": {
-
+  [key: string]: Array<Row>;
 };
   "corpus_rescored": number;
   "deep_analyzed": number;
@@ -110,5 +122,6 @@ export type SolveResult = {
   "schema_version": number;
   "shown": number;
   "status": JobStatus;
+  "timings"?: (Timings) | (null);
   [key: string]: unknown;
 };

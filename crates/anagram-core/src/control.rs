@@ -49,6 +49,69 @@ impl Control {
         // ErrorKind::Interrupted would be retried by read_to_end/read_line.
         self.check().map_err(io::Error::other)
     }
+    /// Stable, cancellable sorting without cloning payloads or unwinding a comparator.
+    /// Uses two index buffers; interruption always leaves every payload intact.
+    pub fn sort_by<T>(
+        &self,
+        values: &mut [T],
+        compare: impl FnMut(&T, &T) -> std::cmp::Ordering,
+    ) -> Result<(), &'static str> {
+        Self::sort_checked(values, compare, || self.check())
+    }
+    pub(crate) fn sort_checked<T>(
+        values: &mut [T],
+        mut compare: impl FnMut(&T, &T) -> std::cmp::Ordering,
+        mut check: impl FnMut() -> Result<(), &'static str>,
+    ) -> Result<(), &'static str> {
+        check()?;
+        let n = values.len();
+        let mut order = Vec::with_capacity(n);
+        let mut scratch = Vec::with_capacity(n);
+        for i in 0..n {
+            if i % 256 == 0 {
+                check()?;
+            }
+            order.push(i);
+            scratch.push(0);
+        }
+        let mut width = 1usize;
+        while width < n {
+            for start in (0..n).step_by(width.saturating_mul(2)) {
+                let middle = start.saturating_add(width).min(n);
+                let end = middle.saturating_add(width).min(n);
+                let (mut left, mut right) = (start, middle);
+                for slot in &mut scratch[start..end] {
+                    check()?;
+                    if left < middle
+                        && (right == end
+                            || compare(&values[order[left]], &values[order[right]])
+                                != std::cmp::Ordering::Greater)
+                    {
+                        *slot = order[left];
+                        left += 1;
+                    } else {
+                        *slot = order[right];
+                        right += 1;
+                    }
+                }
+            }
+            std::mem::swap(&mut order, &mut scratch);
+            width = width.saturating_mul(2);
+        }
+        for (destination, &source) in order.iter().enumerate() {
+            check()?;
+            scratch[source] = destination;
+        }
+        for i in 0..n {
+            while scratch[i] != i {
+                check()?;
+                let j = scratch[i];
+                values.swap(i, j);
+                scratch.swap(i, j);
+            }
+        }
+        check()
+    }
     pub fn reader<R>(&self, inner: R) -> Reader<'_, R> {
         Reader {
             inner,

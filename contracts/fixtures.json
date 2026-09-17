@@ -1,4 +1,6 @@
 [
+  { "schema": "ErrorResponse", "valid": true, "value": { "schema_version": 1, "error": { "code": "empty_input", "message": "No letters" } } },
+  { "schema": "ErrorResponse", "valid": false, "value": { "schema_version": 2, "error": { "code": "empty_input", "message": "No letters" } } },
   { "schema": "DeploymentLimits", "valid": true, "value": {} },
   { "schema": "DeploymentLimits", "valid": true, "value": { "max_candidates": 1, "timeout_ms": 0 } },
   { "schema": "DeploymentLimits", "valid": false, "value": { "max_candidates": 0 } },
@@ -71,7 +73,7 @@
         "schema_version": 1, "job_id": "fixture", "state": "succeeded", "stage": "complete",
         "counts": { "generated": 0, "deep_selected": 0, "deep_analyzed": 0, "orders_evaluated": 0, "corpus_rescored": 0, "shown": 0 },
         "budgets": { "candidate_limit": 20, "deep_per_group": 100, "deep_limit": null, "result_limit_per_group": 20, "deadline_ms": null },
-        "versions": { "engine": "0.1.0", "ranking": "native-ranking-v1", "data": [] },
+        "versions": { "engine": "0.1.0", "ranking": "native-ranking-v1", "data": [], "data_complete": true },
         "cache": { "hit": false, "rebuilt": false, "corrupt_entry_ignored": false },
         "exhaustion": "exhausted", "error": null
       }
@@ -83,7 +85,7 @@
       "schema_version": 1, "job_id": "fixture", "state": "timed_out", "stage": "generating",
       "counts": { "generated": 20, "deep_selected": 0, "deep_analyzed": 0, "orders_evaluated": 0, "corpus_rescored": 0, "shown": 0 },
       "budgets": { "candidate_limit": 20, "deep_per_group": 100, "deep_limit": null, "result_limit_per_group": 20, "deadline_ms": 1000 },
-      "versions": { "engine": "0.1.0", "ranking": "python-reference-v1", "data": [] },
+      "versions": { "engine": "0.1.0", "ranking": "python-reference-v1", "data": [], "data_complete": false },
       "cache": { "hit": false, "rebuilt": false, "corrupt_entry_ignored": false },
       "exhaustion": "unknown", "error": { "code": "timed_out", "message": "timed_out" }
     }

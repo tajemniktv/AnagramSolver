@@ -151,33 +151,41 @@ fn select_controlled(
 ) -> io::Result<(Vec<usize>, usize)> {
     control.check_io()?;
     let mut by_final = bucket.to_vec();
-    by_final.sort_by(|&i, &j| {
-        rows[j]
-            .final_score
-            .total_cmp(&rows[i].final_score)
-            .then_with(|| rows[j].pre_score.total_cmp(&rows[i].pre_score))
-            .then_with(|| rows[i].input.words.cmp(&rows[j].input.words))
-    });
+    control
+        .sort_by(&mut by_final, |&i, &j| {
+            rows[j]
+                .final_score
+                .total_cmp(&rows[i].final_score)
+                .then_with(|| rows[j].pre_score.total_cmp(&rows[i].pre_score))
+                .then_with(|| rows[i].input.words.cmp(&rows[j].input.words))
+        })
+        .map_err(io::Error::other)?;
     let mut by_pre = bucket.to_vec();
-    by_pre.sort_by(|&i, &j| {
-        rows[j]
-            .pre_score
-            .total_cmp(&rows[i].pre_score)
-            .then_with(|| rows[j].final_score.total_cmp(&rows[i].final_score))
-            .then_with(|| rows[i].input.words.cmp(&rows[j].input.words))
-    });
+    control
+        .sort_by(&mut by_pre, |&i, &j| {
+            rows[j]
+                .pre_score
+                .total_cmp(&rows[i].pre_score)
+                .then_with(|| rows[j].final_score.total_cmp(&rows[i].final_score))
+                .then_with(|| rows[i].input.words.cmp(&rows[j].input.words))
+        })
+        .map_err(io::Error::other)?;
     let mut chosen: Vec<_> = by_final.into_iter().take(top).collect();
     for i in by_pre.into_iter().take(top) {
+        control.check_io()?;
         if !chosen.contains(&i) {
             chosen.push(i);
         }
     }
-    let mut pool: Vec<_> = bucket
-        .iter()
-        .copied()
-        .filter(|i| !chosen.contains(i))
-        .collect();
-    let mut scores: HashMap<usize, f64> = pool.iter().map(|&i| (i, 0.0)).collect();
+    let mut pool = Vec::new();
+    let mut scores: HashMap<usize, f64> = HashMap::new();
+    for &i in bucket {
+        control.check_io()?;
+        if !chosen.contains(&i) {
+            pool.push(i);
+            scores.insert(i, 0.0);
+        }
+    }
     let mut owners: HashMap<String, Vec<usize>> = HashMap::new();
     for &i in &pool {
         control.check_io()?;
@@ -187,34 +195,39 @@ fn select_controlled(
         }
         if phrase.is_some() {
             for order in orders {
+                control.check_io()?;
                 owners.entry(order.order.join(" ")).or_default().push(i);
             }
         }
     }
     if let Some(index) = phrase {
         for (text, count) in index.counts(&owners.keys().cloned().collect::<Vec<_>>())? {
+            control.check_io()?;
             if count <= 0 {
                 continue;
             }
             let exact = (0.72 + 0.28 * (count as f64 + 1.0).log10() / 5.0).min(1.0);
             if let Some(ids) = owners.get(&text) {
                 for i in ids {
+                    control.check_io()?;
                     scores.entry(*i).and_modify(|s| *s = s.max(exact));
                 }
             }
         }
     }
-    pool.sort_by(|&i, &j| {
-        scores[&j]
-            .total_cmp(&scores[&i])
-            .then_with(|| {
-                rows[j]
-                    .final_score
-                    .max(rows[j].pre_score)
-                    .total_cmp(&rows[i].final_score.max(rows[i].pre_score))
-            })
-            .then_with(|| rows[i].input.words.cmp(&rows[j].input.words))
-    });
+    control
+        .sort_by(&mut pool, |&i, &j| {
+            scores[&j]
+                .total_cmp(&scores[&i])
+                .then_with(|| {
+                    rows[j]
+                        .final_score
+                        .max(rows[j].pre_score)
+                        .total_cmp(&rows[i].final_score.max(rows[i].pre_score))
+                })
+                .then_with(|| rows[i].input.words.cmp(&rows[j].input.words))
+        })
+        .map_err(io::Error::other)?;
     let added: Vec<_> = pool
         .into_iter()
         .filter(|i| scores[i] > 0.0)
@@ -222,13 +235,15 @@ fn select_controlled(
         .collect();
     let corpus_added = added.len();
     chosen.extend(added);
-    chosen.sort_by(|&i, &j| {
-        rows[j]
-            .final_score
-            .max(rows[j].pre_score)
-            .total_cmp(&rows[i].final_score.max(rows[i].pre_score))
-            .then_with(|| rows[i].input.words.cmp(&rows[j].input.words))
-    });
+    control
+        .sort_by(&mut chosen, |&i, &j| {
+            rows[j]
+                .final_score
+                .max(rows[j].pre_score)
+                .total_cmp(&rows[i].final_score.max(rows[i].pre_score))
+                .then_with(|| rows[i].input.words.cmp(&rows[j].input.words))
+        })
+        .map_err(io::Error::other)?;
     Ok((chosen, corpus_added))
 }
 
@@ -256,13 +271,54 @@ pub fn rescore_controlled(
     bonus_max: f64,
     control: &crate::control::Control,
 ) -> io::Result<usize> {
+    rescore_observed(
+        rows,
+        collocation,
+        phrase,
+        top,
+        bonus_max,
+        control,
+        &mut |_| {},
+    )
+}
+
+pub fn rescore_observed(
+    rows: &mut [Row],
+    collocation: Option<&Collocation>,
+    phrase: Option<&dyn PhraseCorpus>,
+    top: usize,
+    bonus_max: f64,
+    control: &crate::control::Control,
+    observer: &mut dyn FnMut(usize),
+) -> io::Result<usize> {
+    rescore_with_model(
+        rows,
+        collocation,
+        phrase,
+        top,
+        (bonus_max, None),
+        control,
+        observer,
+    )
+}
+
+pub fn rescore_with_model(
+    rows: &mut [Row],
+    collocation: Option<&Collocation>,
+    phrase: Option<&dyn PhraseCorpus>,
+    top: usize,
+    scoring: (f64, Option<&crate::learned::Model>),
+    control: &crate::control::Control,
+    observer: &mut dyn FnMut(usize),
+) -> io::Result<usize> {
+    let bonus_max = scoring.0;
     if !bonus_max.is_finite() || bonus_max < 0.0 {
         return Err(io::Error::new(
             io::ErrorKind::InvalidInput,
             "phrase bonus must be finite and nonnegative",
         ));
     }
-    let result = rescore_inner(rows, collocation, phrase, top, bonus_max, control);
+    let result = rescore_inner(rows, collocation, phrase, top, scoring, control, observer);
     // Retained-order memory is released even on corpus errors, like the facade.
     for row in rows {
         row.alternatives.clear();
@@ -274,9 +330,11 @@ fn rescore_inner(
     collocation: Option<&Collocation>,
     phrase: Option<&dyn PhraseCorpus>,
     top: usize,
-    bonus_max: f64,
+    scoring: (f64, Option<&crate::learned::Model>),
     control: &crate::control::Control,
+    observer: &mut dyn FnMut(usize),
 ) -> io::Result<usize> {
+    let (bonus_max, model) = scoring;
     control.check_io()?;
     let mut buckets: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
     for (i, row) in rows.iter_mut().enumerate() {
@@ -295,31 +353,58 @@ fn rescore_inner(
             for candidate in candidates(row) {
                 control.check_io()?;
                 let colloc = collocation.map_or(0.0, |m| m.score(&candidate.order).0);
-                let attest = match phrase {
-                    Some(p) => p.score(&candidate.order)?,
-                    None => 0.0,
+                let (attest, details) = match phrase {
+                    Some(p) if model.is_some() => crate::phrase_evidence::score(
+                        &candidate.order,
+                        &p.counts(&crate::phrase_evidence::queries(
+                            &candidate.order,
+                            p.max_n(),
+                        ))?,
+                        p.max_n(),
+                        true,
+                    ),
+                    Some(p) => (p.score(&candidate.order)?, HashMap::new()),
+                    None => (0.0, HashMap::new()),
                 };
                 let combined = (ranking::order_base_final(row, &candidate)
                     + bonus_max * attest.max(0.55 * colloc))
                 .min(100.0);
-                results.push((combined, attest, colloc, candidate));
+                let learned = model
+                    .map(|m| {
+                        m.score(&crate::learned::features(
+                            &candidate,
+                            attest,
+                            &details,
+                            candidate.order.len(),
+                        ))
+                    })
+                    .transpose()?;
+                results.push((combined, attest, colloc, candidate, learned));
             }
-            if !results.iter().any(|r| r.1 > 0.0 || r.2 > 0.0) {
+            if model.is_none() && !results.iter().any(|r| r.1 > 0.0 || r.2 > 0.0) {
                 row.base_final = row.final_score;
                 row.colloc_norm = 0.0;
                 row.phrase_attest_norm = 0.0;
                 row.phrase_bonus = 0.0;
                 rescored += 1;
+                observer(rescored);
+                control.check_io()?;
                 continue;
             }
-            results.sort_by(|a, b| {
-                b.0.total_cmp(&a.0)
-                    .then_with(|| b.1.total_cmp(&a.1))
-                    .then_with(|| b.2.total_cmp(&a.2))
-                    .then_with(|| (b.3.order == row.best_order).cmp(&(a.3.order == row.best_order)))
-                    .then_with(|| a.3.order.cmp(&b.3.order))
-            });
-            let (combined, attest, colloc, winner) = results.remove(0);
+            control
+                .sort_by(&mut results, |a, b| {
+                    b.4.unwrap_or(b.0)
+                        .total_cmp(&a.4.unwrap_or(a.0))
+                        .then_with(|| b.0.total_cmp(&a.0))
+                        .then_with(|| b.1.total_cmp(&a.1))
+                        .then_with(|| b.2.total_cmp(&a.2))
+                        .then_with(|| {
+                            (b.3.order == row.best_order).cmp(&(a.3.order == row.best_order))
+                        })
+                        .then_with(|| a.3.order.cmp(&b.3.order))
+                })
+                .map_err(io::Error::other)?;
+            let (combined, attest, colloc, winner, _) = results.remove(0);
             row.base_final = ranking::order_base_final(row, &winner);
             row.best_order = winner.order;
             row.grammar_raw = winner.grammar_raw;
@@ -333,6 +418,8 @@ fn rescore_inner(
             row.phrase_bonus = combined - row.base_final;
             row.final_score = combined;
             rescored += 1;
+            observer(rescored);
+            control.check_io()?;
         }
     }
     Ok(rescored)

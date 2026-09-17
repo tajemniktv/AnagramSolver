@@ -19,6 +19,14 @@ from scoring import close
 
 
 def main():
+    import argparse
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--phrase-db",type=Path)
+    args=parser.parse_args()
+    def digest(path):
+        with path.open("rb") as stream: return hashlib.file_digest(stream,"sha256").hexdigest()
+    real_database=args.phrase_db.resolve() if args.phrase_db else None
+    real_digest=digest(real_database) if real_database else None
     temp=tempfile.TemporaryDirectory(prefix="ranking-parity-",dir=ROOT/".codex/temp")
     lex=reference.WordNetLexicon.load(ROOT/".anagram_data/wordnet31/dict")
     rng=random.Random(917)
@@ -58,14 +66,15 @@ def main():
             top=(0,1,2,10)[number%4]
             bonus=(0.0,18.0,100.0)[number%3]
             model=reference.PositiveBigramModel(unigrams,bigrams,total) if use_collocation else None
-            database=Path(temp.name)/f"phrase {number} # corpus.sqlite"
-            with sqlite3.connect(database) as connection:
-                connection.execute("CREATE TABLE ngrams (text TEXT PRIMARY KEY, n INTEGER, count INTEGER)")
-                connection.executemany("INSERT INTO ngrams VALUES (?, ?, ?)",[(text,len(text.split()),count) for text,count in counts.items()])
-                # Ensure corpus maximum order agrees with component fixtures.
-                connection.execute("INSERT INTO ngrams VALUES ('corpus maximum order sentinel never queried',6,1)")
-            connection.close()
-            before=hashlib.sha256(database.read_bytes()).hexdigest()
+            database=real_database or Path(temp.name)/f"phrase {number} # corpus.sqlite"
+            if real_database is None:
+                with sqlite3.connect(database) as connection:
+                    connection.execute("CREATE TABLE ngrams (text TEXT PRIMARY KEY, n INTEGER, count INTEGER)")
+                    connection.executemany("INSERT INTO ngrams VALUES (?, ?, ?)",[(text,len(text.split()),count) for text,count in counts.items()])
+                    # Ensure corpus maximum order agrees with component fixtures.
+                    connection.execute("INSERT INTO ngrams VALUES ('corpus maximum order sentinel never queried',6,1)")
+                connection.close()
+            before=real_digest or digest(database)
             index=reference.PhraseIndex.open(database) if use_phrase else None
             admission={}
             for wc in sorted({r.word_count for r in rows if r.deep}):
@@ -87,8 +96,8 @@ def main():
         except AssertionError as error:
             (ROOT/".codex/temp/ranking-mismatch.json").write_text(json.dumps(dict(case=cases[i],got=got,want=want),indent=2),encoding="utf-8")
             raise AssertionError((i,error)) from error
-    for case in cases:
-        assert hashlib.sha256(Path(case["corpus"]["path"]).read_bytes()).hexdigest()==case["corpus"]["sha256"]
+    for path, expected_digest in {(case["corpus"]["path"],case["corpus"]["sha256"]) for case in cases}:
+        assert digest(Path(path))==expected_digest
     temp.cleanup()
     print(f"Ranking and corpus-rescoring parity passed: {len(cases)} complete pipeline cases")
 

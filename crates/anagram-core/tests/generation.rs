@@ -15,6 +15,24 @@ fn options() -> Options {
 }
 
 #[test]
+fn expired_empty_diverse_setup_is_not_exhaustion() {
+    let mut options = options();
+    options.strategy = Strategy::Diverse;
+    options.min_words = 3;
+    options.max_words = 4;
+    let result = search(
+        Inventory::from_text("a"),
+        &[],
+        &options,
+        &AtomicBool::new(false),
+        Some(Instant::now()),
+    )
+    .unwrap();
+    assert_eq!(result.stop, Stop::TimedOut);
+    assert!(result.bags.is_empty());
+}
+
+#[test]
 fn reaching_cap_is_not_proof_of_truncation() {
     let target = Inventory::from_text("aa");
     let cancel = AtomicBool::new(false);

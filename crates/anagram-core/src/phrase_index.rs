@@ -1,6 +1,8 @@
 //! Read-only SQLite phrase corpus. Each worker owns its connection.
+use crate::contracts::{DataIdentity, DataRepresentation};
 use crate::corpus_ranking::PhraseCorpus;
 use rusqlite::{Connection, OpenFlags, params_from_iter};
+use sha2::{Digest, Sha256};
 use std::{
     collections::{HashMap, HashSet},
     io,
@@ -31,6 +33,8 @@ impl PhraseIndex {
         connection
             .progress_handler(1000, Some(move || callback_control.check().is_err()))
             .map_err(error)?;
+        // MAX(n), provenance and every later query must see one read snapshot.
+        connection.execute_batch("BEGIN").map_err(error)?;
         let max_n: i64 = connection
             .query_row("SELECT COALESCE(MAX(n), 0) FROM ngrams", [], |row| {
                 row.get(0)
@@ -42,6 +46,65 @@ impl PhraseIndex {
             connection,
             max_n,
             control: control.clone(),
+        })
+    }
+
+    /// Canonical logical identity, not a hash of SQLite pages or WAL files.
+    pub fn identity(&self) -> io::Result<DataIdentity> {
+        self.control.check_io()?;
+        let (kind, schema): (String, String) = self
+            .connection
+            .query_row(
+                "SELECT type, sql FROM sqlite_schema WHERE name='ngrams'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(error)?;
+        if kind != "table" {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Phrase provenance requires a concrete ngrams table, not a dynamic view",
+            ));
+        }
+        let mut statement = self
+            .connection
+            .prepare("SELECT text, n, count FROM ngrams ORDER BY text COLLATE BINARY, n, count")
+            .map_err(error)?;
+        let mut rows = statement.query([]).map_err(error)?;
+        let mut digest = Sha256::new();
+        // Collations can affect lookup semantics even for identical visible rows.
+        let mut header = serde_json::to_vec(&("schema", schema)).map_err(io::Error::other)?;
+        header.push(b'\n');
+        let mut bytes = header.len() as u64;
+        digest.update(header);
+        let mut previous = None;
+        while let Some(row) = rows.next().map_err(error)? {
+            self.control.check_io()?;
+            let record = (
+                row.get::<_, Option<String>>(0).map_err(error)?,
+                row.get::<_, Option<i64>>(1).map_err(error)?,
+                row.get::<_, Option<i64>>(2).map_err(error)?,
+            );
+            if previous.as_ref().is_some_and(|text| text == &record.0) {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Duplicate phrase keys have no deterministic lookup identity",
+                ));
+            }
+            previous = Some(record.0.clone());
+            let mut encoded = serde_json::to_vec(&record).map_err(io::Error::other)?;
+            encoded.push(b'\n');
+            bytes = bytes
+                .checked_add(encoded.len() as u64)
+                .ok_or_else(|| io::Error::other("Phrase identity size overflow"))?;
+            digest.update(encoded);
+        }
+        Ok(DataIdentity {
+            role: "phrase_index".to_owned(),
+            representation: DataRepresentation::PhraseRowsV1,
+            present: true,
+            sha256: format!("{:x}", digest.finalize()),
+            bytes,
         })
     }
 }

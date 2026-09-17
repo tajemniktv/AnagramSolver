@@ -4,7 +4,7 @@ use crate::{
 };
 use std::time::Instant;
 
-pub(crate) struct Progress<'a> {
+pub struct Progress<'a> {
     pub status: JobStatus,
     observer: &'a mut dyn FnMut(&JobStatus),
 }
@@ -39,6 +39,7 @@ impl<'a> Progress<'a> {
                 engine: env!("CARGO_PKG_VERSION").to_owned(),
                 ranking: "native-ranking-v1".to_owned(),
                 data: vec![],
+                data_complete: false,
             },
             cache: CacheFlags {
                 hit: false,
@@ -53,6 +54,10 @@ impl<'a> Progress<'a> {
         progress
     }
     pub fn emit(&mut self) {
+        debug_assert!(
+            self.status.validate().is_ok(),
+            "invalid internal job status"
+        );
         (self.observer)(&self.status);
     }
     pub fn start(&mut self) {

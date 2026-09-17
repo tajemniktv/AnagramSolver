@@ -1,30 +1,40 @@
-//! Immutable WordNet tables and morphological features. Request owners may cache
-//! feature results without putting mutable state in the shared corpus.
-use crate::{control::Control, normalize_letters};
+//! WordNet tables and morphological features. Owners can prepare a bounded word
+//! set before sharing the corpus; scoring never mutates it or uses global caches.
+use crate::{contracts::DataIdentity, control::Control, normalize_letters, provenance::Snapshot};
 use serde::Serialize;
 use std::{
     collections::{BTreeSet, HashMap},
-    fs,
-    io::{self, Read},
+    io,
     path::Path,
 };
 
-fn ascii(path: &Path, control: &Control) -> io::Result<String> {
-    control.check_io()?;
-    let mut bytes = Vec::new();
-    control
-        .reader(fs::File::open(path)?)
-        .read_to_end(&mut bytes)?;
-    Ok(bytes
-        .into_iter()
-        .filter(u8::is_ascii)
-        .map(char::from)
-        .collect())
+fn ascii(path: &Path, control: &Control, identities: &mut Vec<DataIdentity>) -> io::Result<String> {
+    let role = format!("wordnet/{}", path.file_name().unwrap().to_string_lossy());
+    let snapshot = match Snapshot::load(path, &role, control) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            if error.kind() == io::ErrorKind::NotFound {
+                identities.push(Snapshot::absent(&role));
+            }
+            return Err(error);
+        }
+    };
+    identities.push(snapshot.identity);
+    let mut text = String::with_capacity(snapshot.bytes.len());
+    for chunk in snapshot.bytes.chunks(16_384) {
+        control.check_io()?;
+        text.extend(chunk.iter().copied().filter(u8::is_ascii).map(char::from));
+    }
+    Ok(text)
 }
 
-fn index(path: &Path, control: &Control) -> io::Result<BTreeSet<String>> {
+fn index(
+    path: &Path,
+    control: &Control,
+    identities: &mut Vec<DataIdentity>,
+) -> io::Result<BTreeSet<String>> {
     let mut words = BTreeSet::new();
-    for line in ascii(path, control)?.lines() {
+    for line in ascii(path, control, identities)?.lines() {
         control.check_io()?;
         if line.is_empty() || line.starts_with(char::is_whitespace) {
             continue;
@@ -43,8 +53,12 @@ fn index(path: &Path, control: &Control) -> io::Result<BTreeSet<String>> {
     Ok(words)
 }
 
-fn exceptions(path: &Path, control: &Control) -> io::Result<HashMap<String, BTreeSet<String>>> {
-    let text = match ascii(path, control) {
+fn exceptions(
+    path: &Path,
+    control: &Control,
+    identities: &mut Vec<DataIdentity>,
+) -> io::Result<HashMap<String, BTreeSet<String>>> {
+    let text = match ascii(path, control, identities) {
         Ok(text) => text,
         Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(HashMap::new()),
         Err(e) => return Err(e),
@@ -122,6 +136,13 @@ pub struct WordNet {
     noun_exc: HashMap<String, BTreeSet<String>>,
     verb_exc: HashMap<String, BTreeSet<String>>,
     frames: HashMap<String, BTreeSet<u32>>,
+    prepared: HashMap<String, PreparedWord>,
+}
+
+struct PreparedWord {
+    features: Features,
+    frames: BTreeSet<u32>,
+    family: String,
 }
 
 impl WordNet {
@@ -129,8 +150,15 @@ impl WordNet {
         Self::load_controlled(directory, &Control::default())
     }
     pub fn load_controlled(directory: &Path, control: &Control) -> io::Result<Self> {
+        Self::load_identified(directory, control).map(|(lex, _)| lex)
+    }
+    pub fn load_identified(
+        directory: &Path,
+        control: &Control,
+    ) -> io::Result<(Self, Vec<DataIdentity>)> {
+        let mut identities = Vec::new();
         let mut frames: HashMap<String, BTreeSet<u32>> = HashMap::new();
-        let data = match ascii(&directory.join("data.verb"), control) {
+        let data = match ascii(&directory.join("data.verb"), control, &mut identities) {
             Ok(data) => data,
             Err(e) if e.kind() == io::ErrorKind::NotFound => String::new(),
             Err(e) => return Err(e),
@@ -143,15 +171,46 @@ impl WordNet {
                 }
             }
         }
-        Ok(Self {
-            nouns: index(&directory.join("index.noun"), control)?,
-            verbs: index(&directory.join("index.verb"), control)?,
-            adjs: index(&directory.join("index.adj"), control)?,
-            advs: index(&directory.join("index.adv"), control)?,
-            noun_exc: exceptions(&directory.join("noun.exc"), control)?,
-            verb_exc: exceptions(&directory.join("verb.exc"), control)?,
+        let lex = Self {
+            nouns: index(&directory.join("index.noun"), control, &mut identities)?,
+            verbs: index(&directory.join("index.verb"), control, &mut identities)?,
+            adjs: index(&directory.join("index.adj"), control, &mut identities)?,
+            advs: index(&directory.join("index.adv"), control, &mut identities)?,
+            noun_exc: exceptions(&directory.join("noun.exc"), control, &mut identities)?,
+            verb_exc: exceptions(&directory.join("verb.exc"), control, &mut identities)?,
             frames,
-        })
+            prepared: HashMap::new(),
+        };
+        Ok((lex, identities))
+    }
+
+    /// Prepare immutable per-request lexical facts once instead of re-deriving
+    /// morphology for every permutation. Unprepared words retain the same path.
+    /// No global state or locks: the prepared corpus can still be shared read-only.
+    pub fn prepare_words<'a>(
+        &mut self,
+        words: impl IntoIterator<Item = &'a str>,
+        control: &Control,
+    ) -> Result<(), &'static str> {
+        control.check()?;
+        self.prepared.clear();
+        for raw in words {
+            control.check()?;
+            if self.prepared.len() >= 16_384 {
+                break;
+            }
+            let word = normalize_letters(raw);
+            if self.prepared.contains_key(&word) {
+                continue;
+            }
+            let value = PreparedWord {
+                features: self.features(&word),
+                frames: self.frames_for(&word),
+                family: self.morphology_family_word(&word),
+            };
+            self.prepared.insert(word, value);
+        }
+        control.check()
     }
 
     fn plural_bases(&self, word: &str) -> BTreeSet<String> {
@@ -221,6 +280,9 @@ impl WordNet {
     }
 
     pub fn morphology_family_word(&self, raw: &str) -> String {
+        if let Some(value) = self.prepared.get(raw) {
+            return value.family.clone();
+        }
         let word = normalize_letters(raw);
         if let Some(base) = self.plural_bases(&word).into_iter().next() {
             return base;
@@ -246,6 +308,9 @@ impl WordNet {
     }
 
     pub fn frames_for(&self, raw: &str) -> BTreeSet<u32> {
+        if let Some(value) = self.prepared.get(raw) {
+            return value.frames.clone();
+        }
         self.verb_base_lemmas(raw)
             .iter()
             .filter_map(|w| self.frames.get(w))
@@ -255,11 +320,18 @@ impl WordNet {
     }
 
     pub fn allows(&self, raw: &str, category: &[u32]) -> Option<bool> {
+        if let Some(value) = self.prepared.get(raw) {
+            return (!value.frames.is_empty())
+                .then(|| category.iter().any(|frame| value.frames.contains(frame)));
+        }
         let frames = self.frames_for(raw);
         (!frames.is_empty()).then(|| category.iter().any(|frame| frames.contains(frame)))
     }
 
     pub fn features(&self, raw: &str) -> Features {
+        if let Some(value) = self.prepared.get(raw) {
+            return value.features;
+        }
         let word = normalize_letters(raw);
         let noun_exact = self.nouns.contains(&word);
         let verb_exact = self.verbs.contains(&word);

@@ -1,0 +1,392 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "machine": "Windows-11-10.0.26220-SP0",
+  "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
+  "cpu": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+  "native_sha256": "0179260bb247e82345e4dfde39853adfa672fd855f7358a0bab69c08136aec4e",
+  "registry_sha256": "e99e4c3affbd5d8577c83ba93f7ecb3d200025262a1728439a9fd8a82a567735",
+  "methodology": "Serial fresh processes, alternating engine order per sample; Python workers=1; cold means fresh puzzle caches, not cold OS/corpus pages. Warm native reuses completed generation/ranking after fresh exact corpus identity checks; Python reuses generation and ranking. Elapsed time includes startup, parsing and JSON transport. Sampled summed process-tree RSS may double-count shared pages. No parallel speedup claim.",
+  "samples": 3,
+  "cases": [
+    "cli_so_cozy",
+    "cli_hi_everyone",
+    "cli_proper_name_control",
+    "shakira_control",
+    "user_testing_anagrams"
+  ],
+  "complete": true,
+  "runs": [
+    {
+      "case": "cli_so_cozy",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 1.1782713000029617,
+      "sampled_peak_rss_bytes": 73781248
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.21900800000003073,
+      "sampled_peak_rss_bytes": 39591936
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.849818899998354,
+      "sampled_peak_rss_bytes": 73560064
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.2324014999976498,
+      "sampled_peak_rss_bytes": 38674432
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.8520576000009896,
+      "sampled_peak_rss_bytes": 73637888
+    },
+    {
+      "case": "cli_so_cozy",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 2,
+      "deep_analyzed": 2,
+      "seconds": 0.33000809999794,
+      "sampled_peak_rss_bytes": 40435712
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 1.0104167999998026,
+      "sampled_peak_rss_bytes": 73543680
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.20492139999987558,
+      "sampled_peak_rss_bytes": 39284736
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 1.0983063999992737,
+      "sampled_peak_rss_bytes": 73375744
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.22546390000206884,
+      "sampled_peak_rss_bytes": 39608320
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 1.0762434999996913,
+      "sampled_peak_rss_bytes": 73576448
+    },
+    {
+      "case": "cli_hi_everyone",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 260,
+      "deep_analyzed": 260,
+      "seconds": 0.21482980000291718,
+      "sampled_peak_rss_bytes": 38379520
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 1.428419899999426,
+      "sampled_peak_rss_bytes": 73572352
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.24350389999744948,
+      "sampled_peak_rss_bytes": 39796736
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 1.4078771999993478,
+      "sampled_peak_rss_bytes": 73596928
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.21392629999900237,
+      "sampled_peak_rss_bytes": 38400000
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 1.3568101000018942,
+      "sampled_peak_rss_bytes": 73637888
+    },
+    {
+      "case": "cli_proper_name_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 724,
+      "deep_analyzed": 724,
+      "seconds": 0.21879740000076708,
+      "sampled_peak_rss_bytes": 39358464
+    },
+    {
+      "case": "shakira_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 57.86103430000003,
+      "sampled_peak_rss_bytes": 367157248
+    },
+    {
+      "case": "shakira_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 0.2024581000005128,
+      "sampled_peak_rss_bytes": 38813696
+    },
+    {
+      "case": "shakira_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 55.49336570000014,
+      "sampled_peak_rss_bytes": 367243264
+    },
+    {
+      "case": "shakira_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 0.19430800000191084,
+      "sampled_peak_rss_bytes": 40685568
+    },
+    {
+      "case": "shakira_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 56.6067890000013,
+      "sampled_peak_rss_bytes": 367071232
+    },
+    {
+      "case": "shakira_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 0.19149109999852953,
+      "sampled_peak_rss_bytes": 38858752
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 19.466423800000484,
+      "sampled_peak_rss_bytes": 258437120
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 0.19025370000235853,
+      "sampled_peak_rss_bytes": 40734720
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 19.021149100000912,
+      "sampled_peak_rss_bytes": 258228224
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 0.18810540000049514,
+      "sampled_peak_rss_bytes": 37466112
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 18.75169889999961,
+      "sampled_peak_rss_bytes": 258539520
+    },
+    {
+      "case": "user_testing_anagrams",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 6270,
+      "seconds": 0.1862055000019609,
+      "sampled_peak_rss_bytes": 39706624
+    }
+  ],
+  "summary": [
+    {
+      "case": "cli_so_cozy",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 0.8520576000009896,
+      "peak_tree_rss_bytes": 73781248
+    },
+    {
+      "case": "cli_so_cozy",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 0.2324014999976498,
+      "peak_tree_rss_bytes": 40435712
+    },
+    {
+      "case": "cli_hi_everyone",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 1.0762434999996913,
+      "peak_tree_rss_bytes": 73576448
+    },
+    {
+      "case": "cli_hi_everyone",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 0.21482980000291718,
+      "peak_tree_rss_bytes": 39608320
+    },
+    {
+      "case": "cli_proper_name_control",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 1.4078771999993478,
+      "peak_tree_rss_bytes": 73637888
+    },
+    {
+      "case": "cli_proper_name_control",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 0.21879740000076708,
+      "peak_tree_rss_bytes": 39796736
+    },
+    {
+      "case": "shakira_control",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 56.6067890000013,
+      "peak_tree_rss_bytes": 367243264
+    },
+    {
+      "case": "shakira_control",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 0.19430800000191084,
+      "peak_tree_rss_bytes": 40685568
+    },
+    {
+      "case": "user_testing_anagrams",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 19.021149100000912,
+      "peak_tree_rss_bytes": 258539520
+    },
+    {
+      "case": "user_testing_anagrams",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 0.18810540000049514,
+      "peak_tree_rss_bytes": 40734720
+    }
+  ]
+}

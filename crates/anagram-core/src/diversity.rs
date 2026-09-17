@@ -72,6 +72,23 @@ pub fn select(
     quality_core: usize,
     strength: f64,
 ) -> Result<Vec<Candidate>, &'static str> {
+    select_controlled(
+        candidates,
+        top_k,
+        quality_core,
+        strength,
+        &crate::control::Control::default(),
+    )
+}
+
+pub fn select_controlled(
+    candidates: &[Candidate],
+    top_k: usize,
+    quality_core: usize,
+    strength: f64,
+    control: &crate::control::Control,
+) -> Result<Vec<Candidate>, &'static str> {
+    control.check()?;
     if top_k == 0 || quality_core == 0 {
         return Err("retention and quality core must be positive");
     }
@@ -81,21 +98,38 @@ pub fn select(
     let limit = top_k.min(candidates.len());
     let core = quality_core.min(limit);
     if core >= limit || candidates.len() <= limit {
-        return Ok(candidates[..limit].to_vec());
+        return candidates[..limit]
+            .iter()
+            .map(|candidate| {
+                control.check()?;
+                Ok(candidate.clone())
+            })
+            .collect();
     }
-    let fingerprints: Vec<_> = candidates.iter().map(Fingerprint::new).collect();
+    let fingerprints: Vec<_> = candidates
+        .iter()
+        .map(|candidate| {
+            control.check()?;
+            Ok(Fingerprint::new(candidate))
+        })
+        .collect::<Result<_, &'static str>>()?;
     let mut selected = vec![false; candidates.len()];
     selected[..core].fill(true);
     let mut maximum = vec![0.0_f64; candidates.len()];
     for i in core..candidates.len() {
         for j in 0..core {
+            control.check()?;
             maximum[i] = maximum[i].max(fingerprints[i].similarity(&fingerprints[j]));
         }
     }
     for _ in core..limit {
-        let winner = (core..candidates.len())
-            .filter(|&i| !selected[i])
-            .min_by(|&i, &j| {
+        let mut winner: Option<usize> = None;
+        for i in core..candidates.len() {
+            control.check()?;
+            if selected[i] {
+                continue;
+            }
+            let better = winner.is_none_or(|j| {
                 let a = &candidates[i];
                 let b = &candidates[j];
                 let au = a.objective - strength * maximum[i];
@@ -103,18 +137,27 @@ pub fn select(
                 bu.total_cmp(&au)
                     .then_with(|| b.objective.total_cmp(&a.objective))
                     .then_with(|| a.order.cmp(&b.order))
-            })
-            .expect("unselected candidate exists until limit");
+                    .is_lt()
+            });
+            if better {
+                winner = Some(i);
+            }
+        }
+        let winner = winner.expect("unselected candidate exists until limit");
         selected[winner] = true;
         for i in core..candidates.len() {
+            control.check()?;
             if !selected[i] {
                 maximum[i] = maximum[i].max(fingerprints[i].similarity(&fingerprints[winner]));
             }
         }
     }
-    Ok(candidates
-        .iter()
-        .zip(selected)
-        .filter_map(|(candidate, keep)| keep.then_some(candidate.clone()))
-        .collect())
+    let mut result = Vec::with_capacity(limit);
+    for (candidate, keep) in candidates.iter().zip(selected) {
+        control.check()?;
+        if keep {
+            result.push(candidate.clone());
+        }
+    }
+    Ok(result)
 }

@@ -1,3 +1,12 @@
+# Native engine/CLI review boundary
+
+The native generation/ranking engine, contracts, cache/provenance, data tools
+and experimental model tooling are implemented in this branch. See
+`NATIVE_TOOLS.md` and `tests/reference/NATIVE_PHASE3_ACCEPTANCE.md`.
+The desktop application and Python archival are separate follow-up PRs.
+The detailed plan below preserves the earlier planning baseline; its checkboxes
+will be reconciled with the desktop implementation in the next PR.
+
 # AnagramSolver: Rust engine and shared UI plan
 
 Status: implementation in progress, 2026-09-17. Production deployment still

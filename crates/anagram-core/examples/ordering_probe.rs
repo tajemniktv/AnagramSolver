@@ -17,8 +17,14 @@ fn main() {
         } else {
             top_k
         };
-        let (orders, evaluated) =
-            ordering::rank(&words, &lex, value["exact"].as_bool().unwrap(), 32, raw_k).unwrap();
+        let (orders, evaluated) = ordering::rank(
+            &words,
+            &lex,
+            value["exact"].as_bool().unwrap(),
+            value["beam_width"].as_u64().unwrap_or(32) as usize,
+            raw_k,
+        )
+        .unwrap();
         let orders = if diverse {
             diversity::select(&orders, top_k, diversity::QUALITY_CORE, 0.12).unwrap()
         } else {

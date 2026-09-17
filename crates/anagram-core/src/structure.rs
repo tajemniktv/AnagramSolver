@@ -301,14 +301,11 @@ pub fn local_raw(words: &[String], lex: &WordNet) -> f64 {
         return total;
     }
     // Preserve the reference addition order for realized adjacencies.
-    let edges = words
-        .windows(2)
-        .map(|w| {
-            grammar::pair(&w[0], &w[1], lex)
-                + auxiliary_bonus(&w[0], &w[1], lex)
-                + construction_bonus(&w[0], &w[1], lex)
-                + validity::pair(&w[0], &w[1])
-        })
-        .sum::<f64>();
+    let edges = crate::compensated_sum(words.windows(2).map(|w| {
+        grammar::pair(&w[0], &w[1], lex)
+            + auxiliary_bonus(&w[0], &w[1], lex)
+            + construction_bonus(&w[0], &w[1], lex)
+            + validity::pair(&w[0], &w[1])
+    }));
     (total + edges) / (words.len() - 1) as f64
 }

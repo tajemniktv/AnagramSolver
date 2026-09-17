@@ -20,6 +20,16 @@ pub struct GenerateRequest {
     pub hints: Vec<String>,
     #[serde(default)]
     pub excluded: Vec<String>,
+    /// Case-insensitive regular expressions searched against normalized words.
+    #[serde(default)]
+    #[schemars(length(max = 64))]
+    pub exclude_regex: Vec<String>,
+    #[serde(default)]
+    pub short_policy: ShortPolicy,
+    #[serde(default)]
+    pub extra_short_words: Vec<String>,
+    #[serde(default)]
+    pub forbid_chars: String,
     #[schemars(range(min = 1, max = 9007199254740991_u64))]
     pub min_words: usize,
     #[schemars(range(min = 1, max = 9007199254740991_u64))]
@@ -43,6 +53,13 @@ pub struct Error {
     pub message: String,
 }
 
+#[derive(Debug, Serialize, schemars::JsonSchema)]
+pub struct ErrorResponse {
+    #[schemars(range(min = 1, max = 1))]
+    pub schema_version: u32,
+    pub error: Error,
+}
+
 impl Error {
     pub fn new(code: &'static str, message: impl Into<String>) -> Self {
         Self {
@@ -54,6 +71,7 @@ impl Error {
 
 #[derive(Serialize, schemars::JsonSchema)]
 pub struct Generated {
+    #[schemars(range(min = 1, max = 1))]
     pub schema_version: u32,
     pub kind: &'static str,
     pub engine_version: &'static str,
@@ -100,6 +118,8 @@ pub struct Validated {
     required: Vec<String>,
     hints: BTreeSet<String>,
     excluded: BTreeSet<String>,
+    forbidden: BTreeSet<char>,
+    exclude_regex: regex::RegexSet,
 }
 
 /// Validate before opening corpora so identical requests have stable errors.
@@ -139,8 +159,28 @@ pub fn validate(request: &GenerateRequest) -> Result<Validated, Error> {
     let required = words(&request.required)?;
     let mut hints: BTreeSet<_> = words(&request.hints)?.into_iter().collect();
     let excluded: BTreeSet<_> = words(&request.excluded)?.into_iter().collect();
+    let forbidden: BTreeSet<_> = normalize_letters(&request.forbid_chars).chars().collect();
+    // Bound both source size and compiled state. Linear-time matching avoids
+    // user-supplied backtracking expressions monopolizing a worker.
+    if request.exclude_regex.len() > 64
+        || request.exclude_regex.iter().map(String::len).sum::<usize>() > 16_384
+    {
+        return Err(Error::new(
+            "invalid_regex",
+            "Exclusion patterns exceed 64 patterns or 16 KiB",
+        ));
+    }
+    let exclude_regex = regex::RegexSetBuilder::new(&request.exclude_regex)
+        .case_insensitive(true)
+        .size_limit(2 * 1024 * 1024)
+        .dfa_size_limit(2 * 1024 * 1024)
+        .build()
+        .map_err(|e| Error::new("invalid_regex", e.to_string()))?;
     for word in &required {
-        if excluded.contains(word) {
+        if excluded.contains(word)
+            || exclude_regex.is_match(word)
+            || word.chars().any(|c| forbidden.contains(&c))
+        {
             return Err(Error::new(
                 "conflicting_constraints",
                 "Required word is excluded",
@@ -158,6 +198,8 @@ pub fn validate(request: &GenerateRequest) -> Result<Validated, Error> {
     let required_set: BTreeSet<_> = required.iter().cloned().collect();
     hints.retain(|word| {
         !excluded.contains(word)
+            && !exclude_regex.is_match(word)
+            && !word.chars().any(|c| forbidden.contains(&c))
             && (required_set.contains(word)
                 || remaining.subtract(Inventory::from_text(word)).is_some())
     });
@@ -173,6 +215,8 @@ pub fn validate(request: &GenerateRequest) -> Result<Validated, Error> {
         required,
         hints,
         excluded,
+        forbidden,
+        exclude_regex,
     })
 }
 
@@ -183,12 +227,61 @@ pub fn generate(
     cancel: &AtomicBool,
     deadline: Option<Instant>,
 ) -> Result<Generated, Error> {
+    generate_inner(
+        request,
+        dictionary,
+        unigrams,
+        cancel,
+        deadline,
+        &crate::control::Control::default(),
+    )
+}
+
+pub fn generate_controlled(
+    request: &GenerateRequest,
+    dictionary: impl BufRead,
+    unigrams: Option<&Unigrams>,
+    control: &crate::control::Control,
+) -> Result<Generated, Error> {
+    control
+        .check()
+        .map_err(|reason| Error::new(reason, reason))?;
+    generate_inner(
+        request,
+        dictionary,
+        unigrams,
+        control.flag(),
+        control.deadline(),
+        control,
+    )
+}
+
+fn generate_inner(
+    request: &GenerateRequest,
+    dictionary: impl BufRead,
+    unigrams: Option<&Unigrams>,
+    cancel: &AtomicBool,
+    deadline: Option<Instant>,
+    control: &crate::control::Control,
+) -> Result<Generated, Error> {
+    let check = || {
+        if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+            Err("cancelled")
+        } else if deadline.is_some_and(|d| Instant::now() >= d) {
+            Err("timed_out")
+        } else {
+            control.check()
+        }
+    };
+    check().map_err(|reason| Error::new(reason, reason))?;
     let Validated {
         normalized_input,
         remaining,
         required,
         hints,
         excluded,
+        forbidden,
+        exclude_regex,
     } = validate(request)?;
     let required_set: BTreeSet<_> = required.iter().cloned().collect();
     if request.min_zipf > 0.0 && unigrams.is_none() {
@@ -205,8 +298,15 @@ pub fn generate(
             .split_whitespace()
             .map(str::to_owned)
             .collect();
+    short_whitelist.extend(
+        request
+            .extra_short_words
+            .iter()
+            .map(|w| normalize_letters(w))
+            .filter(|w| !w.is_empty()),
+    );
     short_whitelist.extend(vocabulary.iter().filter(|w| w.len() <= 2).cloned());
-    short_whitelist.retain(|w| !excluded.contains(w));
+    short_whitelist.retain(|w| !excluded.contains(w) && !exclude_regex.is_match(w));
     let result = if remaining.is_empty() {
         let valid = required.len() >= request.min_words
             && required.len() <= request.max_words
@@ -229,14 +329,24 @@ pub fn generate(
             min_length: request.min_word_length,
             max_length: request.max_word_length,
             min_zipf: request.min_zipf,
-            short_policy: ShortPolicy::Common,
+            short_policy: request.short_policy,
             short_whitelist: short_whitelist.clone(),
             forced: hints.clone(),
             excluded,
-            forbidden: BTreeSet::new(),
+            forbidden,
         };
-        let candidates = lexicon::admit(dictionary, remaining, &policy, unigrams, |_| false)
-            .map_err(|e| Error::new("corpus_error", e.to_string()))?;
+        let candidates = lexicon::admit_checked(
+            dictionary,
+            remaining,
+            &policy,
+            unigrams,
+            |word| exclude_regex.is_match(word),
+            check,
+        )
+        .map_err(|e| match check() {
+            Err(reason) => Error::new(reason, reason),
+            Ok(()) => Error::new("corpus_error", e.to_string()),
+        })?;
         vocabulary_size = candidates.len();
         vocabulary.extend(candidates.iter().map(|c| c.word.clone()));
         let options = Options {
@@ -252,11 +362,11 @@ pub fn generate(
         generation::search(remaining, &candidates, &options, cancel, deadline)
             .map_err(|e| Error::new("invalid_search", e))?
     };
-    let bags: Vec<_> = result
-        .bags
-        .into_iter()
-        .map(|bag| required.iter().cloned().chain(bag).collect())
-        .collect();
+    let mut bags = Vec::with_capacity(result.bags.len());
+    for bag in result.bags {
+        check().map_err(|reason| Error::new(reason, reason))?;
+        bags.push(required.iter().cloned().chain(bag).collect());
+    }
     Ok(Generated {
         schema_version: 1,
         kind: "generation_only",

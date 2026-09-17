@@ -12,12 +12,32 @@
           "minimum": 0,
           "type": "integer"
         },
+        "exclude_regex": {
+          "default": [],
+          "description": "Case-insensitive regular expressions searched against normalized words.",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64,
+          "type": "array"
+        },
         "excluded": {
           "default": [],
           "items": {
             "type": "string"
           },
           "type": "array"
+        },
+        "extra_short_words": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "forbid_chars": {
+          "default": "",
+          "type": "string"
         },
         "hint_mode": {
           "$ref": "#/$defs/HintMode"
@@ -71,6 +91,10 @@
           "minimum": 1,
           "type": "integer"
         },
+        "short_policy": {
+          "$ref": "#/$defs/ShortPolicy",
+          "default": "common"
+        },
         "strategy": {
           "$ref": "#/$defs/Strategy"
         },
@@ -105,6 +129,14 @@
         "auto",
         "exact",
         "beam"
+      ],
+      "type": "string"
+    },
+    "ShortPolicy": {
+      "enum": [
+        "none",
+        "common",
+        "all"
       ],
       "type": "string"
     },
@@ -160,6 +192,10 @@
     "positive_bigrams": {
       "type": "boolean"
     },
+    "refine": {
+      "default": false,
+      "type": "boolean"
+    },
     "result_limit_per_group": {
       "format": "uint",
       "maximum": 9007199254740991,
@@ -170,6 +206,14 @@
       "format": "uint",
       "maximum": 9007199254740991,
       "minimum": 1,
+      "type": "integer"
+    },
+    "workers": {
+      "default": 1,
+      "description": "One worker by default; explicit parallelism never consumes every core implicitly.",
+      "format": "uint",
+      "maximum": 32,
+      "minimum": 0,
       "type": "integer"
     }
   },

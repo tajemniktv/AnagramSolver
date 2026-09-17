@@ -7,3 +7,9 @@ rust-version.workspace = true
 [dependencies]
 anagram-core = { path = "../anagram-core" }
 serde_json.workspace = true
+serde = { workspace = true, features = ["derive"] }
+tempfile = "3"
+flate2 = "1"
+regex = "1.13.1"
+rayon = "1.11"
+rusqlite = { version = "0.40.2", default-features = false, features = ["bundled"] }

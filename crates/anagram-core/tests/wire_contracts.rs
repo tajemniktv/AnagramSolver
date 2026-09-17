@@ -17,7 +17,8 @@ fn shared_request_and_progress_fixtures_match_rust_deserialization() {
                 .is_ok_and(|request| anagram_core::request::validate(&request).is_ok()),
             "SolveRequest" => serde_json::from_value::<Request>(value)
                 .is_ok_and(|request| anagram_core::solve::validate(&request).is_ok()),
-            "JobStatus" => serde_json::from_value::<JobStatus>(value).is_ok(),
+            "JobStatus" => serde_json::from_value::<JobStatus>(value)
+                .is_ok_and(|status| status.validate().is_ok()),
             // Output-only types are validated from actual CLI serialization by
             // the Python contract consumer, not deserialized by the engine.
             _ => continue,

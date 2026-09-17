@@ -18,24 +18,40 @@ pub struct Lexical {
 }
 
 pub fn lexical(words: &[String], unigrams: Option<&Unigrams>, short: &BTreeSet<String>) -> Lexical {
+    lexical_controlled(words, unigrams, short, &crate::control::Control::default())
+        .expect("unlimited control")
+}
+pub fn lexical_controlled(
+    words: &[String],
+    unigrams: Option<&Unigrams>,
+    short: &BTreeSet<String>,
+    control: &crate::control::Control,
+) -> Result<Lexical, &'static str> {
+    control.check()?;
     if words.is_empty() {
-        return Lexical {
+        return Ok(Lexical {
             lex_raw: 0.0,
             avg_zipf: 0.0,
             min_zipf: 0.0,
             junk_penalty: 0.0,
-        };
+        });
     }
     let mut scores: Vec<_> = words
         .iter()
-        .map(|w| unigrams.map_or(0.0, |u| u.zipf(w)))
-        .collect();
-    let avg_zipf = scores.iter().sum::<f64>() / scores.len() as f64;
-    scores.sort_by(f64::total_cmp);
+        .map(|w| {
+            control.check()?;
+            Ok(unigrams.map_or(0.0, |u| u.zipf(w)))
+        })
+        .collect::<Result<_, &'static str>>()?;
+    let avg_zipf = crate::compensated_sum(scores.iter().copied()) / scores.len() as f64;
+    control.sort_by(&mut scores, f64::total_cmp)?;
     let low_count = scores.len().min(2);
-    let low_tail = scores[..low_count].iter().sum::<f64>() / low_count as f64;
+    let low_tail = crate::compensated_sum(scores[..low_count].iter().copied()) / low_count as f64;
     let mut junk_penalty = 0.0;
+    let mut unique = HashSet::new();
     for word in words {
+        control.check()?;
+        unique.insert(word);
         if word.len() <= 2 && !short.contains(word) {
             junk_penalty += 0.75;
         }
@@ -43,14 +59,13 @@ pub fn lexical(words: &[String], unigrams: Option<&Unigrams>, short: &BTreeSet<S
             junk_penalty += 0.35;
         }
     }
-    let unique: HashSet<_> = words.iter().collect();
     junk_penalty += 1.25 * (words.len() - unique.len()) as f64;
-    Lexical {
+    Ok(Lexical {
         lex_raw: 0.78 * avg_zipf + 0.22 * low_tail - junk_penalty,
         avg_zipf,
         min_zipf: scores[0],
         junk_penalty,
-    }
+    })
 }
 
 pub struct Bigrams<'a> {
@@ -123,29 +138,47 @@ impl<'a> Bigrams<'a> {
     }
 
     pub fn pair_potential(&self, words: &[String]) -> (f64, f64) {
+        self.pair_potential_controlled(words, &crate::control::Control::default())
+            .expect("unlimited control")
+    }
+    pub fn pair_potential_controlled(
+        &self,
+        words: &[String],
+        control: &crate::control::Control,
+    ) -> Result<(f64, f64), &'static str> {
+        control.check()?;
         if words.len() <= 1 {
-            return (0.0, 0.0);
+            return Ok((0.0, 0.0));
         }
         let mut edges = Vec::new();
         for (i, left) in words.iter().enumerate() {
             for (j, right) in words.iter().enumerate() {
+                control.check()?;
                 if i != j {
                     edges.push((self.edge(left, right), self.count(left, right) > 0));
                 }
             }
         }
         // Stable ordering preserves coverage selection when scores tie.
-        edges.sort_by(|a, b| b.0.total_cmp(&a.0));
+        control.sort_by(&mut edges, |a, b| b.0.total_cmp(&a.0))?;
         let chosen = &edges[..words.len() - 1];
-        (
-            chosen.iter().map(|e| e.0).sum::<f64>() / chosen.len() as f64,
+        Ok((
+            crate::compensated_sum(chosen.iter().map(|e| e.0)) / chosen.len() as f64,
             chosen.iter().filter(|e| e.1).count() as f64 / chosen.len() as f64,
-        )
+        ))
     }
 
     /// Exact path DP with reference traversal/tie behavior. Reject oversized
     /// requests rather than allocating an exponential table without a bound.
     pub fn best_order(&self, words: &[String]) -> Result<(f64, Vec<String>, f64), &'static str> {
+        self.best_order_controlled(words, &crate::control::Control::default())
+    }
+    pub fn best_order_controlled(
+        &self,
+        words: &[String],
+        control: &crate::control::Control,
+    ) -> Result<(f64, Vec<String>, f64), &'static str> {
+        control.check()?;
         let n = words.len();
         if n <= 1 {
             return Ok((0.0, words.to_vec(), 0.0));
@@ -179,6 +212,7 @@ impl<'a> Bigrams<'a> {
             }
         }
         for mask in 1..=full {
+            control.check()?;
             for last in 0..n {
                 let Some(path) = dp[mask * n + last].clone() else {
                     continue;
@@ -216,6 +250,7 @@ impl<'a> Bigrams<'a> {
             }
         }
         let best = best.unwrap();
+        control.check()?;
         Ok((
             best.score / (n - 1) as f64,
             best.indices.iter().map(|i| words[*i].clone()).collect(),
@@ -225,25 +260,35 @@ impl<'a> Bigrams<'a> {
 }
 
 pub fn percentiles(values: &[f64]) -> Vec<f64> {
+    percentiles_controlled(values, &crate::control::Control::default()).expect("unlimited control")
+}
+pub fn percentiles_controlled(
+    values: &[f64],
+    control: &crate::control::Control,
+) -> Result<Vec<f64>, &'static str> {
+    control.check()?;
     if values.len() <= 1 {
-        return vec![1.0; values.len()];
+        return Ok(vec![1.0; values.len()]);
     }
     let mut indices: Vec<_> = (0..values.len()).collect();
-    indices.sort_by(|a, b| values[*a].total_cmp(&values[*b]));
+    control.sort_by(&mut indices, |a, b| values[*a].total_cmp(&values[*b]))?;
     let mut result = vec![0.0; values.len()];
     let mut pos = 0;
     while pos < values.len() {
+        control.check()?;
         let mut end = pos + 1;
         while end < values.len() && values[indices[end]] == values[indices[pos]] {
+            control.check()?;
             end += 1;
         }
         let rank = (pos + end - 1) as f64 / 2.0 / (values.len() - 1) as f64;
         for index in &indices[pos..end] {
+            control.check()?;
             result[*index] = rank;
         }
         pos = end;
     }
-    result
+    Ok(result)
 }
 
 pub fn morph_root(
@@ -368,7 +413,10 @@ pub fn pre_rank_controlled(
                 .map(|w| morph_root(w, vocabulary, unigrams))
                 .collect();
             family.sort();
-            let (pair_raw, pair_coverage) = bigrams.map_or((0.0, 0.0), |b| b.pair_potential(words));
+            let (pair_raw, pair_coverage) = match bigrams {
+                Some(b) => b.pair_potential_controlled(words, control)?,
+                None => (0.0, 0.0),
+            };
             Ok(PreRecord {
                 words: words.clone(),
                 matched_hints: hints
@@ -376,7 +424,7 @@ pub fn pre_rank_controlled(
                     .filter(|h| words.contains(h))
                     .cloned()
                     .collect(),
-                lexical: lexical(words, unigrams, short),
+                lexical: lexical_controlled(words, unigrams, short, control)?,
                 family,
                 family_best_lex: 0.0,
                 family_size: 1,
@@ -438,24 +486,27 @@ pub fn pre_rank_controlled(
     }
     for bucket in buckets.values() {
         control.check()?;
-        let lex = percentiles(
+        let lex = percentiles_controlled(
             &bucket
                 .iter()
                 .map(|i| records[*i].lexical.lex_raw)
                 .collect::<Vec<_>>(),
-        );
-        let fam = percentiles(
+            control,
+        )?;
+        let fam = percentiles_controlled(
             &bucket
                 .iter()
                 .map(|i| records[*i].family_best_lex)
                 .collect::<Vec<_>>(),
-        );
-        let pair = percentiles(
+            control,
+        )?;
+        let pair = percentiles_controlled(
             &bucket
                 .iter()
                 .map(|i| records[*i].pair_raw)
                 .collect::<Vec<_>>(),
-        );
+            control,
+        )?;
         for (position, index) in bucket.iter().enumerate() {
             control.check()?;
             let record = &mut records[*index];

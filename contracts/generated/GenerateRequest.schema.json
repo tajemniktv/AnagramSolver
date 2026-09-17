@@ -7,6 +7,14 @@
       ],
       "type": "string"
     },
+    "ShortPolicy": {
+      "enum": [
+        "none",
+        "common",
+        "all"
+      ],
+      "type": "string"
+    },
     "Strategy": {
       "enum": [
         "prefix",
@@ -27,12 +35,32 @@
       "minimum": 0,
       "type": "integer"
     },
+    "exclude_regex": {
+      "default": [],
+      "description": "Case-insensitive regular expressions searched against normalized words.",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 64,
+      "type": "array"
+    },
     "excluded": {
       "default": [],
       "items": {
         "type": "string"
       },
       "type": "array"
+    },
+    "extra_short_words": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "forbid_chars": {
+      "default": "",
+      "type": "string"
     },
     "hint_mode": {
       "$ref": "#/$defs/HintMode"
@@ -85,6 +113,10 @@
       "maximum": 1,
       "minimum": 1,
       "type": "integer"
+    },
+    "short_policy": {
+      "$ref": "#/$defs/ShortPolicy",
+      "default": "common"
     },
     "strategy": {
       "$ref": "#/$defs/Strategy"

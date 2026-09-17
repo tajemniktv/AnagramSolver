@@ -4,6 +4,7 @@
 use unicode_normalization::UnicodeNormalization;
 
 pub mod auxiliary;
+pub mod cache;
 pub mod clause;
 pub mod cohesion;
 pub mod comparative;
@@ -20,13 +21,15 @@ pub mod phrase;
 pub mod phrase_evidence;
 pub mod phrase_index;
 pub mod policy;
-mod progress;
+pub mod progress;
+pub mod provenance;
 pub mod ranking;
 pub mod refinement;
 pub mod request;
 pub mod scoring;
 pub mod solve;
 pub mod structure;
+pub mod training;
 pub mod validity;
 pub mod wordnet;
 
@@ -43,6 +46,21 @@ pub fn normalize_letters(text: &str) -> String {
 /// Exact letter inventory; counts are wide enough for any in-memory input.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Inventory(pub [usize; 26]);
+
+/// Neumaier accumulation for finite scoring terms, matching modern Python sum.
+pub(crate) fn compensated_sum(values: impl IntoIterator<Item = f64>) -> f64 {
+    let (mut sum, mut correction) = (0.0_f64, 0.0_f64);
+    for value in values {
+        let next = sum + value;
+        correction += if sum.abs() >= value.abs() {
+            (sum - next) + value
+        } else {
+            (value - next) + sum
+        };
+        sum = next;
+    }
+    sum + correction
+}
 
 impl Inventory {
     pub fn from_text(text: &str) -> Self {
@@ -68,6 +86,32 @@ impl Inventory {
     pub fn is_empty(self) -> bool {
         self.0.iter().all(|amount| *amount == 0)
     }
+}
+
+/// Presentation only: apostrophes never participate in letter accounting.
+pub fn format_phrase(words: &[String]) -> String {
+    words
+        .iter()
+        .map(|word| match word.as_str() {
+            "dont" => "don't",
+            "cant" => "can't",
+            "wont" => "won't",
+            "isnt" => "isn't",
+            "arent" => "aren't",
+            "wasnt" => "wasn't",
+            "werent" => "weren't",
+            "didnt" => "didn't",
+            "doesnt" => "doesn't",
+            "couldnt" => "couldn't",
+            "shouldnt" => "shouldn't",
+            "wouldnt" => "wouldn't",
+            "hasnt" => "hasn't",
+            "havent" => "haven't",
+            "hadnt" => "hadn't",
+            _ => word,
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 #[cfg(test)]

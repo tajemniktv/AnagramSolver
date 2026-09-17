@@ -1,0 +1,92 @@
+{
+  "reference_commit": "c12e3d5519d653fd65c7ffbbb2a1597941fedd2a",
+  "machine": "Windows-11-10.0.26220-SP0",
+  "python": "3.14.6 (tags/v3.14.6:c63aec6, Jun 10 2026, 10:26:10) [MSC v.1944 64 bit (AMD64)]",
+  "cpu": "AMD64 Family 25 Model 33 Stepping 2, AuthenticAMD",
+  "native_sha256": "4a0f53cc065f64824c3abf8f28c621b19414f91ccfd4d35656f3211b04901631",
+  "registry_sha256": "e99e4c3affbd5d8577c83ba93f7ecb3d200025262a1728439a9fd8a82a567735",
+  "methodology": "Serial fresh processes, alternating engine order per sample; Python workers=1; cold means fresh puzzle caches, not cold OS/corpus pages. Warm native reuses ranking only; Python reuses generation and ranking. Elapsed time includes startup, parsing and JSON transport. Sampled summed process-tree RSS may double-count shared pages. No parallel speedup claim.",
+  "samples": 3,
+  "cases": [
+    "shakira_control"
+  ],
+  "complete": true,
+  "runs": [
+    {
+      "case": "shakira_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 45.94878149999931,
+      "sampled_peak_rss_bytes": 367366144
+    },
+    {
+      "case": "shakira_control",
+      "sample": 0,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 1.7683251999987988,
+      "sampled_peak_rss_bytes": 93671424
+    },
+    {
+      "case": "shakira_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 62.363653699998395,
+      "sampled_peak_rss_bytes": 367329280
+    },
+    {
+      "case": "shakira_control",
+      "sample": 1,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 1.2532874000025913,
+      "sampled_peak_rss_bytes": 93790208
+    },
+    {
+      "case": "shakira_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "cold",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 52.96681729999909,
+      "sampled_peak_rss_bytes": 367505408
+    },
+    {
+      "case": "shakira_control",
+      "sample": 2,
+      "engine": "native",
+      "mode": "warm",
+      "generated": 100000,
+      "deep_analyzed": 11951,
+      "seconds": 2.1047806999995373,
+      "sampled_peak_rss_bytes": 95989760
+    }
+  ],
+  "summary": [
+    {
+      "case": "shakira_control",
+      "engine": "native",
+      "mode": "cold",
+      "median_seconds": 52.96681729999909,
+      "peak_tree_rss_bytes": 367505408
+    },
+    {
+      "case": "shakira_control",
+      "engine": "native",
+      "mode": "warm",
+      "median_seconds": 1.7683251999987988,
+      "peak_tree_rss_bytes": 95989760
+    }
+  ]
+}

@@ -13,6 +13,8 @@ import anagram_rerank_topk_impl as reference
 import anagram_auxiliary_grammar as auxiliary
 from anagram_order_diversity import raw_pool_size, select_diverse_orders
 from scoring import close
+from anagram_suite import cases_for
+from anagram_benchmark import tokens
 
 
 def main():
@@ -27,10 +29,15 @@ def main():
     cases += [dict(words=p.split(),exact=exact,top_k=k,diverse=True)
               for p in phrases if len(p.split()) >= 4
               for exact in (True,False) for k in (48,64,72)]
+    registry = cases_for("ordering")
+    cases += [dict(words=tokens(str(case["answer"])),
+                   exact=len(tokens(str(case["answer"]))) <= 6,
+                   top_k=50, beam_width=256, diverse=True, registry_id=case["id"])
+              for case in registry]
     expected=[]
     for case in cases:
         k=case.get("top_k",8)
-        orders,evaluated=reference.rank_orders(case["words"],lex,order_mode="exact" if case["exact"] else "beam",beam_width=32,top_k=raw_pool_size(k) if case.get("diverse") else k)
+        orders,evaluated=reference.rank_orders(case["words"],lex,order_mode="exact" if case["exact"] else "beam",beam_width=case.get("beam_width",32),top_k=raw_pool_size(k) if case.get("diverse") else k)
         if case.get("diverse"): orders=select_diverse_orders(orders,k)
         expected.append(dict(orders=[asdict(order) for order in orders],evaluated=evaluated))
     subprocess.run(["cargo","build","--locked","--example","ordering_probe"],cwd=ROOT,check=True)
@@ -40,7 +47,11 @@ def main():
     assert len(actual)==len(expected)
     for case,got,want in zip(cases,actual,expected):
         try: close(got,want)
-        except AssertionError as error: raise AssertionError((case,error)) from error
+        except AssertionError as error:
+            destination=ROOT/".codex/temp/ordering-mismatch.json"
+            destination.parent.mkdir(parents=True,exist_ok=True)
+            destination.write_text(json.dumps(dict(case=case,actual=got,expected=want),indent=2),encoding="utf-8")
+            raise AssertionError((case,error,str(destination))) from error
     print(f"Retained-order pool parity passed: {len(cases)} exact/beam cases")
 
 

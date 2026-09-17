@@ -17,9 +17,13 @@ export type Counts = {
 
 export type DataIdentity = {
   "bytes": number;
+  "present": boolean;
+  "representation": DataRepresentation;
   "role": string;
   "sha256": string;
 };
+
+export type DataRepresentation = "file_bytes" | "phrase_rows_v1";
 
 export type EffectiveBudgets = {
   "candidate_limit"?: number | null;
@@ -42,6 +46,7 @@ export type Stage = "queued" | "loading_corpora" | "generating" | "preparing" | 
 
 export type Versions = {
   "data": Array<DataIdentity>;
+  "data_complete": boolean;
   "engine": string;
   "ranking": string;
 };

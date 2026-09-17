@@ -1,6 +1,7 @@
 import type { GenerateRequest } from './generated/GenerateRequest.js';
 import type { SolveRequest } from './generated/SolveRequest.js';
 import type { JobStatus } from './generated/JobStatus.js';
+import type { SolveResult } from './generated/SolveResult.js';
 
 const generation = {
   schema_version: 1, text: 'ate', min_words: 1, max_words: 3,
@@ -22,3 +23,8 @@ const missing: SolveRequest = { generation };
 // @ts-expect-error Terminal states use the shared exact spelling.
 const invalidState: JobStatus['state'] = 'timeout';
 void [solve, invalid, missing, invalidState];
+// Result map values must stay typed even though their JSON keys are numeric strings.
+const score: SolveResult['buckets'][string][number]['final'] = 12.5;
+// @ts-expect-error Scores must not disappear into an untyped map.
+const badScore: SolveResult['buckets'][string][number]['final'] = '12.5';
+void [score, badScore];

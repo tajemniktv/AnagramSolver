@@ -25,6 +25,12 @@ def typescript(schema):
     if kind=="object":
         fields=[f"  {json.dumps(k)}{'' if k in schema.get('required',[]) else '?'}: {typescript(v)};" for k,v in sorted(schema.get("properties",{}).items())]
         additional=schema.get("additionalProperties",True)
+        patterns=schema.get("patternProperties",{})
+        if patterns:
+            if set(patterns)!={r"^\d+$"}:raise ValueError(f"Unsupported schema key patterns: {patterns}")
+            # TypeScript cannot express an arbitrary key regex. Preserve the
+            # value type; JSON Schema remains authoritative for numeric keys.
+            fields.append(f"  [key: string]: {typescript(patterns[r'^\d+$'])};")
         if additional is not False:fields.append(f"  [key: string]: {typescript(additional)};")
         return "{\n"+"\n".join(fields)+"\n}"
     raise ValueError(f"Unsupported schema node: {schema}")
