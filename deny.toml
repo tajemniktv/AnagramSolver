@@ -1,0 +1,8 @@
+# This gate covers the shipped Windows desktop/CLI graph, not future Linux packaging.
+# See apps/desktop/DEPENDENCIES.md before changing the supported target set.
+[graph]
+targets = ["x86_64-pc-windows-msvc"]
+
+[advisories]
+db-path = ".codex/temp/advisory-dbs"
+ignore = []

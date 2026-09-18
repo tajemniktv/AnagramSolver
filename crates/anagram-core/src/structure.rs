@@ -58,10 +58,11 @@ pub fn passive_tail(words: &[String], lex: &WordNet) -> (f64, usize) {
     if words.is_empty() {
         return (0.96, 0);
     }
-    if words[0] == "by" && words.len() > 1 {
-        if let Some((end, _)) = phrase::starting_at(words, 1, lex, true) {
-            return (0.99, passive_adverbs(words, end + 1, lex));
-        }
+    if words[0] == "by"
+        && words.len() > 1
+        && let Some((end, _)) = phrase::starting_at(words, 1, lex, true)
+    {
+        return (0.99, passive_adverbs(words, end + 1, lex));
     }
     let consumed = passive_adverbs(words, 0, lex);
     if consumed > 0 {

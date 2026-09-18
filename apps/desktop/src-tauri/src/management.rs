@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use std::{
     ffi::OsString,
     fs,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufReader, Read, Write},
     path::Path,
     time::Duration,
 };
@@ -127,10 +127,9 @@ pub fn validate(c: &Corpora, model: &str, control: &Control) -> Result<Value, St
     ] {
         let mut valid = 0_u64;
         let mut ignored = 0_u64;
-        for line in control
-            .reader(BufReader::new(fs::File::open(path).map_err(error)?))
-            .lines()
-        {
+        for line in anagram_core::lexicon::decoded_lines(
+            control.reader(BufReader::new(fs::File::open(path).map_err(error)?)),
+        ) {
             let line = line.map_err(error)?;
             let fields: Vec<_> = line.split_whitespace().collect();
             let accepted = if tokens == 0 {
@@ -451,6 +450,25 @@ mod tests {
             2
         );
         fs::write(&c.dictionary, "").unwrap();
+        assert!(validate(&c, "", &control).is_err());
+    }
+    #[test]
+    fn validation_uses_the_same_malformed_utf8_policy_as_loaders() {
+        let temp = scratch();
+        let input = temp.path().join("source");
+        sources(&input);
+        let control = Control::default();
+        let prepared =
+            prepare(temp.path(), input.to_str().unwrap(), false, false, &control).unwrap();
+        let c: Corpora = serde_json::from_value(prepared["corpora"].clone()).unwrap();
+        fs::write(&c.dictionary, b"a\xff\n").unwrap();
+        fs::write(&c.unigrams, b"a\t1\xff00\n").unwrap();
+        fs::write(&c.bigrams, b"a a\t1\xff0\n").unwrap();
+        let report = validate(&c, "", &control).unwrap();
+        for role in ["dictionary", "unigrams", "bigrams"] {
+            assert_eq!(report["text_rows"][role]["usable_rows"], 1);
+        }
+        fs::write(&c.unigrams, b"a\t-10\n").unwrap();
         assert!(validate(&c, "", &control).is_err());
     }
     #[test]

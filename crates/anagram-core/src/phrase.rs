@@ -61,47 +61,47 @@ pub fn ending_at(words: &[String], head: usize, lex: &WordNet) -> Option<(usize,
         modifiers += 1;
         previous = i.checked_sub(1);
     }
-    if let Some(i) = previous {
-        if let Some(class) = determiner(&words[i]) {
-            start = i;
-            coherence += match class {
-                Class::DetPl => {
-                    if hf.noun_plural {
-                        0.24
-                    } else if hf.noun_singular {
-                        -0.35
-                    } else {
-                        0.0
-                    }
+    if let Some(i) = previous
+        && let Some(class) = determiner(&words[i])
+    {
+        start = i;
+        coherence += match class {
+            Class::DetPl => {
+                if hf.noun_plural {
+                    0.24
+                } else if hf.noun_singular {
+                    -0.35
+                } else {
+                    0.0
                 }
-                Class::DetSg => {
-                    if hf.noun_singular {
-                        0.20
-                    } else if hf.noun_plural {
-                        -0.35
-                    } else {
-                        0.0
-                    }
+            }
+            Class::DetSg => {
+                if hf.noun_singular {
+                    0.20
+                } else if hf.noun_plural {
+                    -0.35
+                } else {
+                    0.0
                 }
-                Class::Article => {
-                    if ["a", "an"].contains(&words[i].as_str()) && hf.noun_plural {
-                        -0.45
-                    } else {
-                        0.15
-                    }
+            }
+            Class::Article => {
+                if ["a", "an"].contains(&words[i].as_str()) && hf.noun_plural {
+                    -0.45
+                } else {
+                    0.15
                 }
-                Class::NumDet => {
-                    if words[i] == "one" {
-                        if hf.noun_plural { -0.20 } else { 0.12 }
-                    } else if hf.noun_plural {
-                        0.12
-                    } else {
-                        0.02
-                    }
+            }
+            Class::NumDet => {
+                if words[i] == "one" {
+                    if hf.noun_plural { -0.20 } else { 0.12 }
+                } else if hf.noun_plural {
+                    0.12
+                } else {
+                    0.02
                 }
-                _ => 0.10,
-            };
-        }
+            }
+            _ => 0.10,
+        };
     }
     Some((start, coherence.clamp(0.0, 1.0)))
 }
@@ -196,11 +196,10 @@ pub fn starting_at(
         && words
             .get(end + 1)
             .is_some_and(|w| ["of", "for", "with"].contains(&w.as_str()))
+        && let Some((embedded_end, embedded_coherence)) = starting_at(words, end + 2, lex, false)
     {
-        if let Some((embedded_end, embedded_coherence)) = starting_at(words, end + 2, lex, false) {
-            end = embedded_end;
-            coherence = (coherence + 0.08 * embedded_coherence).min(1.0);
-        }
+        end = embedded_end;
+        coherence = (coherence + 0.08 * embedded_coherence).min(1.0);
     }
     Some((end, coherence.clamp(0.0, 1.0)))
 }

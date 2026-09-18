@@ -1,0 +1,47 @@
+name: desktop validation
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows-desktop:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.codex/temp/desktop-build
+      CARGO_BUILD_JOBS: '2'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        with:
+          node-version: '24'
+      - run: npm install --global pnpm@11.25.0
+      - name: Install the declared minimum Rust toolchain
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal --component clippy
+          rustup default 1.88.0
+      - name: Frozen dependencies, Svelte checks, frontend and release host build (no installation)
+        run: pwsh -NoProfile -File tools/build-desktop.ps1 -TestOnly -KeepBuildCache
+      - name: Frontend asynchronous state regressions
+        run: node --test tools/test-desktop-ui.cjs
+      - name: Installer preflight and rollback integration
+        run: pwsh -NoProfile -File tools/test-desktop-installation.ps1
+      - run: cargo test --locked -p tajs-anagrams
+      - run: cargo clippy --locked -p tajs-anagrams --all-targets -- -D warnings
+  windows-dependency-advisories:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.codex/temp/deny-build
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal
+      - run: cargo +stable install cargo-deny --version 0.20.2 --locked --root .codex/temp/deny-runtime
+      - name: Check the supported Windows graph against current RustSec advisories
+        run: .codex/temp/deny-runtime/bin/cargo-deny --locked check advisories --warn unmaintained

@@ -336,11 +336,11 @@ pub fn base_structure(words: &[String], lex: &WordNet) -> Structure {
         .filter(|w| phrase::determiner(&w[0]).is_some() && phrase::determiner(&w[1]).is_some())
         .count() as f64;
     let mut candidates = Vec::new();
-    if let Some((end, quality)) = comparative(words, 0, lex) {
-        if end == n - 1 {
-            let norm = (0.84 + 0.13 * quality).min(0.97);
-            candidates.push(structure(norm, 0.78, 1.0, 0.75, "comparative"));
-        }
+    if let Some((end, quality)) = comparative(words, 0, lex)
+        && end == n - 1
+    {
+        let norm = (0.84 + 0.13 * quality).min(0.97);
+        candidates.push(structure(norm, 0.78, 1.0, 0.75, "comparative"));
     }
     for (i, token) in words.iter().enumerate() {
         if function_class(token) != Some(Class::BeAux) || i == 0 || i + 1 >= n {
@@ -476,11 +476,11 @@ pub fn base_structure(words: &[String], lex: &WordNet) -> Structure {
         norm = (norm - 0.22 * collisions).clamp(0.0, 1.0);
         candidates.push(structure(norm, valency, coverage, agree, "clause"));
     }
-    if let Some((end, coherence)) = phrase::starting_at(words, 0, lex, true) {
-        if end == n - 1 {
-            let norm = (0.70 + 0.20 * coherence - 0.22 * collisions).clamp(0.0, 0.90);
-            candidates.push(structure(norm, 0.60, 1.0, 0.70, "noun-phrase"));
-        }
+    if let Some((end, coherence)) = phrase::starting_at(words, 0, lex, true)
+        && end == n - 1
+    {
+        let norm = (0.70 + 0.20 * coherence - 0.22 * collisions).clamp(0.0, 0.90);
+        candidates.push(structure(norm, 0.60, 1.0, 0.70, "noun-phrase"));
     }
     if lex.features(&words[0]).verb_base && function_class(&words[0]).is_none() {
         let (valency, consumed) = tail(&words[0], &words[1..], lex);

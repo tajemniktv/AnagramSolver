@@ -90,6 +90,36 @@ fn experimental_training_publishes_small_model_without_enabling_it_and_joins_on_
     assert!(inner.experiment.error.is_some());
     assert_eq!(fs::read_dir(app.data.join("models")).unwrap().count(), 2);
 }
+
+#[test]
+fn invalid_optimizer_limits_are_rejected_before_starting_work() {
+    let temp = scratch();
+    let app = Desktop::new(temp.path().join("settings")).unwrap();
+    for (learning_rate, l2) in [
+        (0.0, 0.0),
+        (1.01, 0.0),
+        (f64::NAN, 0.0),
+        (0.08, -1.0),
+        (0.08, 1.01),
+        (0.08, f64::INFINITY),
+    ] {
+        let error = app
+            .train_model_options(
+                "does-not-exist.json".into(),
+                anagram_core::training::Options {
+                    learning_rate,
+                    l2,
+                    ..Default::default()
+                },
+            )
+            .unwrap_err();
+        assert!(error.contains("learning rate"));
+        let inner = app.inner.lock().unwrap();
+        assert!(!inner.experiment.active);
+        assert!(inner.worker.is_none());
+        assert!(!app.data.join("models").exists());
+    }
+}
 #[test]
 fn installed_corpora_defaults_and_legacy_migration_preserve_custom_paths() {
     let temp = scratch();

@@ -8,24 +8,30 @@
   let learningRate = $state(0.08); let l2 = $state(0.002); let retainedOrders = $state(56); let phraseBonus = $state(10);
   let items = $state(''); let rankingReport = $state<Record<string, unknown> | null>(null);
   let status = $state<TrainingStatus | null>(null); let error = $state(''); let cancelling = $state(false);
-  let timer: ReturnType<typeof setTimeout>; let disposed = false;
+  let timer: ReturnType<typeof setTimeout>; let disposed = false; let revision = 0;
+  function begin() {
+    if(busy || disposed) return false;
+    ++revision; clearTimeout(timer); busy = true; error = ''; cancelling = false; status = null;
+    return true;
+  }
   async function browse(kind: 'model' | 'training') { try { const path = await bridge.choose(kind); if(path) { if(kind === 'model') model = path; else dataset = path; } } catch(e) { error = message(e); } }
   async function refresh() {
     if(disposed) return;
-    try { const next = await bridge.maintenanceStatus(); if(disposed) return; busy = next.active;
+    const current = ++revision;
+    try { const next = await bridge.maintenanceStatus(); if(disposed || current !== revision) return; busy = next.active;
       status = {active:next.active,error:next.error,report:next.report?.model_path ? next.report as unknown as TrainingStatus['report'] : null};
       if(next.report?.dataset_path) { dataset = String(next.report.dataset_path); buildReport = next.report; }
       if(next.report?.indices) rankingReport = next.report;
       if(next.active) timer = setTimeout(refresh, 300); else cancelling = false; }
-    catch(e) { error = message(e); if(busy) timer = setTimeout(refresh, 1000); }
+    catch(e) { if(disposed || current !== revision) return; error = message(e); if(busy) timer = setTimeout(refresh, 1000); }
   }
   async function train(event: SubmitEvent) {
-    event.preventDefault(); if(busy) return; busy = true; error = ''; cancelling = false;
-    try { await bridge.train(dataset, epochs, folds, learningRate, l2); await refresh(); } catch(e) { error = message(e); busy = false; }
+    event.preventDefault(); if(!begin()) return;
+    try { await bridge.train(dataset, epochs, folds, learningRate, l2); await refresh(); } catch(e) { if(disposed) return; error = message(e); busy = false; }
   }
   async function cancel() { try { await bridge.cancelTraining(); cancelling = true; } catch(e) { error = message(e); } }
-  async function build() { busy = true; error = ''; buildReport = null; try { await bridge.manage({kind:'build_training',cases,corpora:$state.snapshot(corpora),options:{retained_orders:retainedOrders,phrase_bonus_max:phraseBonus}}); await refresh(); } catch(e) { error = message(e); busy = false; } }
-  async function rank() { busy = true; error = ''; rankingReport = null; try { await bridge.manage({kind:'rank_model',model,items}); await refresh(); } catch(e) { error = message(e); busy = false; } }
+  async function build() { if(!begin()) return; buildReport = null; try { await bridge.manage({kind:'build_training',cases,corpora:$state.snapshot(corpora),options:{retained_orders:retainedOrders,phrase_bonus_max:phraseBonus}}); await refresh(); } catch(e) { if(disposed) return; error = message(e); busy = false; } }
+  async function rank() { if(!begin()) return; rankingReport = null; try { await bridge.manage({kind:'rank_model',model,items}); await refresh(); } catch(e) { if(disposed) return; error = message(e); busy = false; } }
   async function browseItems() { try { items = await bridge.choose('training') ?? items; } catch(e) { error = message(e); } }
   async function browseCases() { try { cases = await bridge.choose('training') ?? cases; } catch(e) { error = message(e); } }
   async function openReport() {
@@ -55,7 +61,7 @@
     <label>Prepared training dataset<div class="path-field"><input required bind:value={dataset} placeholder="Choose a local groups JSON file"/><button type="button" class="icon" aria-label="Browse training dataset" onclick={() => browse('training')}><FolderOpen size={18}/></button></div></label>
     <div class="pair"><label>Epochs<input type="number" required min="1" max="200" step="1" bind:value={epochs}/></label><label>Validation folds<input type="number" required min="2" max="10" step="1" bind:value={folds}/></label></div>
     <button type="submit" disabled={!dataset}>Train and evaluate locally</button>
-    <div class="pair"><label>Learning rate<input required type="number" min="0.000001" step="any" bind:value={learningRate}/></label><label>L2 regularization<input required type="number" min="0" step="any" bind:value={l2}/></label></div>
+    <div class="pair"><label>Learning rate<input required type="number" min="0.000001" max="1" step="any" bind:value={learningRate}/></label><label>L2 regularization<input required type="number" min="0" max="1" step="any" bind:value={l2}/></label></div>
   </fieldset>
 </form>
 {#if busy}<p class="hint" role="status">{cancelling ? 'Cancellation requested; waiting for the worker to stop…' : 'Building or evaluating examples locally…'}</p><button disabled={cancelling} onclick={cancel}>Cancel</button>{/if}

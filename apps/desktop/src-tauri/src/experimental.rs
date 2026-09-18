@@ -42,6 +42,15 @@ impl Desktop {
         if !(1..=200).contains(&epochs) || !(2..=10).contains(&folds) {
             return Err("Experimental training allows 1–200 epochs and 2–10 folds".into());
         }
+        if !options.learning_rate.is_finite()
+            || !(0.000001..=1.0).contains(&options.learning_rate)
+            || !options.l2.is_finite()
+            || !(0.0..=1.0).contains(&options.l2)
+        {
+            return Err(
+                "Experimental training requires learning rate 0.000001–1 and L2 0–1".into(),
+            );
+        }
         let directory = self.data.join("models");
         self.operation(60, move |control| {
             train(Path::new(&dataset), &directory, &options, control)

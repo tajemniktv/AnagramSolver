@@ -126,6 +126,24 @@ utilities remain offline; they are not silently added to the default pipeline.
 
 ## Verification
 
+Windows desktop CI runs the non-installing `tools/build-desktop.ps1 -TestOnly`
+pipeline (frozen dependencies, Svelte checks, frontend production build and release
+host), desktop Rust tests and Clippy on Rust 1.88, plus
+`node --test tools/test-desktop-ui.cjs` and
+`pwsh -NoProfile -File tools/test-desktop-installation.ps1`.
+The latter uses isolated fake installations and injects migration, copy and startup
+failures; it never changes the real installed app. Dependency policy and outstanding
+upstream constraints are documented in [DEPENDENCIES.md](DEPENDENCIES.md).
+
+Installation preflights legacy/current path conflicts, redirected paths and staged
+leftovers before stopping the app or moving files. Migration, provisioning,
+executable rotation and shortcut publication share a reverse-order rollback journal.
+Settings are snapshotted before startup, which can rewrite relocated corpus paths.
+Synchronous failure restores the previous managed files and paths; the previous application
+can then be launched again. Recovery snapshots/journals remain under the project's
+`.codex/temp/desktop-install-*` on failure. Process termination or power loss requires
+manual recovery from that journal; this is not a crash-atomic filesystem transaction.
+
 `pnpm --dir apps/desktop check`, `cargo test -p tajs-anagrams`, and
 `cargo clippy -p tajs-anagrams --all-targets -- -D warnings`.
 Installed-window tests must separately exercise real solving, cancel, missing

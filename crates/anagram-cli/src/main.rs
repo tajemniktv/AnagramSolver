@@ -98,10 +98,10 @@ fn run() -> Result<serde_json::Value, Error> {
     };
     let control = limits.control(&control)?;
     let result = run_inner(&args, &control, &limits, progress, cache.as_ref());
-    if result.is_err() {
-        if let Err(reason) = control.check() {
-            return Err(Error::new(reason, reason));
-        }
+    if result.is_err()
+        && let Err(reason) = control.check()
+    {
+        return Err(Error::new(reason, reason));
     }
     result
 }
@@ -140,10 +140,10 @@ fn run_inner(
     if progress && !ranked {
         return Err(Error::new("usage", "--progress currently applies to solve"));
     }
-    if let Some(command) = args.first().and_then(|a| a.to_str()) {
-        if utilities::is_command(command) {
-            return utilities::run(args, control);
-        }
+    if let Some(command) = args.first().and_then(|a| a.to_str())
+        && utilities::is_command(command)
+    {
+        return utilities::run(args, control);
     }
     if !(ranked && (5..=7).contains(&args.len())
         || !ranked && (args.len() == 2 || args.len() == 3) && args[0] == "generate")
